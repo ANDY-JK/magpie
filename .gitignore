@@ -7,3 +7,9 @@
 /magpie-dev-backend
 /magpie-dev.new
 /internal/update/launcher-*.com
+
+# 本地 agent 会话的钩子状态与快照（46 MB，本机产物）
+/.mimosa/
+
+# 历史测试的遗留物（隔离配置、旧截图、旧打包），可整体删除
+/_scratch-*/
