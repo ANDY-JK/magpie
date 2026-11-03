@@ -1716,8 +1716,9 @@ result for every request: who went first, and why.
    of a window (100% In order). *Stays: Strict* does, and asks no other:
    the conversation stays on its account, resting, spent or past its cap,
    and its errors go to the agent.
-   With *Stays: Session* or *Strict* under Smart, Least used first or
-   Use before expiry, a new conversation goes to the account the fewest other
+   With *Stays: Session* or *Strict* under Smart, Least used first,
+   Use before expiry or Balanced, a new conversation goes to the account the
+   fewest other
    conversations of the last 30 minutes are on (of those not resting and
    under 90%), so sessions side by side each keep an account of their own;
    a Claude Code subagent goes with its session's account.
@@ -1726,9 +1727,11 @@ So routing decides who goes first only for a conversation nobody has
 answered yet. An account that has used 90% goes behind the others for new
 conversations, but a conversation already on it stays there until 98%.
 
-**The routings.** Smart, Least used first and Use before expiry go by the share
+**The routings.** Smart, Least used first, Use before expiry and Balanced go
+by the share
 used of the fullest window that counts the model, the 5-hour window
-included. Smart and Use before expiry put an account behind the others once a
+included. Smart, Use before expiry and Balanced put an account behind the
+others once a
 window is at 90% or more, and behind those once one is at 98% or more,
 each of these groups ordered by the share used.
 
@@ -1786,6 +1789,30 @@ each of these groups ordered by the share used.
   among them the one magpie sent the fewest tokens lately goes first. A
   Claude account not known goes first once, as in Smart; another unknown
   account counts as a fresh week.
+- **Balanced**: what Use before expiry weighs, with how each has answered
+  lately. The account or key with the highest pace goes first, those
+  within a tenth of it going as alike, as in Use before expiry. Of those
+  alike, one that has failed since it last answered goes behind those
+  that answered since, the one failing most last, so one that keeps
+  failing is asked again only when the others can't answer; and a
+  provider whose accounts or keys in the pool keep failing goes behind a
+  provider whose don't, by how many of them are — a vendor that refuses
+  magpie refuses its accounts alike, so the ones it happened to pick are
+  enough to find out. One whose replies would take more than four times
+  the pool's fastest goes behind the rest of its band as well: a channel
+  up but crawling gives way to one that works. Those still alike are
+  taken in turn by their weight and what magpie sent each lately (half of
+  it stops counting after an hour): one weighing 3 carries three times
+  the tokens of one weighing 1 between turns, so none is used up while
+  the others sit idle — two subscriptions that renew together would
+  otherwise have the first drained before the second is tried
+  (OpenCode Go's two plans). A key that reads no window has no pace and
+  keeps its place behind the subscriptions, as in Use before expiry.
+  Price isn't weighed: Cheapest first is for that. The Routing page says
+  why: "Balanced: opencode-go#2 has the most of its allowance left per
+  hour until it is lost — 82% left, resets in 5 days", or "Balanced:
+  k1 answered since, and k2 failed since they last did, so it goes
+  first."
 - **Speed first**: the account, key or group member that answered this
   model fastest lately first. magpie keeps, in memory, how long each one's
   streamed answers took to their first token and how many tokens a second
@@ -1836,6 +1863,7 @@ depends on the routing:
 | Smart | Only between accounts whose windows all renew in the same hours, or whose shares used are equal. |
 | Least used first | Only between accounts with the same share used and the same tokens sent lately. |
 | Use before expiry | Only between accounts in the same pace band that magpie sent the same tokens lately, in practice none since magpie started. |
+| Balanced | Only between accounts in the same pace band that have failed as often lately and been sent as many tokens for their weight, in practice none since magpie started. |
 | Speed first | Only between those within a tenth of each other's speed, and among those not measured lately. |
 | Cheapest first | Only between those that cost the same now, and among those with no known price. |
 

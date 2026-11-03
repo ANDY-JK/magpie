@@ -95,6 +95,36 @@ func byLeft(seats []Seat, before func(a, b Seat) bool) func(i, j int) int {
 // wallets of two kinds keep between them (byLeft).
 func fewerTokens(a, b Seat) bool { return a.Tokens < b.Tokens }
 
+// paceBands is the pace of each seat as a band, the highest pace in band 0:
+// seats within a tenth of the top of their band are in it, and the next
+// below starts the band after. Drawn from each band's highest down, so that
+// sorting by them is consistent — "within a tenth of each other" alone is
+// not, three paces a twelfth apart each going round in a circle. Only the
+// seats a pace orders are drawn — those with room that aren't learning —
+// and a seat that isn't is in band 0, which its order doesn't read.
+func paceBands(seats []Seat) []int {
+	var byPace []int
+	for i, s := range seats {
+		if seatTier(s) == 0 && !s.Learns {
+			byPace = append(byPace, i)
+		}
+	}
+	sort.SliceStable(byPace, func(a, b int) bool { return seats[byPace[a]].Pace > seats[byPace[b]].Pace })
+	band, top := make([]int, len(seats)), 0.0
+	for k, i := range byPace {
+		if p := seats[i].Pace; k == 0 || p < 0.9*top {
+			top = p
+			if k > 0 {
+				band[i] = band[byPace[k-1]] + 1
+				continue
+			}
+		} else {
+			band[i] = band[byPace[k-1]]
+		}
+	}
+	return band
+}
+
 func identity(n int) []int {
 	idx := make([]int, n)
 	for i := range idx {
@@ -357,31 +387,13 @@ var LeastUsed = Strategy{ByUse: true, Order: func(_ string, seats []Seat) []int 
 // reset about to run out by itself goes by the hours until then when that
 // is sooner (Allowance.Pace, #717).
 var Pace = Strategy{ByUse: true, Order: func(_ string, seats []Seat) []int {
-	// the bands of pace alike within a tenth, the highest first: drawn
-	// before sorting, from each band's highest down, so that sorting by
-	// them is consistent — "within a tenth of each other" alone is not,
-	// three paces a twelfth apart each going round in a circle. Drawn among
+	// the bands of pace alike within a tenth, the highest first, drawn
+	// from each band's highest down, so that sorting by them is
+	// consistent — "within a tenth of each other" alone is not, three
+	// paces a twelfth apart each going round in a circle. Drawn among
 	// those the pace orders alone — one running low would otherwise set a
 	// band's top and part two alike behind it
-	var byPace []int
-	for i, s := range seats {
-		if seatTier(s) == 0 && !s.Learns {
-			byPace = append(byPace, i)
-		}
-	}
-	sort.SliceStable(byPace, func(a, b int) bool { return seats[byPace[a]].Pace > seats[byPace[b]].Pace })
-	band, top := make([]int, len(seats)), 0.0
-	for k, i := range byPace {
-		if p := seats[i].Pace; k == 0 || p < 0.9*top {
-			top = p
-			if k > 0 {
-				band[i] = band[byPace[k-1]] + 1
-				continue
-			}
-		} else {
-			band[i] = band[byPace[k-1]]
-		}
-	}
+	band := paceBands(seats)
 	left := byLeft(seats, fewerTokens)
 	idx := identity(len(seats))
 	sort.SliceStable(idx, func(a, b int) bool {
@@ -510,6 +522,7 @@ var Builtin = map[string]Strategy{
 	provider.Rotate:    Rotate,
 	provider.LeastUsed: LeastUsed,
 	provider.Pace:      Pace,
+	provider.Balanced:  Balanced,
 	provider.Weighted:  Weighted,
 	provider.FreeFirst: FreeFirst,
 	provider.Fastest:   Fastest,

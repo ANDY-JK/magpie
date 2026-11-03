@@ -205,7 +205,7 @@ func TestCreditsFirstOfTheSpent(t *testing.T) {
 		{Key: "low", Used: 92, Credits: true},
 		{Key: "fine", Used: 20},
 	}
-	for name, st := range map[string]Strategy{"smart": Smart, "pace": Pace, "least used": LeastUsed} {
+	for name, st := range map[string]Strategy{"smart": Smart, "pace": Pace, "least used": LeastUsed, "balance": Balanced} {
 		if got := keys(s, Apply(st, "p", s)); !slices.Equal(got, []string{"fine", "low", "credits", "spent"}) {
 			t.Errorf("%s: %v", name, got)
 		}

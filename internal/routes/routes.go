@@ -5,8 +5,8 @@
 // failover itself; a Strategy only says the order.
 //
 // Smart, the default, is the core's. The others a provider or group can be
-// routed by (order, rotate, usage, pace, weight, free, fast, cheap,
-// drain) are here for a plugin to
+// routed by (order, rotate, usage, pace, balance, weight, free, fast,
+// cheap, drain) are here for a plugin to
 // register: plugins/rotation does, and off, a pool routed by one of them is
 // tried in its listed order, as an unknown routing always was.
 package routes
@@ -43,6 +43,16 @@ type Seat struct {
 	Pace float64
 	// Weight is its key's weight, at least 1
 	Weight int
+	// Vendor is the provider the seat belongs to: a pool's seats are one,
+	// and the heads of a group's members are each its own. Balanced weighs
+	// what a vendor's seats have done lately together, the rest of a pool
+	// against them (a vendor refusing magpie refuses its accounts alike).
+	Vendor string
+	// Failures is how many times in a row it has failed since it last
+	// answered, as the gateway counts them: 0 for one that answered last,
+	// and one that failed while it rested counted once. Balanced puts it
+	// behind those that have answered since.
+	Failures int
 	// Resting: it rests after a failure now
 	Resting bool
 	// Spent: it rests because it is out of quota or credit, not for a

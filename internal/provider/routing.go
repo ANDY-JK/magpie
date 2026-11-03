@@ -26,6 +26,12 @@ const (
 	Rotate    = "rotate"
 	LeastUsed = "usage"
 	Pace      = "pace"
+	// Balanced weighs a pool together: what each seat would lose at its
+	// reset, how it has answered lately and how its vendor's other seats
+	// have, and what magpie has sent each against its weight, so that no
+	// seat is used up while the others idle and one that keeps failing is
+	// asked again only when the others can't answer (routes.Balanced).
+	Balanced = "balance"
 	// Weighted spreads a provider's requests over its keys by each key's
 	// weight (KeyAccount.Weight, #841), or a subscription's over its
 	// accounts by each account's (AccountWeights), smoothly: 3 and 1 go
@@ -54,6 +60,20 @@ const (
 
 // pluginRouting is a routing a plugin serves: "<plugin>/<name>".
 var pluginRouting = regexp.MustCompile(`^[A-Za-z0-9._-]+/[A-Za-z0-9][A-Za-z0-9._-]*$`)
+
+// keptRouting says whether a provider's or a group's file keeps routing as
+// it is: one magpie serves, or one a plugin does ("<plugin>/<name>"), a
+// group's Cheapest first and Manual among them. Anything else is read as
+// Smart ("") instead.
+func keptRouting(routing string, group bool) bool {
+	switch routing {
+	case "", Ordered, Rotate, LeastUsed, Pace, Balanced, Weighted, FreeFirst, Fastest, Drain:
+		return true
+	case Cheapest, Manual:
+		return group
+	}
+	return PluginRouting(routing)
+}
 
 // PluginRouting says whether routing is one a plugin serves,
 // "<plugin>/<name>" (a JS gateway plugin's strategies). providers.json

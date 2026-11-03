@@ -298,11 +298,14 @@ type Weighed struct {
 	Unit   string  `json:"unit,omitempty"`
 	// Balance is a prepaid wallet's left in Unit (left.bal, #3950): the
 	// Routing page tells the figure, not a share
-	Balance  *float64          `json:"balance,omitempty"`
-	Renews   []time.Time       `json:"renews,omitempty"`   // when those windows renew, the biggest first
-	Pace     float64           `json:"pace,omitempty"`     // remaining allowance per hour until its window resets
-	Due      *time.Time        `json:"due,omitempty"`      // when the allowance window used for pace resets
-	Tokens   float64           `json:"tokens,omitempty"`   // least used: tokens it served lately
+	Balance *float64    `json:"balance,omitempty"`
+	Renews  []time.Time `json:"renews,omitempty"` // when those windows renew, the biggest first
+	Pace    float64     `json:"pace,omitempty"`   // remaining allowance per hour until its window resets
+	Due     *time.Time  `json:"due,omitempty"`    // when the allowance window used for pace resets
+	Tokens  float64     `json:"tokens,omitempty"` // least used: tokens it served lately
+	// Fails: how many times in a row it has failed since it last answered
+	// (routes.Seat.Failures), which Balanced puts it behind the others for
+	Fails    int               `json:"fails,omitempty"`
 	Free     bool              `json:"free,omitempty"`     // its model costs nothing there (free first)
 	LateTTFT float64           `json:"lateTtft,omitempty"` // speed first: its ms to the first token lately, 0 if not measured (speed.go)
 	LateTPS  float64           `json:"lateTps,omitempty"`  // speed first: its tokens a second lately, 0 if not told
@@ -556,6 +559,7 @@ func weighed(c candidate, p provider.Provider, wg weighing, fallback bool, from 
 	if wg.tokens != nil {
 		w.Tokens = wg.tokens[c.rest]
 	}
+	w.Fails = wg.fails[c.rest]
 	if wg.free != nil {
 		w.Free = wg.free[c.rest]
 	}

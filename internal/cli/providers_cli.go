@@ -42,8 +42,11 @@ const providerUsage = `usage:
                                           compaction=native asks the provider Codex's own compaction and hands
                                           Codex its sealed item as it came (a Responses API, a ChatGPT account,
                                           Copilot), compaction=magpie, the default, has magpie summarise
-                                          routing=smart|order|rotate|usage|pace|weight|free|fast|drain spreads requests
-                                          over its keys or accounts (fast: the one that answered fastest lately first;
+                                          routing=smart|order|rotate|usage|pace|balance|weight|free|fast|drain spreads requests
+                                          over its keys or accounts (balance: what each would lose at its reset, how
+                                          each has answered lately and how its provider's others have, and what was
+                                          sent each, so none is used up while the others idle; fast: the one that
+                                          answered fastest lately first;
                                           drain: one until it is used up, then the next, never back to an earlier one);
                                           prompt=as-written sends Antigravity the system prompt exactly as written;
                                           prompt=default, the default, breaks up the lines Google answers with a
@@ -1248,7 +1251,7 @@ func applyPairs(p *provider.Provider, pairs []string) error {
 			if r == provider.Manual || r == provider.Cheapest {
 				// cheap: its keys and accounts all bill the provider's one
 				// price, so there is nothing to weigh
-				return fmt.Errorf("routing=%s is a group's: a provider's keys or accounts are routed smart, order, rotate, usage, pace, weight, free, fast or drain", r)
+				return fmt.Errorf("routing=%s is a group's: a provider's keys or accounts are routed smart, order, rotate, usage, pace, balance, weight, free, fast or drain", r)
 			}
 			p.Routing = r
 		case "icon":

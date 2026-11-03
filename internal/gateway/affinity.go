@@ -924,7 +924,7 @@ func spreadsSessions(mode, routing string) bool {
 		return false
 	}
 	switch routingOf(routing) {
-	case "", provider.LeastUsed, provider.Pace:
+	case "", provider.LeastUsed, provider.Pace, provider.Balanced:
 		return true
 	}
 	return false

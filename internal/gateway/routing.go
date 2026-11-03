@@ -1962,6 +1962,11 @@ type weighing struct {
 	// restID (a group's heads can be two models on one key): filled only
 	// when the routing weighs by it (routes.Strategy.ByPrice)
 	price map[string]seatPrice
+
+	// fails is how many times in a row each seat has failed since it last
+	// answered, by rest key, for those that have (routes.Seat.Failures):
+	// nil when none has
+	fails map[string]int
 }
 
 // seatPrice is a seat's price at the request's time, as Cheapest weighed
@@ -2116,7 +2121,14 @@ func weighRouted(p provider.Provider, cs []candidate, model string, from provide
 		}
 		seats[i] = routes.Seat{Key: c.rest, Account: c.p.Account != nil, Known: known, Learns: learns(c, wg.lefts),
 			Used: l.used, Soon: l.soon, Lapse: l.lapse, Pace: pace, Weight: keyWeight(c), Resting: resting(c), Tokens: routed.used[c.restKey()].now(now), Credits: l.credits, First: l.first,
+			Vendor: c.p.ID, Failures: max(routed.failures[c.restKey()], routed.failures[c.restID()]),
 			Left: l.bal, LeftIn: l.balIn, Spent: spentRest(c)}
+		if f := seats[i].Failures; f > 0 {
+			if wg.fails == nil {
+				wg.fails = map[string]int{}
+			}
+			wg.fails[c.rest] = f
+		}
 	}
 	routed.Unlock()
 	if st.ByUse {
