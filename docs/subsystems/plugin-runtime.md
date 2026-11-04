@@ -57,6 +57,23 @@ plugins' scripts and `app.js`, all classic scripts sharing one scope. It is
   `title` is the page's header (English; `show` translates it).
   `magpie.pages()` adds the plugins' pages to the views `show` and
   `?view=` know.
+- **A page that comes with its script.** A page whose code is heavy is
+  declared before it: `magpie.lazy(key, {plugin, title, loads, scripts})`
+  in `assets/pages.js`, whose scripts it reads from index.html's lazyPages
+  template (that naming is what gives each its `?v=`, `api.go`). Its
+  `<main class="view">` is in the window at once, so the sidebar, `show`
+  and `?view=` have it and its title is known, and its script, markup and
+  hooks come the first time a hook asks for the page — `open` when `show`
+  opens it, or `magpie.ready(key)`. One fetch per page however many ask,
+  the view saying it is loading until then, and a script that never
+  registers its page goes through the error boundary. Such a page must be
+  self-contained: nothing of the window's may call what its script defines
+  before it has run (app.js asks a page's `dirty` with `=== true`, since a
+  page whose script hasn't come answers with a promise). Sessions and
+  Library are declared this way. Routing is not: its script hands the tray
+  panel, Usage's Requests and the context card what they draw with
+  (`panelRoutingShown`, `kindName`, `swapWhy`, `routedWhy`,
+  `purposeOptions`, `openRoute`), so it loads with the window.
 - **Words.** A plugin's `i18n.js` calls `magpie.strings({zh, "zh-TW", ja,
   de})`, added to i18n.js's `I18N` before app.js translates anything. A key
   already there is logged and not taken. `tests/strings.cjs` reads them as
@@ -90,9 +107,10 @@ stream's events or its reply), which Usage's ledger and Routing's trace
 call too; every plugin's scripts load whether it is on or off. Still in
 app.js and app.css: its styles, its sidebar and header buttons
 (`data-feature="gateway"` in index.html), and `decideEntry`, which the model
-info card shares. `TestBuiltinClientsLoaded` holds index.html to load every
-plugin's `Client` script between kernel.js and app.js, and its stylesheet in
-the head, each with its `?v=`.
+info card shares. `TestBuiltinClientsLoaded` holds index.html to name
+every plugin's `Client` script — loaded between kernel.js and app.js, or in
+the lazyPages template when its page is one pages.js declares — and its
+stylesheet in the head, each with its `?v=`.
 
 ## Pages moved out (P2)
 

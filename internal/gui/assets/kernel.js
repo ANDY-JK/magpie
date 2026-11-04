@@ -12,9 +12,16 @@
 // register at once, so its page is in the page before app.js looks for
 // it, but run nothing of app.js's then: mount runs at magpie.start, which
 // app.js calls once it is set up.
+//
+// A page whose code is heavy may be declared ahead of it instead
+// (magpie.lazy, pages.js): the page is in the window from the start — the
+// sidebar lists it, its view is here for show() to hide and show — and
+// its script, markup and hooks come the first time the reader opens it.
 (() => {
   const plugins = new Map(); // id → { id, config, onConfig: [], disposers: [] }
-  const pages = new Map(); // key → { plugin, part, main, mounted, broken }
+  // key → { plugin, part, main, mounted, broken, lazy, loading }: lazy
+  // holds a shell's scripts until they have run, then is null
+  const pages = new Map();
   let started = false;
 
   function context(p) {
@@ -39,9 +46,16 @@
 
   function add(p, slot, part) {
     if (slot !== "page") throw new Error(`no slot ${slot}`);
-    if (!/^[a-z][a-z0-9-]*$/.test(part.key || "") || pages.has(part.key) || document.getElementById("view-" + part.key)) {
-      throw new Error(`page ${part.key} is taken`);
+    if (!/^[a-z][a-z0-9-]*$/.test(part.key || "")) throw new Error(`page ${part.key} is not a name`);
+    const shell = pages.get(part.key);
+    if (shell) {
+      // the page this plugin declared ahead of its script (magpie.lazy):
+      // the markup and hooks are here now, and the page was drawn empty
+      if (!shell.lazy || shell.plugin.id !== p.id) throw new Error(`page ${part.key} is taken`);
+      fill(shell, p, part);
+      return;
     }
+    if (document.getElementById("view-" + part.key)) throw new Error(`page ${part.key} is taken`);
     const main = document.createElement("main");
     main.className = "view";
     main.id = "view-" + part.key;
@@ -55,6 +69,65 @@
     const page = { plugin: p, part, main, mounted: false, broken: null };
     pages.set(part.key, page);
     if (started) run(page, "mount", [main]);
+  }
+
+  // lazy is a page declared before its script (pages.js): its view is in
+  // the window at once, so the sidebar and show() have it, and its script
+  // comes the first time it is asked for anything.
+  function lazy(key, spec) {
+    if (!/^[a-z][a-z0-9-]*$/.test(key || "") || pages.has(key) || document.getElementById("view-" + key)) {
+      throw new Error(`page ${key} is taken`);
+    }
+    const main = document.createElement("main");
+    main.className = "view";
+    main.id = "view-" + key;
+    main.hidden = true;
+    main.dataset.feature = spec.plugin;
+    const anchor = document.querySelector('template[data-slot="page"]');
+    if (anchor) anchor.before(main);
+    else document.body.append(main);
+    // what the shell says of itself is what app.js reads before the page
+    // has drawn: its title, and a page drawn from the providers list
+    pages.set(key, { plugin: { id: spec.plugin }, part: { key, title: spec.title, loads: spec.loads },
+      main, mounted: false, broken: null, lazy: spec.scripts || [] });
+  }
+
+  // fill is a page's script registering the page its shell declared.
+  function fill(page, p, part) {
+    page.plugin = p;
+    page.part = part;
+    page.lazy = null;
+    page.main.innerHTML = part.html || "";
+    window.magpie?.fillSlots?.(page.main);
+    window.translateStatic?.();
+    page.main.classList.remove("loading");
+    page.main.removeAttribute("aria-busy");
+    if (started) run(page, "mount", [page.main]);
+  }
+
+  // load brings in a shell's scripts, one after another, each registering
+  // the page (fill) as it runs; asked once, however many hooks ask.
+  function load(page) {
+    if (page.loading) return page.loading;
+    page.main.classList.add("loading");
+    page.main.setAttribute("aria-busy", "true");
+    const done = (page.lazy || []).reduce((p, src) => p.then(() => script(src)), Promise.resolve());
+    page.loading = done
+      .then(() => { if (page.lazy) throw new Error(`no page ${page.part.key} from its scripts`); })
+      .catch((err) => { if (!page.broken) fail(page, "mount", [], err); })
+      .then(() => { page.loading = null; });
+    return page.loading;
+  }
+
+  // script is one file, brought in and run.
+  function script(src) {
+    return new Promise((ran, no) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = ran;
+      s.onerror = () => no(new Error(`${src} did not load`));
+      document.head.append(s);
+    });
   }
 
   // The error boundary: a hook that throws (or whose promise fails) is
@@ -103,6 +176,11 @@
 
   function run(page, hook, args) {
     if (page.broken) return undefined;
+    // a page whose script hasn't come: bring it in, then ask again — mount
+    // goes with it, the page not being drawn before its markup is here
+    if (page.lazy) {
+      return load(page).then(() => (page.broken || page.lazy ? undefined : run(page, hook, args)));
+    }
     if (hook === "mount") {
       if (page.mounted) return undefined;
       page.mounted = true;
@@ -239,7 +317,19 @@
     start() {
       if (started) return;
       started = true;
-      for (const page of pages.values()) run(page, "mount", [page.main]);
+      // a shell's mount is its script's, and comes with it, when the page
+      // is first opened: mounting every page here would bring in every
+      // script at start, which is what declaring them ahead of time avoids
+      for (const page of pages.values()) if (!page.lazy) run(page, "mount", [page.main]);
+    },
+    // a page declared before its script (pages.js): key, and
+    // { plugin, title, loads, scripts }
+    lazy,
+    // the page is here, its script run: for a test or a caller that must
+    // wait for it rather than ask a hook
+    ready(key) {
+      const page = pages.get(key);
+      return page && page.lazy ? load(page).then(() => !page.lazy) : Promise.resolve(true);
     },
     // a page's hook, behind the boundary; nothing for a page no plugin has
     call(key, hook, ...args) {

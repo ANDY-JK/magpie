@@ -7627,7 +7627,7 @@ async function cancelEdit(keep) {
   return true;
 }
 window.addEventListener("beforeunload", (e) => {
-  if (providerDirty() || magpie.call("routing", "dirty") || ((view === "library" || importing || importingApps) && modalFormDirty())) {
+  if (providerDirty() || magpie.call("routing", "dirty") === true || ((view === "library" || importing || importingApps) && modalFormDirty())) {
     e.preventDefault();
     e.returnValue = "";
   }
@@ -23167,11 +23167,13 @@ async function show(v) {
       if (view === "library" && modalFormDirty() && !(await confirmDiscard())) return false;
       if (view === "library") magpie.call("library", "close"); else closeModal();
     }
-    if (view === "routing" && magpie.call("routing", "dirty")) {
+    // a page whose script hasn't come yet says nothing of unsaved work:
+    // asking for it gives a promise, not that page's answer (kernel.js)
+    if (view === "routing" && magpie.call("routing", "dirty") === true) {
       if (!(await confirmDiscard())) return false;
       magpie.call("routing", "discard");
     }
-    if (view === "library" && magpie.call("library", "dirty")) {
+    if (view === "library" && magpie.call("library", "dirty") === true) {
       if (!(await confirmDiscard())) return false;
       magpie.call("library", "discard");
     }

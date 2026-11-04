@@ -542,13 +542,13 @@
      all -->
 <script src="i18n.js"></script>
 <script src="kernel.js"></script>
-<!-- the built-in plugins' own scripts (pluginrt.Manifest.Client) -->
+<!-- the built-in plugins' own scripts (pluginrt.Manifest.Client), and the
+     heavy pages' declared ahead of theirs (pages.js): a page's script comes
+     when the reader first opens it -->
 <script src="plugins/gateway/keys.js"></script>
 <script src="plugins/gateway/client.js"></script>
 <script src="plugins/sessions/i18n.js"></script>
-<script src="plugins/sessions/client.js"></script>
 <script src="plugins/library/i18n.js"></script>
-<script src="plugins/library/client.js"></script>
 <script src="plugins/routing/i18n.js"></script>
 <script src="plugins/routing/client.js"></script>
 <script src="plugins/usage/i18n.js"></script>
@@ -556,6 +556,16 @@
 <script src="plugins/redact/i18n.js"></script>
 <script src="plugins/redact/client.js"></script>
 <script src="plugins/otel/i18n.js"></script>
+<!-- the pages pages.js opens on the reader's first visit, named here so
+     each is asked for by its content's hash, as the page's own scripts are
+     (api.go, versionedPage): a cache in front of `magpie web` that kept an
+     older version's client.js would run it under the new page. A
+     template's scripts never run. -->
+<template id="lazyPages">
+  <script src="plugins/sessions/client.js" data-page="sessions"></script>
+  <script src="plugins/library/client.js" data-page="library"></script>
+</template>
+<script src="pages.js"></script>
 <script src="purposes.js"></script>
 <script src="app.js"></script>
 <script src="plugins.js"></script>
