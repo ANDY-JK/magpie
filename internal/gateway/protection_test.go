@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/yetone/magpie/internal/provider"
 )
@@ -71,6 +72,11 @@ func restingNow(t *testing.T) []string {
 // backend as it came only with native compaction on (#2582); off, magpie
 // summarises it, as TestProtectionRefusedCompactionAsText's model is.
 func TestProtectionRefusalAskedOnceNobodyRests(t *testing.T) {
+	// the refusal is the answer's status, which a keepalive written while
+	// the request was held takes away: past the 200 the refusal can only be
+	// the stream's own event, right in itself and not what this asks — a
+	// machine slow enough to hold the request past the gap answered so
+	keepFast(t, time.Hour, keepaliveEvery, keepaliveLongest)
 	for _, said := range []string{
 		`{"error":{"message":"response protection is unavailable","type":"server_error"}}`,
 		`{"detail":"response protection is unavailable"}`,
