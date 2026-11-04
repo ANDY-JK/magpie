@@ -118,6 +118,11 @@ func (t *phaseTidy) write(b []byte) []byte {
 // an event that hasn't ended, moved to buf's front so the next write
 // appends into the same bytes. What event gives may be its ev, a slice of
 // buf, so it is copied out before buf is written again.
+//
+// Chat's mender (chatTidy.lines) splits by line rather than by event and
+// keeps its own loop: it gates the whole buffer through needs once, which
+// one event at a time would lose, and that gate is what keeps a mended
+// stream from paying a decode on every line.
 func tidyEvents(buf []byte, event func(ev []byte) []byte) (out, rest []byte) {
 	at := 0
 	for {

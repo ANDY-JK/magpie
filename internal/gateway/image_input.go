@@ -76,7 +76,7 @@ func walkImages(proto provider.Protocol, body []byte, swap func(imageAt) (json.R
 	case provider.Gemini:
 		turnsKey, contentKey = "contents", "parts"
 	}
-	if !anyImageTurn(proto, body, turnsKey, contentKey) {
+	if !hasImageTurn(proto, body) {
 		// Most requests have no image, and this walk runs several times
 		// on each: decoding every turn and block cost ~2.6 MB for each
 		// 1.5 MB conversation (yg6888 on X), and the request's top level
@@ -126,6 +126,21 @@ func walkImages(proto provider.Protocol, body []byte, swap func(imageAt) (json.R
 	}
 	request[turnsKey], _ = json.Marshal(turns)
 	return json.Marshal(request)
+}
+
+// hasImageTurn is anyImageTurn for proto's own keys, its walk kept while
+// the body is held (scanOf): walkImages asks it before its walk, and
+// hasImage, textOnlyBody and the vision checks walk the same body several
+// times as a request is served.
+func hasImageTurn(proto provider.Protocol, body []byte) bool {
+	turnsKey, contentKey := "messages", "content"
+	switch proto {
+	case provider.Responses:
+		turnsKey = "input"
+	case provider.Gemini:
+		turnsKey, contentKey = "contents", "parts"
+	}
+	return scanOf(proto, body, scanImage, func() bool { return anyImageTurn(proto, body, turnsKey, contentKey) })
 }
 
 // anyImageTurn is whether body may hold a block walkImages gives to swap:

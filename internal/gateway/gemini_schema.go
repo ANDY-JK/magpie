@@ -39,7 +39,7 @@ import (
 // which takes JSON Schema whole, and Antigravity its own cut-down schema
 // (plainSchema), so a Gemini-shaped body isn't walked.
 func geminiToolTypes(body []byte) []byte {
-	if !geminiNamed(gjson.GetBytes(body, "model").String()) {
+	if !geminiNamed(topString(body, "model")) {
 		return body
 	}
 	body = geminiSchemaShapes(body)

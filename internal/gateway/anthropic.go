@@ -524,17 +524,23 @@ func claudeVersionOf(model string) (major, minor int, ok bool) {
 // asked for unless the request names its own display. A provider that
 // refuses display has it taken out after (withoutRefusedShapes).
 func adaptiveThinking(body []byte) []byte {
-	th := gjson.GetBytes(body, "thinking")
-	if th.Get("type").String() != "enabled" || !adaptiveOnly(gjson.GetBytes(body, "model").String()) {
+	// the top-level member from the body's split top level (topMember),
+	// which doesn't walk a long conversation to find it missing; the
+	// reading inside it is gjson's, as before
+	th, found, ok := topMember(body, "thinking")
+	if !ok || !found {
+		return body
+	}
+	if getIn(th, "type").String() != "enabled" || !adaptiveOnly(topString(body, "model")) {
 		return body
 	}
 	thinking := map[string]any{"type": "adaptive", "display": "summarized"}
-	if d := th.Get("display"); d.Exists() {
+	if d := getIn(th, "display"); d.Exists() {
 		thinking["display"] = d.Value()
 	}
 	fields := map[string]any{"thinking": thinking}
 	if gjson.GetBytes(body, "output_config.effort").String() == "" {
-		if e := effortOfBudget(int(th.Get("budget_tokens").Int())); e != "" {
+		if e := effortOfBudget(int(getIn(th, "budget_tokens").Int())); e != "" {
 			if e == "xhigh" {
 				e = "max" // a budget can't tell xhigh from max (budgetOf), and 4.6 has no xhigh
 			}
@@ -624,11 +630,18 @@ func thinkingOffOf(model string) thinkingOff {
 // body names none, the request path's. Any other request, other vendors'
 // models' and older Claudes' included, goes byte for byte as it came.
 func thinkingOffAsTaken(body []byte, path string) []byte {
-	t := gjson.GetBytes(body, "thinking.type").String()
+	// the top-level member from the body's split top level (topMember),
+	// which doesn't walk a long conversation to find it missing; the
+	// reading inside it is gjson's, as before
+	th, found, ok := topMember(body, "thinking")
+	var t string
+	if ok && found {
+		t = getIn(th, "type").String()
+	}
 	if t != "disabled" && t != "between_tools" {
 		return body
 	}
-	model := gjson.GetBytes(body, "model").String()
+	model := topString(body, "model")
 	if model == "" {
 		model = path
 	}

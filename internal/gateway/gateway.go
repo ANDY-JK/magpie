@@ -8410,6 +8410,12 @@ func modelOf(body []byte) string {
 // Claude Code in (packy) takes a body with its fields sorted and its < and >
 // escaped, as re-encoding leaves it, for one tampered with (#179).
 func rewriteModel(body []byte, model string) []byte {
+	// every request that reaches here with the name it already has goes
+	// without a walk: the member is read from the body's split top level
+	// (topMember), where gjson walked to it through the conversation
+	if v, found, ok := topMember(body, "model"); ok && found && jsonStringIs(v, model) {
+		return body
+	}
 	v := gjson.GetBytes(body, "model")
 	if v.Type == gjson.String && v.Str == model {
 		return body

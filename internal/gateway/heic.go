@@ -74,8 +74,15 @@ var heicWait = 30 * time.Second
 var heicEncode = encodeHEIC
 
 // mayHoldHEIC is whether the body may have a HEIC in it: an image/heic or
-// image/heif type, or the base64 of an HEVC still's ftyp.
+// image/heif type, or the base64 of an HEVC still's ftyp. The walk is kept
+// while the body is held (scanOf), so a second ask of the same bytes is
+// free.
 func mayHoldHEIC(body []byte) bool {
+	return scanOf(provider.Chat, body, scanHEIC, func() bool { return holdsHEIC(body) })
+}
+
+// holdsHEIC is the walk itself; the answer is the same in every protocol.
+func holdsHEIC(body []byte) bool {
 	if bytes.Contains(body, []byte("image/hei")) || bytes.Contains(body, []byte(`image\/hei`)) {
 		return true
 	}

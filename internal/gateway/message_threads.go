@@ -2,8 +2,6 @@ package gateway
 
 import (
 	"net/http"
-
-	"github.com/tidwall/gjson"
 )
 
 // Claude Code's Message Threads (the message-threads-2026-08-12 beta):
@@ -32,8 +30,8 @@ const threadUnsupportedCode = "thread_unsupported_request"
 // "thread" that is not null, of any type, create as well as continue (a
 // create would be followed by continues).
 func namesThread(body []byte) bool {
-	t := gjson.GetBytes(body, "thread")
-	return t.Exists() && t.Type != gjson.Null
+	v, found, ok := topMember(body, "thread")
+	return ok && found && string(v) != "null"
 }
 
 // refuseThread answers a request that names a thread as Anthropic's API

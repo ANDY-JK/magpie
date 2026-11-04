@@ -54,14 +54,14 @@ func isServerReviewBeta(b string) bool { return strings.HasPrefix(b, serverRevie
 // no model (the model in Bedrock's path), or goes to Anthropic's own API,
 // is Claude's.
 func (s *Server) serverReview(p provider.Provider, asked []string, body []byte) ([]string, []byte) {
-	model := gjson.GetBytes(body, "model").String()
+	model := topString(body, "model")
 	claude := model == "" || AutoModeReviewed(p, model)
 	if !claude {
 		asked = slices.DeleteFunc(slices.Clone(asked), isServerReviewBeta)
 	}
 	betas := s.betas(p, asked)
 	if !claude || slices.ContainsFunc(asked, isServerReviewBeta) && !slices.ContainsFunc(betas, isServerReviewBeta) {
-		if gjson.GetBytes(body, "safeguards").Exists() {
+		if _, found, ok := topMember(body, "safeguards"); ok && found {
 			body = withoutFields(body, "safeguards")
 		}
 	}
