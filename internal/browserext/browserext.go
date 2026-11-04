@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // ID is the extension's ID in every Chromium browser, fixed by the public
@@ -68,10 +70,6 @@ func Write(dir, gatewayURL string) error {
 		if old, err := os.ReadFile(to); err == nil && bytes.Equal(old, b) {
 			return nil
 		}
-		tmp := to + ".tmp"
-		if err := os.WriteFile(tmp, b, 0o644); err != nil {
-			return err
-		}
-		return os.Rename(tmp, to)
+		return steady.WriteFile(to, b, 0o644)
 	})
 }

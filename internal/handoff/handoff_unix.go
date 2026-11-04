@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // Offer is a socket waiting to be handed to the new magpie.
@@ -72,13 +74,7 @@ func Open(dir, exe string) (*Offer, error) {
 	}
 	o := &Offer{dir: tmp, pointer: filepath.Join(dir, pointerName), ln: ln}
 	b, _ := json.Marshal(pointer{PID: os.Getpid(), Sock: sock, Exe: exe, At: time.Now()})
-	part := o.pointer + ".tmp"
-	if err := os.WriteFile(part, b, 0o600); err != nil {
-		o.Close()
-		return nil, err
-	}
-	if err := os.Rename(part, o.pointer); err != nil {
-		os.Remove(part)
+	if err := steady.WriteFile(o.pointer, b, 0o600); err != nil {
 		o.Close()
 		return nil, err
 	}

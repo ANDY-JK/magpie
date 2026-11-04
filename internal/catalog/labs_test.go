@@ -1,13 +1,17 @@
 package catalog
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // The catalogs as models.dev serves them on 10-27, cut to Claude: its
@@ -165,5 +169,46 @@ func TestSyncKeepsLabs(t *testing.T) {
 	}
 	if Stale() {
 		t.Error("stale after the labs came")
+	}
+}
+
+// A lab catalog is flushed to the disk before it is renamed over the one
+// kept: a flush that fails leaves the old catalog as it was and no temp
+// file beside it (#1505). Written straight over, as before steady.WriteFile,
+// the old catalog would be gone with nothing to replace it.
+func TestSyncLabsFlushesBeforeRenaming(t *testing.T) {
+	labs, _ := os.ReadFile(claudeLabs10_27)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/models.json" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Write(labs)
+	}))
+	defer srv.Close()
+	useCatalogs(t, "", "")
+	was := modelsDevURL
+	modelsDevURL = srv.URL + "/api.json"
+	t.Cleanup(func() { modelsDevURL = was; labsTried.Store(false) })
+
+	if err := syncLabs(context.Background()); err != nil {
+		t.Fatalf("first sync: %v", err)
+	}
+	kept, err := os.ReadFile(LabsPath())
+	if err != nil || !bytes.Equal(kept, labs) {
+		t.Fatalf("labs written = %d bytes, %v", len(kept), err)
+	}
+
+	defer func() { steady.Sync = (*os.File).Sync }()
+	steady.Sync = func(*os.File) error { return errors.New("the disk went away") }
+	if err := syncLabs(context.Background()); err == nil {
+		t.Fatal("a lab catalog that couldn't be flushed reported as written")
+	}
+	now, err := os.ReadFile(LabsPath())
+	if err != nil || !bytes.Equal(now, kept) {
+		t.Fatalf("a failed flush changed the labs to %d bytes, %v", len(now), err)
+	}
+	if left, _ := filepath.Glob(filepath.Join(filepath.Dir(LabsPath()), "."+filepath.Base(LabsPath())+".*")); len(left) > 0 {
+		t.Fatalf("a failed flush left %v", left)
 	}
 }

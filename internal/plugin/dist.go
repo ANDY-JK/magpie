@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/source"
+	"github.com/yetone/magpie/internal/steady"
 	"github.com/yetone/magpie/internal/update"
 )
 
@@ -335,20 +336,8 @@ func installDist(ctx context.Context, bun, name, version string) error {
 		return err
 	}
 	file := path.Base(v.File)
-	tmp, err := os.CreateTemp(dir, file+".*")
-	if err != nil {
+	if err := steady.WriteFile(filepath.Join(dir, file), b, 0o600); err != nil {
 		return err
-	}
-	_, werr := tmp.Write(b)
-	if cerr := tmp.Close(); werr == nil {
-		werr = cerr
-	}
-	if werr == nil {
-		werr = os.Rename(tmp.Name(), filepath.Join(dir, file))
-	}
-	if werr != nil {
-		os.Remove(tmp.Name())
-		return werr
 	}
 	return bunAdd(ctx, bun, "./dist/"+file)
 }

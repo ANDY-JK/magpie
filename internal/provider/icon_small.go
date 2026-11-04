@@ -14,6 +14,7 @@ import (
 	_ "golang.org/x/image/webp"
 
 	"github.com/yetone/magpie/internal/appdir"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // iconSide is the longest side, in pixels, of a picture the window is sent.
@@ -63,16 +64,7 @@ func IconServed(name string) (path, ctype string) {
 	if err := os.MkdirAll(smallIconDir(), 0o755); err != nil {
 		return f, ""
 	}
-	tmp, err := os.CreateTemp(smallIconDir(), ".small-*")
-	if err != nil {
-		return f, ""
-	}
-	_, werr := tmp.Write(b)
-	if cerr := tmp.Close(); werr == nil {
-		werr = cerr
-	}
-	if werr != nil || os.Rename(tmp.Name(), small) != nil {
-		os.Remove(tmp.Name())
+	if err := steady.WriteFile(small, b, 0o600); err != nil {
 		return f, ""
 	}
 	return small, "image/png"

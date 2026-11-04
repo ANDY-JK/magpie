@@ -21,6 +21,7 @@ import (
 
 	"github.com/yetone/magpie/internal/gateway"
 	"github.com/yetone/magpie/internal/settings"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // hubCard is what the router last learnt of one server, for the server as
@@ -162,13 +163,8 @@ func writeCards(m map[string]hubCard) {
 	if os.MkdirAll(filepath.Dir(p), 0o755) != nil {
 		return
 	}
-	tmp := p + ".tmp"
-	if os.WriteFile(tmp, b, 0o600) != nil {
-		os.Remove(tmp)
+	if err := steady.WriteFile(p, b, 0o600); err != nil {
 		return
-	}
-	if os.Rename(tmp, p) != nil {
-		os.Remove(tmp)
 	}
 }
 

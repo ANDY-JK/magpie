@@ -11,6 +11,7 @@ import (
 
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/proc"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // desktopIcon is the entry's Icon=magpie, put in the user's icon theme: the
@@ -66,7 +67,7 @@ Terminal=false
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, []byte(entry), 0o644); err != nil {
+	if err := steady.WriteFile(path, []byte(entry), 0o644); err != nil {
 		return err
 	}
 	_ = proc.Command("update-desktop-database", dir).Run()
@@ -84,11 +85,7 @@ func installIcon(data string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	tmp := path + ".new"
-	if err := os.WriteFile(tmp, desktopIcon, 0o644); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return steady.WriteFile(path, desktopIcon, 0o644)
 }
 
 // keepWebData moves WebKitGTK's data (the pages' localStorage, which holds

@@ -11,6 +11,7 @@ import (
 
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/settings"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // A partner pays to be listed, so how often it is seen and picked is
@@ -183,8 +184,5 @@ func writePartnerCounts(c partnerCounts) {
 		return
 	}
 	_ = os.MkdirAll(filepath.Dir(partnerCountFile()), 0o755)
-	tmp := partnerCountFile() + ".tmp"
-	if os.WriteFile(tmp, b, 0o644) == nil {
-		_ = os.Rename(tmp, partnerCountFile())
-	}
+	_ = steady.WriteFile(partnerCountFile(), b, 0o644)
 }
