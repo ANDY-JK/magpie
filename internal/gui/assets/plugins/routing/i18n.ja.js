@@ -659,5 +659,13 @@ magpie.strings({
     "Any of its accounts": "どのアカウントでも",
     "This group spends only {accounts} of {provider}": "このグループは {provider} の {accounts} だけを使います",
     "This group may spend every account of {provider}": "このグループは {provider} のすべてのアカウントを使えます",
+    "Balanced: the member's account or key with the most of its allowance left per hour until it is lost goes first, so little of each member's allowance is lost at its resets; one that has failed since it last answered waits behind those that answered since, and a member whose accounts keep failing behind the others. Those alike go in turn by their weight, so none of a member's allowance is used up while the others sit idle.": "バランス：メンバーのアカウントやキーは、期限までの 1 時間あたりの残り利用枠が多い順に使われるため、リセットごとに失われる各メンバーの枠が少なくなります。前回以降に失敗したものはその後に応答したものの後ろに回り、アカウントが続けて失敗するメンバーはほかのメンバーの後ろに回ります。似たものは重みに応じて順番に使うので、ほかを遊ばせたまま使い切ることはありません。",
+    "Balanced: {who} goes first.": "バランス：{who} が先です。",
+    "Balanced: every one here has failed since it last answered, so {who}, which failed the fewest times, goes first.": "バランス：ここはどれも前回以降に失敗しているため、失敗回数が最も少ない {who} が先です。",
+    "Balanced: {who} answered since, and {failed} failed since they last did, so it goes first.": "バランス：{who} はその後応答し、{failed} は前回以降に失敗しているため、{who} が先です。",
+    "Balanced: {who} has the most of its allowance left per hour until it is lost — {n} left, resets in {d}.": "バランス：{who} は期限までの 1 時間あたりの残り利用枠が最も多いです — 残り {n}、{d} 後にリセット。",
+    "Balanced: {who} has the most of its allowance left per hour until it is lost — {n} used.": "バランス：{who} は期限までの 1 時間あたりの残り利用枠が最も多いです — 使用済み {n}。",
+    "Balanced: {who} goes first: one of its windows renews soon with much of it unspent, so what it has is spent before it is lost.": "バランス：{who} が先です。枠のひとつがまもなくリセットされるのに大半が残っているため、失われる前に使います。",
+    "Balanced: {who} goes first: what it has comes back sooner than the others' quota, and theirs is kept for later.": "バランス：{who} が先です。その枠はほかより早く戻るため、ほかの分は後にとっておきます。",
   },
 });

@@ -659,5 +659,13 @@ magpie.strings({
     "Any of its accounts": "Jedes seiner Konten",
     "This group spends only {accounts} of {provider}": "Diese Gruppe verbraucht nur {accounts} von {provider}",
     "This group may spend every account of {provider}": "Diese Gruppe darf jedes Konto von {provider} verbrauchen",
+    "Balanced: the member's account or key with the most of its allowance left per hour until it is lost goes first, so little of each member's allowance is lost at its resets; one that has failed since it last answered waits behind those that answered since, and a member whose accounts keep failing behind the others. Those alike go in turn by their weight, so none of a member's allowance is used up while the others sit idle.": "Ausgeglichen: das Konto oder der Schlüssel eines Mitglieds mit dem meisten Rest pro Stunde bis zum Verfall kommt zuerst, sodass beim Zurücksetzen wenig Kontingent jedes Mitglieds verloren geht; was seit seiner letzten Antwort gescheitert ist, wartet hinter dem, was seither geantwortet hat, und ein Mitglied, dessen Konten immer wieder scheitern, hinter den anderen. Gleichwertige kommen nach ihrem Gewicht reihum, sodass kein Kontingent eines Mitglieds aufgebraucht wird, während die anderen stillstehen.",
+    "Balanced: {who} goes first.": "Ausgeglichen: {who} kommt zuerst.",
+    "Balanced: every one here has failed since it last answered, so {who}, which failed the fewest times, goes first.": "Ausgeglichen: alle hier sind seit ihrer letzten Antwort gescheitert, daher kommt {who}, das am seltensten scheiterte, zuerst.",
+    "Balanced: {who} answered since, and {failed} failed since they last did, so it goes first.": "Ausgeglichen: {who} hat seither geantwortet, und {failed} ist seit seiner letzten Antwort gescheitert, daher kommt {who} zuerst.",
+    "Balanced: {who} has the most of its allowance left per hour until it is lost — {n} left, resets in {d}.": "Ausgeglichen: {who} hat das meiste Restkontingent pro Stunde bis zum Verfall — {n} übrig, Zurücksetzen in {d}.",
+    "Balanced: {who} has the most of its allowance left per hour until it is lost — {n} used.": "Ausgeglichen: {who} hat das meiste Restkontingent pro Stunde bis zum Verfall — {n} verbraucht.",
+    "Balanced: {who} goes first: one of its windows renews soon with much of it unspent, so what it has is spent before it is lost.": "Ausgeglichen: {who} zuerst: eines seiner Fenster wird bald zurückgesetzt und ist noch großteils unverbraucht, also wird es verbraucht, bevor es verfällt.",
+    "Balanced: {who} goes first: what it has comes back sooner than the others' quota, and theirs is kept for later.": "Ausgeglichen: {who} zuerst: sein Kontingent kommt schneller zurück als das der anderen, und ihres bleibt für später.",
   },
 });

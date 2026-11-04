@@ -659,5 +659,12 @@ magpie.strings({
     "Any of its accounts": "任一帳號",
     "This group spends only {accounts} of {provider}": "這個組只消耗 {provider} 的 {accounts}",
     "This group may spend every account of {provider}": "這個組可以消耗 {provider} 的每個帳號",
+    "Balanced: the member's account or key with the most of its allowance left per hour until it is lost goes first, so little of each member's allowance is lost at its resets; one that has failed since it last answered waits behind those that answered since, and a member whose accounts keep failing behind the others. Those alike go in turn by their weight, so none of a member's allowance is used up while the others sit idle.": "均衡：成員的帳號或金鑰按剩餘額度 ÷ 距作廢小時數排序，越高越先用，所以各成員的額度在重置時損失得少；上次之後失敗的，等之後答上了的用過再用；帳號接連失敗的成員排在其他成員後面。差不多的按權重輪流用，不會把一個人的額度用光而別人閒著。",
+    "Balanced: every one here has failed since it last answered, so {who}, which failed the fewest times, goes first.": "均衡：這裡的每一個上次之後都失敗過，所以失敗次數最少的 {who} 排第一。",
+    "Balanced: {who} answered since, and {failed} failed since they last did, so it goes first.": "均衡：{who} 之後答上了，而 {failed} 上次之後一直失敗，所以 {who} 排第一。",
+    "Balanced: {who} has the most of its allowance left per hour until it is lost — {n} left, resets in {d}.": "均衡：{who} 的剩餘額度 ÷ 距作廢小時數最高，剩餘 {n}，{d} 後重置。",
+    "Balanced: {who} has the most of its allowance left per hour until it is lost — {n} used.": "均衡：{who} 的剩餘額度 ÷ 距作廢小時數最高，已用 {n}。",
+    "Balanced: {who} goes first: one of its windows renews soon with much of it unspent, so what it has is spent before it is lost.": "均衡：{who} 先走：它的某個視窗很快重置，卻還剩大半沒用，先花掉，免得作廢。",
+    "Balanced: {who} goes first: what it has comes back sooner than the others' quota, and theirs is kept for later.": "均衡：{who} 先走：它的額度比別人的更快恢復，別人的留到後面用。",
   },
 });
