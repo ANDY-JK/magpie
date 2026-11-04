@@ -1564,7 +1564,7 @@ body.masked :hover > .acct-eye, body.masked .pq-card:hover .acct-eye, body.maske
 .led .where-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .led .where-line > .ic { width: 14px; height: 14px; flex: none; }
 .led .source-badges { display: flex; flex-wrap: nowrap; gap: 4px; margin-top: 4px; }
-.led .price-reference { font-size: 10px; color: var(--muted); }
+.led .price-reference, .led .row-credits { font-size: 10px; color: var(--muted); }
 .led .cost { color: var(--green); }
 .led .cost.faint { color: var(--faint); }
 /* a block of its own, centred in the cell as the time and the model are: an
@@ -3272,6 +3272,9 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
 .editor .bal-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--muted); }
 .editor .bal-fix:empty { display: none; }
 .editor .bal-fix.warn { color: var(--amber); }
+.editor .bal-fix .bal-uid { display: flex; align-items: center; gap: 8px; max-width: 100%; color: var(--fg); }
+.editor .bal-fix .bal-uid input { width: 12em; max-width: 100%; min-width: 0; }
+.editor .bal-fix .bal-uid input.bad { border-color: var(--amber); }
 .editor .bal-fix .text.action { height: 24px; font-size: 11.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .editor .pair.wrap { flex-wrap: wrap; }
 .editor .bal-res { flex-basis: 100%; font-size: 12px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }

@@ -88,7 +88,7 @@ func effortAccounts(t *testing.T, freeLevels []string, plusOut *bool) func() []s
 		tried = append(tried, acct+":"+q.Reasoning.Effort)
 		mu.Unlock()
 		switch {
-		case acct == "acct-free" && strings.Contains(string(b), "make it fail"):
+		case strings.Contains(string(b), "make it fail"):
 			w.WriteHeader(400)
 			io.WriteString(w, `{"error":{"message":"Invalid 'input[0].content': string too long.","type":"invalid_request_error","param":"input","code":"string_above_max_length"}}`)
 			return
@@ -155,10 +155,13 @@ func TestEffortRefusedGoesToAnotherAccount(t *testing.T) {
 	if got := strings.Join(tried(), ","); code != 200 || got != "acct-free:medium" {
 		t.Fatalf("medium: status %d, tried %s: %s", code, got, body)
 	}
-	// a request at fault in itself is the agent's to hear, not sent on
+	// a request at fault in itself is the agent's to hear, not sent on. Which
+	// account hears it is routing's: under Auto a new conversation spreads
+	// over the provider's accounts, so both refuse it here and exactly one
+	// is asked.
 	code, body = post(t, "/v1/responses", `{"model":"codex/gpt-6-luna","input":"make it fail","reasoning":{"effort":"medium"}}`)
-	if got := strings.Join(tried(), ","); code != 400 || got != "acct-free:medium" {
-		t.Fatalf("bad request: status %d, tried %s: %s", code, got, body)
+	if got := tried(); code != 400 || len(got) != 1 {
+		t.Fatalf("bad request: status %d, tried %v: %s", code, got, body)
 	}
 }
 

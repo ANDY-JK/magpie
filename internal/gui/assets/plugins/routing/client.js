@@ -537,6 +537,9 @@ function routingPage(part) {
     rotate: ["In turn", "In turn: each conversation's next turn goes to the account after the one that answered its last, and a new conversation starts one further along; the requests within a turn stay put, keeping the prompt cache."],
     usage: ["Least used", "Least used first: the account with the most of its allowance left goes first; a key by the tokens magpie sent it lately."],
     pace: ["Use before expiry", "Use before expiry: the account with the most left per hour until it is lost goes first — at its reset, or, when credits in it expire sooner, by those that expire first; an account with five hours and no week by what its five hours have left per hour. One at 90% or more waits until the others can't answer; a key by the tokens magpie sent it lately."],
+    // routes.Balanced: what would be lost weighed with how each has
+    // answered lately and how its provider's others have
+    balance: ["Balanced", "Each request goes to the account or key with the most left per hour until it is lost, as Use before expiry does, so little is lost at resets — with one that has failed since it last answered behind those that answered since, and a provider whose accounts keep failing behind the others. Those alike go in turn by their weight, so no one is used up while the others sit idle. One at 90% or more waits until the others can't answer."],
     manual: ["Manual", "Manual: every request goes to the model picked on the group's card, over its own accounts or keys."],
     // a provider's keys or a subscription's accounts by weight (#841,
     // rubbzha on X); both strings as the provider editor's routing options
@@ -800,6 +803,30 @@ function routingPage(part) {
         }
         if (f.kind === "key" && !someKnown) return t("Use before expiry: {who} served the fewest tokens lately — {n}.", { who: w, n: tokens(f.tokens || 0) });
         return t("Use before expiry: {who} goes first.", { who: w });
+      case "balance": {
+        // Balanced (routes.Balanced): what would be lost at its reset first
+        // (Weighed.loses), then the quota that comes back soonest
+        // (Weighed.class), then what was sent each; one that failed since
+        // it last answered goes behind those that answered since
+        // (Weighed.fails), and a provider's seats are weighed together
+        if (f.loses) return t("Balanced: {who} goes first: one of its windows renews soon with much of it unspent, so what it has is spent before it is lost.", { who: w });
+        if (f.balance != null) return walletWhy(r, f) || t("Balanced: {who} goes first.", { who: w });
+        if (f.fails) return t("Balanced: every one here has failed since it last answered, so {who}, which failed the fewest times, goes first.", { who: w });
+        const failed = peers.filter((p) => p.fails).map(who);
+        if (failed.length) return t("Balanced: {who} answered since, and {failed} failed since they last did, so it goes first.", { who: w, failed: failed.join(", ") });
+        // a seat no window was read for (class 5) is one whose cost is
+        // unknown and may be money, so keeping it for later is the story
+        if (f.known && peers.some((p) => (p.known || p.kind === "key") && (p.class || 0) > (f.class || 0))) {
+          return t("Balanced: {who} goes first: what it has comes back sooner than the others' quota, and theirs is kept for later.", { who: w });
+        }
+        if (f.known) {
+          const left = known0(f.due) ? Math.min(100, Math.round((f.pace || 0) * Math.max(1, (at(f.due) - at(r.time)) / 36e5))) : null;
+          return left !== null
+            ? t("Balanced: {who} has the most of its allowance left per hour until it is lost — {n} left, resets in {d}.", { who: w, n: pct(left), d: dur(at(f.due) - at(r.time)) })
+            : t("Balanced: {who} has the most of its allowance left per hour until it is lost — {n} used.", { who: w, n: pct(f.used) });
+        }
+        return t("Balanced: {who} goes first.", { who: w });
+      }
     }
     // keys that read their own windows (a sub2api key's limits) are
     // weighed by them, as accounts are, and one not read yet beside them
@@ -5141,7 +5168,7 @@ function routingPage(part) {
   // after the requests: a request picked in the list plays on the stage,
   // so the list sits right under it
   more.append(gsec);
-  const ROUTE_OPTS = [["", "Smart"], ["order", "In order"], ["drain", "Until used up"], ["rotate", "In turn"], ["usage", "Least used"], ["pace", "Use before expiry"], ["free", "Free first"], ["fast", "Speed first"]];
+  const ROUTE_OPTS = [["", "Smart"], ["order", "In order"], ["drain", "Until used up"], ["rotate", "In turn"], ["usage", "Least used"], ["pace", "Use before expiry"], ["balance", "Balanced"], ["free", "Free first"], ["fast", "Speed first"]];
   // a group may also be routed by hand: every request to the member the
   // user picks on its card (provider.Manual, #317) — a provider's keys can't
   // and by its members' weights, as a provider's keys are (#1910)
@@ -5187,6 +5214,7 @@ function routingPage(part) {
     usage: "Least used first: the account or key with the most of its allowance left goes first.",
     pace: "Use before expiry: the account with the most left per hour until it is lost goes first — its week at its reset, or credits in it that expire sooner — so less of each member's allowance is lost; an account with five hours and no week (Claude Enterprise) by what its five hours have left per hour until they renew, so almost always first; a key by the tokens magpie sent it lately.",
     weight: GROUP_WEIGHT,
+    balance: "Balanced: the member's account or key with the most of its allowance left per hour until it is lost goes first, so little of each member's allowance is lost at its resets; one that has failed since it last answered waits behind those that answered since, and a member whose accounts keep failing behind the others. Those alike go in turn by their weight, so none of a member's allowance is used up while the others sit idle.",
     free: "Free first: the members whose model its vendor serves at no cost to the subscription's allowance or credits go first, then the rest — each whole, over its own accounts or keys as its provider routes them. The free ones are tried before any that spends, so nothing that costs nothing is left unused.",
     fast: "Speed first: the member that answered fastest lately goes first, by its time to the first token and how fast it writes, each of its accounts or keys weighed on its own; those within a tenth keep their listed order, and one not measured lately gets one request in five, so it is measured again.",
     cheap: "Cheapest first: the member whose model costs least now goes first, by its price a million tokens in and out at this hour — so a model billed double in its vendor's peak hours, as DeepSeek's own API and Ollama Cloud's DeepSeek models are, goes behind a provider charging less then, and ahead of it off-peak. Those that cost the same keep their listed order; one with no known price goes last.",
@@ -7452,7 +7480,7 @@ function routingPage(part) {
     drawLevels();
     ed.append(el("label", "", t("Levels")), lw);
 
-    const bar = el("div", "bar");
+    const bar = el("div", "bar view-foot");
     if (g) {
       const del = el("button", "text danger", t("Remove"));
       del.onclick = () => groupAction("delete", { id: g.id }, t("{name} removed", { name: g.name }));

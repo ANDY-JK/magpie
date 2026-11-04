@@ -243,5 +243,9 @@ magpie.strings({
     "Upstream provider": "上游",
     "The agent spoke {from}; sent upstream as {to}": "agent 用 {from} 协议请求；以 {to} 协议发往上游",
     "Sent upstream as {to}, as the agent spoke it": "以 {to} 协议发往上游，与 agent 所用协议相同",
+    "What it cost in its plan's credits, as the reply said": "按回复所说，这次请求消耗的套餐积分",
+    "What it cost in its plan's credits, as the reply said": "依回覆所述，這次請求消耗的方案積分",
+    "What it cost in its plan's credits, as the reply said": "このリクエストが消費したプランのクレジット（応答の申告どおり）",
+    "What it cost in its plan's credits, as the reply said": "Was die Anfrage laut Antwort an Credits des Tarifs gekostet hat",
   },
 });

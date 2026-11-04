@@ -14,12 +14,18 @@ import (
 // Stays: Session, Smart routing, ended up on two accounts. A conversation
 // nobody has answered yet went where routing put it first, whatever other
 // sessions were on, so two sessions shared one account while another sat
-// unused. Kept for the whole session, a new session now goes to the one the
-// fewest others are on (spreadsSessions, leastHeld), and each then stays
-// where it began; its subagents go with it (withLead).
-func TestWholeSessionSpreadsNewSessions(t *testing.T) {
-	for _, mode := range []string{provider.AffinitySession, provider.AffinityStrict} {
-		t.Run(mode, func(t *testing.T) {
+// unused. A new conversation now goes to the one the fewest others are on
+// (spreadsNew, leastHeld) — under Stays: Auto too, its accounts being the
+// same model at the same price — and each then stays where it began; its
+// subagents go with it (withLead).
+func TestNewSessionsSpreadOverTheAccounts(t *testing.T) {
+	for _, c := range []struct{ name, mode string }{
+		{"auto", ""},
+		{"session", provider.AffinitySession},
+		{"strict", provider.AffinityStrict},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			mode := c.mode
 			fresh(t)
 			up := &keyed{}
 			serveOn(t, "sp", "k1", []string{"m1"}, up, "k2", "k3")
@@ -95,35 +101,49 @@ func TestInOrderKeepsNewSessionsOnTheFirst(t *testing.T) {
 	}
 }
 
-func TestSpreadsSessionsOnlyWhenKeptAndRoutedByWhatIsLeft(t *testing.T) {
+// A new conversation spreads under Stays: Auto over a provider's own keys
+// and accounts, and under Session and Strict over those and a group's
+// members, with a routing that picks by what each has left. A group's
+// members are different models, so Auto keeps its order among them; In
+// order, By weight, Free first, Speed first, Cheapest, Manual and a
+// plugin's routing keep their order in every mode, and In turn spreads its
+// turns on its own.
+func TestSpreadsNewOnlyByWhatIsLeftAndAPoolOfOneModel(t *testing.T) {
 	for _, c := range []struct {
 		mode, routing string
-		want          bool
+		group, want   bool
 	}{
-		{provider.AffinitySession, "", true},
-		{provider.AffinityStrict, "", true},
-		{provider.AffinitySession, provider.LeastUsed, true},
-		{provider.AffinitySession, provider.Pace, true},
-		{"", "", false},
-		{provider.AffinityTurn, "", false},
-		{provider.AffinityOff, "", false},
-		{provider.AffinitySession, provider.Ordered, false},
-		{provider.AffinitySession, provider.Weighted, false},
-		{provider.AffinitySession, provider.FreeFirst, false},
-		{provider.AffinitySession, provider.Cheapest, false},
-		{provider.AffinitySession, provider.Rotate, false}, // spreads on its own
+		{"", "", false, true}, // Auto, a provider's accounts
+		{"", "", true, false},
+		{"", provider.LeastUsed, false, true},
+		{"", provider.Pace, false, true},
+		{"", provider.Balanced, false, true},
+		{"", provider.Ordered, false, false},
+		{"", provider.Weighted, false, false},
+		{"", provider.Rotate, false, false},
+		{provider.AffinitySession, "", false, true},
+		{provider.AffinitySession, "", true, true},
+		{provider.AffinityStrict, "", false, true},
+		{provider.AffinityStrict, provider.LeastUsed, true, true},
+		{provider.AffinitySession, provider.Ordered, false, false},
+		{provider.AffinitySession, provider.Weighted, false, false},
+		{provider.AffinitySession, provider.FreeFirst, false, false},
+		{provider.AffinitySession, provider.Cheapest, false, false},
+		{provider.AffinitySession, provider.Rotate, false, false}, // spreads on its own
+		{provider.AffinityTurn, "", false, false},
+		{provider.AffinityTurn, "", true, false},
+		{provider.AffinityOff, "", false, false},
 	} {
-		if got := spreadsSessions(c.mode, c.routing); got != c.want {
-			t.Errorf("spreadsSessions(%q, %q) = %v, want %v", c.mode, c.routing, got, c.want)
+		if got := spreadsNew(c.mode, c.routing, c.group); got != c.want {
+			t.Errorf("spreadsNew(%q, %q, group=%v) = %v, want %v", c.mode, c.routing, c.group, got, c.want)
 		}
 	}
 }
 
-// Spreading a whole session's new conversations never puts one on an
-// account Smart keeps new conversations off — used past lowShare — nor on a
-// provider's fallback while the provider's own model leads: those stay
-// behind, and with every other account holding as many sessions, routing's
-// first takes it.
+// Spreading a new conversation never puts one on an account Smart keeps new
+// conversations off — used past lowShare — nor on a provider's fallback
+// while the provider's own model leads: those stay behind, and with every
+// other account holding as many sessions, routing's first takes it.
 func TestWholeSessionSpreadLeavesTheNearlyUsedAndFallbacks(t *testing.T) {
 	fresh(t)
 	key := func(k string) candidate {

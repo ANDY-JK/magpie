@@ -673,7 +673,7 @@ function renderAgents() {
     else if (!kind && a.appRestart) who.append(appRestart(a));
     // the CLI's version and its update (#202)
     if (mode !== "panel") who.append(cliTag(a));
-    if (mode !== "panel" && isHere(a)) who.append(Object.assign(el("span", "ag-missing ag-here", t(HERE)), { title: t(HERE_TIP, { agent: a.name }) }));
+    if (mode !== "panel" && isHere(a)) who.append(Object.assign(el("span", "ag-missing ag-here", t(HERE_TAG)), { title: t(HERE_TIP, { agent: a.name }) }));
     // which of magpie's models its lists show, on a line under the name
     if (mode !== "panel" && a.models && !kind) {
       const line = el("div", "ag-models-line");
@@ -1120,11 +1120,7 @@ const REAPPLY = "M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3.25h-3.25";
 const UNPLUG = "M6 2v3M10 2v3M4.5 5h7v2.5a3.5 3.5 0 0 1-7 0zM8 11v3M2 2l12 12";
 const DISCONNECT_TIP = "Take out everything magpie wrote into {agent}'s config and put back what it had before";
 
-// An agent is connected to magpie with a switch (the owner: the Agents page
-// connects an agent, and its models are picked in the agent): on, magpie is
-// its provider and its own model list has magpie's models (agent.Connect);
-// off, magpie takes out what it wrote (askDisconnect). An agent with none of
-// magpie's models to offer (Cursor, Copilot) has no switch.
+// an agent is connected with a switch (agent.Connect), off takes out what magpie wrote
 // the field magpie is picked in: the first, or Gemini CLI's model, its
 // first being how it signs in
 const connectField = (a) => a.fields.find((f) => f.options.some((o) => o.ref)) || a.fields.find((f) => f.options.some((o) => o.value === "magpie"));
@@ -1213,13 +1209,7 @@ function connectSwitch(a) {
   return s;
 }
 
-// ---------- 「接入」 in the window (the owner's design boards) ----------
-// A row there answers one thing: does the agent go through magpie. Its
-// switch stands where the model and effort pickers stood, a line under the
-// name says what it runs on and where it picks a model, and a connected
-// one opens to what else there is: when it takes effect, which models it
-// lists, what a new session starts on, the files magpie changed, and the
-// way back.
+// ---------- 「接入」 in the window: does the agent go through magpie ----------
 
 // agents with no way onto magpie: no switch, the reason instead, and that
 // it is why (@G_Z_Y on X read "Only Cursor's own models" beside "Can't
@@ -1243,12 +1233,7 @@ const MENU_FROM_LIST = new Set(["claude-desktop", "cursor-local"]);
 const listsMenu = (a) => MENU_FROM_LIST.has(a.id) || !!a.menu;
 const menuFromList = (a) => listsMenu(a) && a.wired && !!a.models;
 
-// menuSaid: the models such an agent lists, as its list's ticks are. Every
-// one ticked is said as all of them, a few picked by their names, and more
-// as how many of how many. Its first two names and +N (routing groups come
-// first) read as a pick of a group and a model while every model was on
-// (NG_shiyu on X: 「路由组，模型+数字」 here, one 「路由」 on the row above,
-// and every model in the list opened)
+// menuSaid: the models such an agent lists, as its list's ticks are (NG_shiyu on X)
 function menuSaid(c) {
   if (!c.shown) return t("No models");
   if (c.shown >= c.listed) return t("All {n} models", { n: c.listed });
@@ -1500,24 +1485,12 @@ function sheet(box, open, done) {
   run.oncancel = run.onfinish;
 }
 
-// startField: the field an agent's model is picked in (Gemini CLI's model,
-// not how it signs in). Its model is that field whatever the providers
-// on: one switched off changes only what it lists, so Codex's model with
-// none of magpie's left isn't traded for its subagent model, which still
-// has a ChatGPT account's (#1582). A model with nothing to list (Ante's,
-// magpie's only) leaves the field it connects through.
+// startField: the field an agent's model is picked in (#1582)
 function startField(a) {
   return a.fields.find((f) => f.key === "model" && f.options.length) || connectField(a);
 }
 
-// startButton picks the model an agent starts on, from the row. It says
-// what the agent is on, connected or not, its Default or a model, and
-// lists every choice: the agent's own models with magpie's. A magpie model
-// picked while it isn't connected connects it and starts it on it. Not
-// connected, only Claude Code said its model, the others Pick a model
-// beside it (EZN7L2C3, #834: 这里似乎需要统一); and Claude Code's list had
-// lost the one picked. A field that isn't a model (a provider) still
-// offers magpie's models alone.
+// startButton picks the model an agent starts on, from the row (#834)
 function startButton(a, f, fieldBtn) {
   const b = fieldBtn(f, "ag-start");
   if (!a.wired && !a.native && f.key !== "model" && !f.options.some((o) => o.direct)) {
@@ -1720,15 +1693,7 @@ function agentsLead(list) {
   }
 }
 
-// ---------- Get started (wangye1644294 on X) ----------
-// A new user is shown three steps above the agents: add a model source,
-// connect an agent (those magpie found here listed, each connected in a
-// click), and, optionally, a routing group made of their own models in a
-// click (provider.Templates). Each step is ticked from what is so — the
-// models magpie serves (state.served), an agent wired, a group of the
-// user's own — never from having been seen. The card goes once the first
-// two are done, or when put away (settings.GuideHidden, saved on the
-// server so the panel and the window agree).
+// ---------- Get started (wangye1644294 on X): three steps, each ticked from what is so ----------
 
 // the templates offered as a starter, most harmless first: each behind
 // the other changes no model the agent asked for until one fails
@@ -2089,6 +2054,19 @@ function appRestart(a) {
   return go;
 }
 
+// Air's own Codex and Claude Agent: the IDE plugin's run this computer's codex and claude, the app's never go through magpie (jumy_18634)
+const AIR_KINDS = new Set(["air", "air-ide"]);
+function airSaid(a, line) {
+  const warn = (s) => { const w = line(el("span", "ag-dot"), el("span", "", s)); w.classList.add("ag-warn", "ag-air-own"); return w; };
+  const out = [line(t("In Air's agent menu, pick Magpie: the model here is Magpie's, and magpie's models are in its model menu."))];
+  if (kindOf(a) === "air") return [...out, warn(t("Air's own agents (Codex, Claude Agent…) run on Air's own sign-in and settings, not through magpie: only Magpie in its agent menu takes magpie's models."))];
+  out.push(line(t("Air's own Codex and Claude Agent don't take the model here: they run the Codex and Claude Code on this computer, with those agents' own settings.")));
+  const on = (id) => state.agents.find((x) => x.id === id + a.id.slice(7))?.wired;
+  out.push(on("codex") ? line(t("Codex is connected here, so Air's Codex lists magpie's models too: pick one in its model menu, in a new Codex task.")) : warn(t("Codex isn't connected here, so Air's Codex doesn't go through magpie: connect Codex here to put magpie's models in its model menu.")));
+  out.push(on("claude") ? line(t("Claude Code is connected here, so Air's Claude Agent goes through magpie, on the models picked for Claude Code.")) : warn(t("Claude Code isn't connected here, so Air's Claude Agent doesn't go through magpie.")));
+  return out;
+}
+
 // connectPanel: a connected agent's row, opened
 function connectPanel(a, { fields, fieldBtn }) {
   const box = el("div", "ag-exp");
@@ -2160,7 +2138,7 @@ function connectPanel(a, { fields, fieldBtn }) {
     // its 3p window has no Chinese (GZXYMH on X)
     if (a.id === "claude-desktop" && /^zh/.test(locale)) p.push(el("div", "ag-vl ag-warn ag-desktop-lang")), p[1].append(el("span", "ag-dot"), el("span", "", t("On magpie, Desktop shows Anthropic's gateway window, which has no Chinese; disconnect it for Chinese.")));
     kv(t("In {agent}", { agent: a.name }), ...p);
-  }
+  } else if (AIR_KINDS.has(kindOf(a))) kv(t("In {agent}", { agent: a.name }), ...airSaid(a, line));
   // Hermes' other profiles, each on its own model
   const bots = a.fields.filter(hermesBot);
   if (bots.length) kv(t("Other profiles"), ...bots.map((f) => line(el("span", "ag-tier", f.label), fieldBtn(f, "ag-pick"), el("span", "ag-hint", "hermes -p " + f.label))));
@@ -2811,17 +2789,8 @@ async function openPluginAgents(e) {
 let agentsGlide = null; // how the panel's edge moves after the next render
 let panelOpenAgent = null; // the one agent row the panel has opened
 
-// set up: a model, a provider, a role given one — what magpie is there for.
-// How the agent's own model is run (ultracode, an effort) is not: turning
-// Claude Code's ultracode on folded every other agent away under Show more.
-// One with 「接入」's switch is set up when it is connected, and only then
-// (#726): its fields are read from its own files. One magpie connected
-// that has come apart (drift) stays up
-// too, to be put right. One with no switch (Cursor, an app's own models)
-// goes by what is set on it, as before, though while an agent can be
-// connected it doesn't start the folding (arrangeAgents): its values are
-// its own files' too, and a Cursor on auto would fold every agent not
-// connected yet away on a fresh magpie.
+// set up: a model, a provider, a role given one, not an effort or ultracode;
+// one with 「接入」's switch only when connected or drifted (#726).
 const tweak = (f) => f.key === "ultracode" || f.key === "effort" || f.key.endsWith("_effort");
 const onMagpie = (a) => !!(a.added || a.wired || a.drift);
 // one whose only control is its launch command (Cursor Private Inference)
@@ -3058,7 +3027,7 @@ function moveAgent(id, to) {
   saveArrangement([...ids, ...folded.map((a) => a.id)], hiddenIds(), []);
 }
 
-const HERE = "This computer only", HERE_TIP = "{agent}'s picks (model, effort…) stay as set here: sync, a Restore and a backup file neither bring another computer's in nor take these to the others";
+const HERE = "Don't sync picks to your other computers", HERE_TAG = "Not synced", HERE_TIP = "{agent}'s picks (model, effort…) stay as set here: sync, a Restore and a backup file neither bring another computer's in nor take these to the others";
 const HERE_GLYPH = "M3.5 4.5h9v6h-9zM2 12.5h12";
 const isHere = (a) => !!state.settings?.agentsHere?.includes(a.id);
 async function setAgentHere(a, on) {
@@ -3077,9 +3046,7 @@ function setAgentHidden(a, hide) {
   // the rows that change go on the panel's edge, as the fold does
   agentsGlide = hide ? ROLLUP : UNROLL;
   saveArrangement(all.map((x) => x.id), hidden, []);
-  // hidden, it says where it went, since the row goes out of sight; shown
-  // with nothing set on it, it stays folded under Not set up, and says why:
-  // one with a switch until it is connected
+  // hidden, it says where it went; shown unset, why it stays folded
   const still = !hide && arrangeAgents().folded.includes(a);
   const until = connectable(a) ? "{agent} is no longer hidden · it stays under Not set up until it is connected"
     : "{agent} is no longer hidden · it stays under Not set up until a model is picked for it";
@@ -8078,9 +8045,15 @@ function headerRows(obj) {
 }
 function headersOf(rows) {
   const out = {};
+  const own = !!newAPIUserOf(rows, false);
   for (const [k, v] of rows || []) {
-    const name = (k || "").trim();
-    const val = (v || "").trim();
+    let name = (k || "").trim();
+    let val = (v || "").trim();
+    // a user id typed as a name (zxc56823): userIDHeader in provider.go
+    if (/^\d+$/.test(name) && !val) {
+      if (own) continue;
+      [name, val] = ["New-Api-User", name];
+    }
     if (!name || !val) continue;
     for (const had of Object.keys(out)) if (had.toLowerCase() === name.toLowerCase()) delete out[had];
     // minify only a JSON blob; a plain value like "2.0" must stay verbatim
@@ -8104,7 +8077,7 @@ function looksJSON(s) {
 // in the list yet is offered as a button that adds its row, value left empty.
 function headerEditor(hints = []) {
   const box = el("div", "headers");
-  const render = () => {
+  const render = box.render = () => {
     box.replaceChildren();
     draft.headers.forEach((row, i) => {
       const line = el("div", "pair");
@@ -8169,6 +8142,22 @@ function headerEditor(hints = []) {
   return box;
 }
 function parses(s) { try { JSON.parse(s); return true; } catch { return false; } }
+
+// a new-api user id: New-Api-User's value, or a name of digits with no value
+const nauRow = (r) => (r[0] || "").trim().toLowerCase() === "new-api-user";
+const digitRow = (r) => /^\d+$/.test((r[0] || "").trim()) && !(r[1] || "").trim();
+function newAPIUserOf(rows, typed = true) {
+  const r = (rows || []).find((r) => nauRow(r) && (r[1] || "").trim()) || (typed && (rows || []).find(digitRow));
+  return r ? (r[1] || r[0]).trim() : "";
+}
+function setNewAPIUser(rows, id) {
+  for (let i = rows.length; i--;) if (digitRow(rows[i])) rows.splice(i, 1);
+  let row = rows.find(nauRow);
+  if (!row && !id) return;
+  if (!row) row = rows.find((r) => !(r[0] || "").trim() && !(r[1] || "").trim()) || (rows.push(["", "", false]), rows.at(-1));
+  row[0] = row[0] || "New-Api-User";
+  row[1] = id;
+}
 
 // A provider's extra body fields (#1604): a JSON object the gateway merges
 // into the top of every request's body to the vendor, filling in what the
@@ -9693,9 +9682,8 @@ function drawEditor(p, presetID) {
     if (custom) {
       balFix = balanceFix(p);
       wrap.append(balFix);
-      // whatever is typed — the token, the Balance URL, a header — may
-      // make it or unmake it
-      ed.addEventListener("input", () => balFix.refresh());
+      // whatever is typed may make it or unmake it, but the User ID keeps its place
+      ed.addEventListener("input", (e) => { if (!e.target.closest?.(".bal-uid")) balFix.refresh(); });
     }
     advIn.append(label, wrap);
   }
@@ -10690,14 +10678,8 @@ function showRest(n, open) {
   return b;
 }
 
-// detectAPIs: which of magpie's APIs answer at the base URL typed
-// (01huadalang: 一键检测支持什么协议): each is sent the smallest request,
-// with the key typed (or saved) and a model typed or from the list; "Use
-// these" takes those that answered. A saved provider's typed model that
-// some APIs answer can be asked on one alone (staged as Names & levels).
-// "Each picked model" asks every pick on each API, a few at a time (有的仅
-// 支持 response 有的双协议); its "Use these" gives a model answered on
-// one API only that API.
+// detectAPIs: which APIs answer at the base URL typed, each sent the
+// smallest request (01huadalang); "Use these" takes those that answered.
 // DETECT_MAX: the most models one detection asks (provider.DetectMax)
 const DETECT_MAX = 30;
 // addFormModels: the add form's models, typed in (ex) or picked from the
@@ -11393,7 +11375,10 @@ function renderModels(p) {
       };
       name.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") name.blur(); else if (e.key === "Escape") { name.value = nameNow(); name.blur(); } };
       const who = el("div", "mwho");
-      who.append(name, el("code", "", m.id));
+      // its own id, the one its provider is asked for, even once it is
+      // listed by another here (axelburks on Discord: the box after the
+      // name showed the Listed as id, and the model's own was gone)
+      who.append(name, el("code", "", m.vendor || m.id));
       row.append(who);
       // the model of other providers' it is, for the routing groups magpie
       // finds, when its id is one no rule matches up with theirs
@@ -11904,6 +11889,7 @@ const ROUTINGS = [
   ["rotate", "In turn", "Each turn of a conversation goes to the next one, spreading the load evenly; the requests within a turn stay where it began, so the prompt cache holds, and one that fails is passed over while it rests."],
   ["usage", "Least used first", "Each request goes to the one used least: a subscription by the share of its allowance used, a key by the tokens it served in the last hours."],
   ["pace", "Use before expiry", "Each request goes to the subscription with the most left per hour until it is lost — its week at its reset, or credits in it that expire sooner — so less is lost to resets and expiry; one at 90% or more waits until the others can't answer. A key goes by the tokens it served in the last hours."],
+  ["balance", "Balanced", "Each request goes to the quota that comes back soonest — points, credits and a day's quota before a plan's five hours, that before its week and that before its month, with a wallet's money last — so a paid plan's windows are kept for when the rest is out. Within that, the one with the most left per hour until it is lost goes first, so little is lost at resets; one that has failed since it last answered goes behind those that answered since, and a provider whose accounts keep failing behind the others. Those alike go in turn by their weight, so no one is used up while the others sit idle. One at 90% or more waits until the others can't answer, and one whose window is about to renew with much of it left is spent first, before what it has is lost."],
   ["weight", "By weight", "Requests spread over the keys or accounts by the weight set beside each: one weighing 3 takes three requests for every one weighing 1 takes, evenly over a few requests. One that fails is passed over while it rests, and the others share its requests; a conversation stays with it as Stays says."],
   ["free", "Free first", "Requests go to what costs nothing first: the models their vendor serves at no cost to this subscription's allowance or credits, in their listed order, and only when those can't answer to one that spends them. Nothing that cost nothing is left unused."],
   ["fast", "Speed first", "Requests go to the one that has answered this model fastest lately, by its time to the first token and how fast it writes; those within a tenth of each other keep their listed order. One not measured lately gets one request in five, so it is measured again, and one that fails is passed over while it rests."],
@@ -11911,7 +11897,7 @@ const ROUTINGS = [
 // the routings besides Smart are the built-in plugin rotation's
 // (plugins/rotation): off, their options leave the page, as anything marked
 // data-feature does, and Smart is left — one in use keeps it on
-const ROTATION = new Set(["order", "drain", "rotate", "usage", "pace", "weight", "free", "fast", "cheap"]);
+const ROTATION = new Set(["order", "drain", "rotate", "usage", "pace", "balance", "weight", "free", "fast", "cheap"]);
 // jsRoutings: the routings JS gateway plugins serve now ("<plugin>/<name>",
 // settings' jsRoutings, plugins/middleware's), and saved, a routing none
 // serves now, shown as it is: its pool is tried in its listed order
@@ -13628,7 +13614,7 @@ function balanceFieldOf(raw) {
 function balanceError(err) {
   if (/takes the API key, not the access token/.test(err)) return t("The Balance URL …/api/usage/token takes the API key, not the access token — set it to …/api/user/self in the provider's settings");
   if (/takes the API key, not the login token/.test(err)) return t("The Balance URL …/v1/usage takes the API key, not the login token — set it to …/api/v1/user/profile in the provider's settings");
-  if (/New-Api-User/i.test(err)) return t("Add the header New-Api-User = your user ID (shown in the site's personal settings) to the provider's Headers");
+  if (/New-Api-User/i.test(err)) return t("Fill in your user ID (shown in the site's personal settings) under the provider's Account balance");
   // errOpenCodeNoBalance: not a reading that failed
   if (/^OpenCode tells no API key its balance/.test(err)) return t("OpenCode doesn't tell an API key its balance — see Zen's credits in the OpenCode console, Overview → Credits");
   return "";
@@ -13677,8 +13663,23 @@ function balanceFix(p) {
       }
       return;
     }
-    if (path === "/api/user/self" && !(draft.headers || []).some((h) => (h[0] || "").trim().toLowerCase() === "new-api-user" && (h[1] || "").trim())) {
-      box.append(el("span", "", t("A new-api relay also wants the header New-Api-User = your user ID (shown in the site's personal settings): add it under Headers.")));
+    // new-api wants the user's id in New-Api-User (zxc56823)
+    if (path === "/api/user/self") {
+      draft.headers = draft.headers || [];
+      const have = newAPIUserOf(draft.headers);
+      const row = el("label", "bal-uid");
+      const uid = input(have, t("in the site's personal settings"));
+      uid.inputMode = "numeric";
+      const bad = () => uid.classList.toggle("bad", !!uid.value.trim() && !/^\d+$/.test(uid.value.trim()));
+      bad();
+      uid.oninput = () => {
+        setNewAPIUser(draft.headers, uid.value.trim());
+        bad();
+        box.closest(".editor")?.querySelector(".headers")?.render?.();
+      };
+      row.append(el("span", "bal-uid-name", t("User ID")), uid);
+      box.append(row);
+      if (!have) box.append(el("span", "bal-uid-why", t("A new-api relay also asks for your user ID with the token. It is in the site's personal settings.")));
     }
   };
   box.refresh();
@@ -14187,14 +14188,9 @@ function quotaCount(w) {
   const amount = Math.max(0, w.amount || 0), n = quotaLeft ? Math.max(0, w.limit - amount) : amount;
   return (countFormat.format(n) + " / " + countFormat.format(w.limit) + (w.unit ? " " + t(w.unit) : "")).trim();
 }
-// familyWindows: an account's per-model windows as one a model family.
-// Antigravity reports each level of each model (Gemini 3.1 Pro (High), (Low),
-// Gemini 3.7 Flash (Low), (Medium), (High)…), which over several accounts
-// reads as a wall of meters (01huadalang on Discord); Gemini and Claude
-// first, then any other. A family's figure is its tightest window, the most
-// used, the soonest to start again of those; its windows go along as tiers
-// for its tooltip and for "Every model". Windows that name no family, or an
-// account with a window a family already, are as they were.
+// familyWindows: an account's per-model windows as one a model family
+// (Antigravity's levels, 01huadalang), its tightest window as the figure and
+// the rest as tiers.
 const FAMILY_FIRST = ["Gemini", "Claude"];
 function familyWindows(ws) {
   if (ws?.some(isPool)) return poolWindows(ws);
@@ -18598,9 +18594,7 @@ function ledGroupSpeed(x) {
   const vTitle = !v || !kv ? "" : f ? t(kv === 1 ? "Measured on {k} reply, from its first token to its end" : "Measured on {k} replies, from their first token to their end", { k: ledNum(kv) })
     : t(kv === 1 ? "Measured on {k} reply, from its first token to its end; the others tell no speed" : "Measured on {k} replies, from their first token to their end; the others tell no speed", { k: ledNum(kv) });
   const fTitle = !f || !kf ? "" : t(kf === 1 ? "At least: {k} reply read from a session file, which doesn't say when its answer began, so time before that is counted too" : "At least: {k} replies read from session files, which don't say when their answers began, so time before that is counted too", { k: ledNum(kf) });
-  // each figure as its speed and its count, kept apart so a narrow card can
-  // put the count under the speed rather than run past its edge (#1623); the
-  // card sets the count as a caption, with no "·" to lead a wrapped line
+  // speed and count kept apart for a narrow card (#1623)
   const measured = v ? { s: v, head: tok(v), count: count(kv, true), title: vTitle } : null;
   const floor = f ? { s: f, head: "≥" + tok(f), count: count(kf, false), title: fTitle } : null;
   // the larger sample first; a tie keeps the measured one first

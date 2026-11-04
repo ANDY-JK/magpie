@@ -420,6 +420,12 @@ func TestNativeCompactionWriterThroughAGroupWhoseListLacksTheModel(t *testing.T)
 // account refused it.
 func TestCodexOwnModelCompactionHonoursTheToggle(t *testing.T) {
 	codexSignedIn(t, "spare@example.com")
+	// Ordered, so me@example.com answers both rounds: which account a new
+	// conversation starts on is routing's (under Auto it spreads over the
+	// provider's accounts), and this test is about the toggle alone.
+	if err := provider.SetRouting("codex", provider.Ordered); err != nil {
+		t.Fatal(err)
+	}
 	var mu sync.Mutex
 	var asked []string
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

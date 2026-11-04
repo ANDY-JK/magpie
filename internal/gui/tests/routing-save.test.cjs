@@ -162,7 +162,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           await page.evaluate(() => applyFeatures([{ id: "rotation", on: true }]));
           const back = await field.locator(".segs").first().evaluate((box) => [...box.querySelectorAll(".opt")].filter((b) => getComputedStyle(b).display !== "none").length);
           // By weight is offered for accounts as for keys (rubbzha on X)
-          assert.equal(back, 9, `${where}: every routing back`);
+          assert.equal(back, 10, `${where}: every routing back`);
           assert.deepEqual(errors, [], where);
           await page.context().close();
         }

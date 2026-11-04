@@ -788,7 +788,7 @@ const heldFor = 30 * time.Minute
 // none of those while the provider's own leads (standsIn): held by nobody,
 // it was the one held on fewest.
 //
-// ready is for a conversation kept for the whole session (spreadsSessions):
+// ready is for a new conversation spread over the pool (spreadsNew):
 // it goes only to one routing would put a new conversation on as well —
 // not a fallback while the provider's own model leads, nor one used past
 // lowShare, which Smart puts behind for new conversations — and routing's
@@ -888,7 +888,7 @@ func lastBehind(order []Weighed, i int) bool {
 
 // withLead puts first, for a subagent's conversation nobody has answered
 // yet (a key stickKey gave "|agent:"), the key or account its session's
-// lead is on, while that one is readyForNew: under spreadsSessions the
+// lead is on, while that one is readyForNew: under spreadsNew the
 // session keeps its account, subagents included, rather than a subagent
 // counted as a session of its own and sent to another.
 func withLead(key string, cs []candidate, pl planned) ([]candidate, planned) {
@@ -909,22 +909,40 @@ func withLead(key string, cs []candidate, pl planned) ([]candidate, planned) {
 	return cs, pl
 }
 
-// spreadsSessions says whether new conversations kept for the whole
-// session (Stays: Session or Strict) go to the key, account or member the
-// fewest others are on (leastHeld), under a routing that picks by what
-// each has left: Smart, Least used first, Use before expiry. Several sessions
-// started side by side then each keep an account of their own until its
-// allowance runs out, as a user picking the mode with several accounts
-// expects (connor_yang on Discord: three sessions on two of three
-// accounts). In order, By weight, Free first, Speed first, Cheapest, Manual
-// and a plugin's routing pick for their own reasons, and keep their order;
-// In turn spreads on its own.
-func spreadsSessions(mode, routing string) bool {
-	if mode != provider.AffinitySession && mode != provider.AffinityStrict {
+// spreadsNew says whether a conversation nobody has answered yet goes to
+// the key or account the fewest other conversations of the last heldFor
+// are on (leastHeld), under a routing that picks by what each has left:
+// Smart, Least used first, Use before expiry, Balanced.
+//
+// A provider's own keys and accounts spread under Stays: Auto too, not
+// only under Session and Strict: seats of one provider are the same model
+// at the same price, so where a new conversation starts is a matter of
+// load alone, and Auto's staying on what answered it has nothing to say
+// about a conversation nobody has answered. Without it every new session
+// went wherever routing put first (several agents' sessions side by side,
+// the same account of a vendor that limits it by how many requests it
+// takes at once, while its other accounts sat idle: three sessions on two
+// of three accounts for connor_yang on Discord, and a provider's seven
+// accounts with every session of a day on one).
+//
+// A group's members are different models, and its order is the user's
+// preference among them, so under Auto a new conversation takes routing's
+// first; Session or Strict spread over them, as the user asked. In order,
+// By weight, Free first, Speed first, Cheapest, Manual and a plugin's
+// routing pick for their own reasons, and keep their order; In turn
+// spreads on its own.
+func spreadsNew(mode, routing string, group bool) bool {
+	switch mode {
+	case "":
+		if group {
+			return false
+		}
+	case provider.AffinitySession, provider.AffinityStrict:
+	default:
 		return false
 	}
 	switch routingOf(routing) {
-	case "", provider.LeastUsed, provider.Pace:
+	case "", provider.LeastUsed, provider.Pace, provider.Balanced:
 		return true
 	}
 	return false
