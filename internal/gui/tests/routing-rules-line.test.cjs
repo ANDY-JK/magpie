@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { settled } = require("./reader.cjs");
 
 const assets = path.resolve(process.env.ASSETS || path.join(__dirname, "../assets"));
 const models = [
@@ -99,6 +100,10 @@ async function openEditor(page, w) {
   await press(page, group.locator("button", { hasText: w.edit }));
   const ed = page.locator(".rt-gedit");
   await ed.locator(".rt-rule").first().waitFor();
+  // the editor's own opening motion: the save bar sweeps down with the box
+  // it is sticky in until that box stops growing, so a press measured
+  // before then lands where the bar no longer is (reader.cjs's settled)
+  await settled(page);
   return ed;
 }
 
