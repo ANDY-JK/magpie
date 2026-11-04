@@ -106,7 +106,11 @@ func TestSearchQueueKeepsCodexAlive(t *testing.T) {
 			// #2547: the idle window starts at the first data line, not at
 			// the headers: a loaded machine's path to the first translated
 			// event is not the client's idle, and the hard cap still ends a
-			// stream that never speaks.
+			// stream that never speaks. Between two lines it is a second:
+			// the vendor ticks every 20ms, and under load a machine's
+			// translate-and-write of one tick took past 300ms, which ended
+			// the stream as if the queue had gone quiet
+			const idleMost = time.Second
 			var idle *time.Timer
 			defer func() {
 				if idle != nil {
@@ -128,9 +132,9 @@ func TestSearchQueueKeepsCodexAlive(t *testing.T) {
 				body.WriteString(line + "\n")
 				if strings.HasPrefix(line, "data:") {
 					if idle == nil {
-						idle = time.AfterFunc(300*time.Millisecond, cancel)
+						idle = time.AfterFunc(idleMost, cancel)
 					} else {
-						idle.Reset(300 * time.Millisecond)
+						idle.Reset(idleMost)
 					}
 				}
 				if strings.Contains(line, `"type":"response.in_progress"`) {
