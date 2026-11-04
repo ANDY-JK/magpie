@@ -13,9 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"net/url"
-
 	"github.com/yetone/magpie/internal/appdir"
+	"github.com/yetone/magpie/internal/sqlitedb"
 )
 
 // Cursor's CLI (cursor-agent) keeps a chat in a folder of its own under its
@@ -212,11 +211,7 @@ func OpenUntouched(path string) (db *sql.DB, closeDB func(), err error) {
 
 // openSQLite opens the SQLite database at p, with query as its URI's.
 func openSQLite(p, query string) (*sql.DB, error) {
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(p), RawQuery: query}
-	if len(u.Path) >= 2 && u.Path[1] == ':' {
-		u.Path = "/" + u.Path
-	}
-	db, err := sql.Open("sqlite", u.String())
+	db, err := sql.Open("sqlite", sqlitedb.FileURL(p, query))
 	if err != nil {
 		return nil, err
 	}
