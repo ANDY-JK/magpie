@@ -1793,30 +1793,46 @@ each of these groups ordered by the share used.
   among them the one magpie sent the fewest tokens lately goes first. A
   Claude account not known goes first once, as in Smart; another unknown
   account counts as a fresh week.
-- **Balanced**: what Use before expiry weighs, with how each has answered
-  lately. The account or key with the highest pace goes first, those
-  within a tenth of it going as alike, as in Use before expiry. Of those
-  alike, one that has failed since it last answered goes behind those
-  that answered since, the one failing most last, so one that keeps
-  failing is asked again only when the others can't answer; and a
-  provider whose accounts or keys in the pool keep failing goes behind a
-  provider whose don't, by how many of them are — a vendor that refuses
-  magpie refuses its accounts alike, so the ones it happened to pick are
-  enough to find out. One whose replies would take more than four times
-  the pool's fastest goes behind the rest of its band as well: a channel
-  up but crawling gives way to one that works. Those still alike are
-  taken in turn by their weight and what magpie sent each lately (half of
-  it stops counting after an hour): one weighing 3 carries three times
-  the tokens of one weighing 1 between turns, so none is used up while
-  the others sit idle — two subscriptions that renew together would
-  otherwise have the first drained before the second is tried
-  (OpenCode Go's two plans). A key that reads no window has no pace and
-  keeps its place behind the subscriptions, as in Use before expiry.
-  Price isn't weighed: Cheapest first is for that. The Routing page says
-  why: "Balanced: opencode-go#2 has the most of its allowance left per
-  hour until it is lost — 82% left, resets in 5 days", or "Balanced:
-  k1 answered since, and k2 failed since they last did, so it goes
-  first."
+- **Balanced**: what Use before expiry weighs, with what kind of quota
+  each spends and how each has answered lately. One about to lose what it
+  has goes before them all, whatever its quota and whatever the others
+  have: a week or a month in the last tenth of its span, or a window that
+  renews at a set time within a day of it, with a fifth of it still
+  unspent — what is left is lost at the reset, so it is spent now. Then
+  the tiers are Smart's: one with room goes before one at 90% or more of a
+  window, and that before one all but used up, so nothing running out is
+  spent while there is room elsewhere. Of those alike, one that has
+  failed since it last answered goes behind those that answered since,
+  the one failing most last, so one that keeps failing is asked again
+  only when the others can't answer; and a provider whose accounts or
+  keys in the pool keep failing goes behind a provider whose don't, by
+  how many of them are — a vendor that refuses magpie refuses its
+  accounts alike, so the ones it happened to pick are enough to find out.
+  Then the quota that comes back soonest goes first: check-in points,
+  credits or a day's window, before a plan's five hours, that before its
+  week and that before its month, with a wallet's money last, which never
+  comes back. A paid plan's windows keep for when the rest is out, and
+  its month is spent in its last days rather than left to the reset. A
+  seat no window was read for goes after them all: what spending it costs
+  is unknown, and may be money. Then
+  the account or key with the highest pace goes first, those within a
+  tenth of it going as alike, as in Use before expiry. One whose replies
+  would take more than four times the pool's fastest goes behind the rest
+  of its band as well: a channel up but crawling gives way to one that
+  works. Those still alike are taken in turn by their weight and what
+  magpie sent each lately (half of it stops counting after an hour): one
+  weighing 3 carries three times the tokens of one weighing 1 between
+  turns, so none is used up while the others sit idle — two subscriptions
+  that renew together would otherwise have the first drained before the
+  second is tried (OpenCode Go's two plans). A key that reads no window
+  has no pace and keeps its place behind the subscriptions, as in Use
+  before expiry. Price isn't weighed: Cheapest first is for that. The
+  Routing page says why: "Balanced: opencode-go#2 goes first: what it has
+  comes back sooner than the others' quota, and theirs is kept for
+  later", "Balanced: k1 goes first: one of its windows renews soon with
+  much of it unspent, so what it has is spent before it is lost", or
+  "Balanced: k1 answered since, and k2 failed since they last did, so it
+  goes first."
 - **Speed first**: the account, key or group member that answered this
   model fastest lately first. magpie keeps, in memory, how long each one's
   streamed answers took to their first token and how many tokens a second

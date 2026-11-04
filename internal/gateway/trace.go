@@ -302,7 +302,17 @@ type Weighed struct {
 	Renews  []time.Time `json:"renews,omitempty"` // when those windows renew, the biggest first
 	Pace    float64     `json:"pace,omitempty"`   // remaining allowance per hour until its window resets
 	Due     *time.Time  `json:"due,omitempty"`    // when the allowance window used for pace resets
-	Tokens  float64     `json:"tokens,omitempty"` // least used: tokens it served lately
+	// Class is which quota spending what it has uses up, by how soon it is
+	// made good again (provider.Allowance.Class): 0 points, credits or a
+	// day, 1 five hours, 2 a week, 3 a month, 4 money, and 5 for a seat no
+	// window was read for. Balanced spends the lowest first
+	// (routes.Seat.Class)
+	Class int `json:"class,omitempty"`
+	// Loses: one of its windows is about to renew with much of it left, so
+	// what it has is lost at the reset, and Balanced spends it first
+	// (routes.Seat.Loses)
+	Loses  bool    `json:"loses,omitempty"`
+	Tokens float64 `json:"tokens,omitempty"` // least used: tokens it served lately
 	// Fails: how many times in a row it has failed since it last answered
 	// (routes.Seat.Failures), which Balanced puts it behind the others for
 	Fails    int               `json:"fails,omitempty"`
@@ -509,7 +519,8 @@ type planned struct {
 
 func weighed(c candidate, p provider.Provider, wg weighing, fallback bool, from provider.Protocol) Weighed {
 	w := Weighed{ID: c.rest, Provider: p.ID, Name: p.Name, Icon: p.Icon, Preset: p.Preset, Model: c.model, Fixed: c.effort, Fast: c.fast,
-		Routing: p.Routing, Fallback: fallback, Shared: c.rest != p.ID, Rank: c.rank, NoURL: c.noURL, Reserve: c.reserve}
+		Routing: p.Routing, Fallback: fallback, Shared: c.rest != p.ID, Rank: c.rank, NoURL: c.noURL, Reserve: c.reserve,
+		Class: int(provider.QuotaUnread)} // until an allowance is read for it
 	switch {
 	case c.p.Account != nil:
 		w.Kind, w.Who, w.Agent, w.Plan = "account", c.p.Account.User, c.p.Account.Agent, c.p.Account.Plan
@@ -529,6 +540,7 @@ func weighed(c candidate, p provider.Provider, wg weighing, fallback bool, from 
 	}
 	if l, ok := wg.lefts[c.allowanceKey()]; ok {
 		w.Known, w.Used, w.Renews, w.Pace, w.Credits, w.CreditsFirst = true, l.used, l.renews, l.pace, l.credits, l.first
+		w.Class, w.Loses = int(l.class), l.loses
 		if !l.fullest.IsZero() {
 			ur := l.fullest
 			w.UsedRenews = &ur

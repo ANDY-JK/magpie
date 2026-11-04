@@ -801,14 +801,21 @@ function routingPage(part) {
         if (f.kind === "key" && !someKnown) return t("Use before expiry: {who} served the fewest tokens lately — {n}.", { who: w, n: tokens(f.tokens || 0) });
         return t("Use before expiry: {who} goes first.", { who: w });
       case "balance": {
-        // Balanced (routes.Balanced): what would be lost at its reset first,
-        // then what was sent each; one that failed since it last answered
-        // goes behind those that answered since (Weighed.fails), and a
-        // provider's seats are weighed together
+        // Balanced (routes.Balanced): what would be lost at its reset first
+        // (Weighed.loses), then the quota that comes back soonest
+        // (Weighed.class), then what was sent each; one that failed since
+        // it last answered goes behind those that answered since
+        // (Weighed.fails), and a provider's seats are weighed together
+        if (f.loses) return t("Balanced: {who} goes first: one of its windows renews soon with much of it unspent, so what it has is spent before it is lost.", { who: w });
         if (f.balance != null) return walletWhy(r, f) || t("Balanced: {who} goes first.", { who: w });
         if (f.fails) return t("Balanced: every one here has failed since it last answered, so {who}, which failed the fewest times, goes first.", { who: w });
         const failed = peers.filter((p) => p.fails).map(who);
         if (failed.length) return t("Balanced: {who} answered since, and {failed} failed since they last did, so it goes first.", { who: w, failed: failed.join(", ") });
+        // a seat no window was read for (class 5) is one whose cost is
+        // unknown and may be money, so keeping it for later is the story
+        if (f.known && peers.some((p) => (p.known || p.kind === "key") && (p.class || 0) > (f.class || 0))) {
+          return t("Balanced: {who} goes first: what it has comes back sooner than the others' quota, and theirs is kept for later.", { who: w });
+        }
         if (f.known) {
           const left = known0(f.due) ? Math.min(100, Math.round((f.pace || 0) * Math.max(1, (at(f.due) - at(r.time)) / 36e5))) : null;
           return left !== null

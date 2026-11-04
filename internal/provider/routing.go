@@ -318,6 +318,127 @@ func (a Allowance) WeekUsedUp(now time.Time) bool {
 	return false
 }
 
+// QuotaClass is how soon spending what an account has is made good again,
+// which Balanced goes by to keep the dearer quota for last: points,
+// credits and a window of a day come back soonest, then a plan's five
+// hours, its week and its month — and a wallet's money never does.
+type QuotaClass int
+
+const (
+	// QuotaDay is what a check-in, points or credits leave, which tells
+	// nothing of when it comes back, or a window of a day: Qoder's add-on
+	// credits, MiniMax's, AutoClaw's daily points, Cloudflare's neurons a
+	// day.
+	QuotaDay QuotaClass = iota
+	// QuotaFive is a window of hours, a plan's five: OpenCode Go's,
+	// Claude's, Codex's.
+	QuotaFive
+	// QuotaWeek is a window of days: a plan's week.
+	QuotaWeek
+	// QuotaMonth is a window of weeks or more (OpenCode Go's month,
+	// OrcaTerm's 30 days), or one that doesn't say how long it runs and
+	// renews later than a week (CodeArts' points, which reset on a day).
+	QuotaMonth
+	// QuotaWallet is a balance of money, spent per token and never made
+	// good: the last to spend.
+	QuotaWallet
+	// QuotaUnread is a seat no window was read for — a key, or a
+	// subscription whose vendor hasn't told — so what spending it costs
+	// is unknown and may be money: it goes after a plan's own quota, as a
+	// key that reads no window keeps its place behind the subscriptions
+	// (#4535). Balanced is handed this by the gateway, for Class has an
+	// allowance to read.
+	QuotaUnread
+)
+
+// losingBehind is how far behind its window's clock an account must be for
+// Class to call what it has about to be lost: with a tenth of the span to
+// go, more than a fifth of the window unspent ends at the reset.
+const losingBehind = 20
+
+// losingSoon is how near its reset a window that doesn't say how long it
+// runs must be for what it has left to count as about to be lost.
+const losingSoon = 24 * time.Hour
+
+// Class is which quota spending what the account has for model uses up —
+// class, of the longest window that counts the model, the month a
+// five-hour window sits in — and loses, whether one of them is about to
+// renew with much of it left: within a tenth of its span, and a fifth of
+// the window behind the clock of its share used, so what it has is lost at
+// the reset. A window that doesn't say how long it runs is taken by how
+// soon it renews — within the day a day, within the week a week, else a
+// month — as its span would have said, and is about to be lost with a day
+// to go.
+//
+// A plan's windows come back on their own, at their reset, so spending
+// them is kept for when what comes back sooner is out: points, credits and
+// a day's quota are spent first, then the five hours, the week and the
+// month, with money last, which never comes back at all. An account whose
+// reading holds only a balance has no window: it is a wallet, unless
+// another window that counts the model says otherwise.
+func (a Allowance) Class(model string, now time.Time) (class QuotaClass, loses bool) {
+	model = strings.ToLower(model)
+	longest := time.Duration(0)
+	found := false
+	for _, l := range a {
+		if !l.applies(model) {
+			continue
+		}
+		u, ends := l.Used, l.Resets
+		if !ends.IsZero() && !ends.After(now) {
+			u, ends = 0, time.Time{} // its reset passed: empty again
+		}
+		if l.Balance != nil && l.Of == 0 && l.Span == 0 && ends.IsZero() && l.RunsOut.IsZero() {
+			continue // a wallet's balance, which is no window: last, below
+		}
+		found = true
+		// how long it runs: what it says, else how long until it renews
+		if run := l.Span; run > 0 {
+			longest = max(longest, run)
+		} else if ends.After(now) {
+			longest = max(longest, ends.Sub(now))
+		}
+		loses = loses || aboutToLose(l, u, ends, now)
+	}
+	if !found {
+		if _, _, ok := a.Left(model); ok {
+			return QuotaWallet, false
+		}
+		return QuotaDay, false // points or credits, which say nothing of when
+	}
+	switch {
+	case longest <= 0:
+		return QuotaDay, false
+	case longest <= 8*time.Hour:
+		class = QuotaFive
+	case longest <= 36*time.Hour:
+		class = QuotaDay
+	case longest <= 8*24*time.Hour:
+		class = QuotaWeek
+	default:
+		class = QuotaMonth
+	}
+	return class, loses
+}
+
+// aboutToLose is whether window l, its share used and its reset at ends, is
+// about to renew with much of it left. A window of a day or less comes back
+// within the day, so nothing of it is worth spending first.
+func aboutToLose(l Limit, used float64, ends, now time.Time) bool {
+	if !ends.After(now) {
+		return false
+	}
+	left := ends.Sub(now)
+	if l.Span == 0 {
+		return left <= losingSoon && used+losingBehind < 100
+	}
+	if l.Span <= 36*time.Hour {
+		return false
+	}
+	clock := 100 * (1 - float64(left)/float64(l.Span))
+	return left <= l.Span/10 && used+losingBehind < clock
+}
+
 // Restarts is when an auto-used reset starts the account's windows again,
 // as the Codex reset about to run out is spent (expiringResetSpent):
 // resetLead before it runs out, or now when the account is held up

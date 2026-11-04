@@ -16,6 +16,8 @@ import (
 	"slices"
 	"sync"
 	"time"
+
+	"github.com/yetone/magpie/internal/provider"
 )
 
 // Seat is one route of a pool, as a strategy weighs it.
@@ -41,6 +43,17 @@ type Seat struct {
 	// Pace is its week left per hour until that renews; an account not
 	// known has a whole week (provider.FreshPace), a key none
 	Pace float64
+	// Class is how soon spending what it has is made good again, by the
+	// longest window that counts the model (provider.Allowance.Class): a
+	// day's quota, points and credits first, then a plan's five hours, its
+	// week and its month, and a wallet's money last, which never comes
+	// back. A seat no window was read for (provider.QuotaUnread) goes
+	// after them all.
+	Class provider.QuotaClass
+	// Loses: one of its windows is about to renew with much of it left
+	// (provider.Allowance.Class), so what it has is lost at the reset, and
+	// Balanced spends it first whatever its class.
+	Loses bool
 	// Weight is its key's weight, at least 1
 	Weight int
 	// Vendor is the provider the seat belongs to: a pool's seats are one,

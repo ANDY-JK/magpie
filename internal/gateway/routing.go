@@ -2017,6 +2017,11 @@ type left struct {
 	// empty when no balance was told: routes.Seat.LeftIn
 	bal            float64
 	balUnit, balIn string
+	// class is which quota spending what it has uses up, and loses whether
+	// one of its windows is about to renew with much of it left
+	// (Allowance.Class): routes.Seat.Class, Seat.Loses
+	class provider.QuotaClass
+	loses bool
 }
 
 // learns: c is a subscription whose allowance isn't known yet, of an agent
@@ -2094,6 +2099,7 @@ func weighRouted(p provider.Provider, cs []candidate, model string, from provide
 				restarts: rs, dueRestart: !rs.IsZero() && due.Equal(rs), credits: spendsCredits(c.p, a)} // one not known counts as unused
 			l.dueExpiry = !l.dueRestart && !l.lapse.IsZero() && due.Equal(l.lapse)
 			l.first = l.credits && provider.CodexCreditsFirst(c.p.Account.User)
+			l.class, l.loses = a.Class(c.model, now)
 			if b, bu, has := a.Left(c.model); has {
 				// a wallet's figure is weighed only against the same
 				// provider's in the same unit (routes.Seat.LeftIn)
@@ -2119,10 +2125,16 @@ func weighRouted(p provider.Provider, cs []candidate, model string, from provide
 		if !known && c.p.Account != nil {
 			pace = provider.FreshPace
 		}
+		// a seat nothing was read for spends money as far as Balanced
+		// knows, or a quota it can't weigh: it goes after a plan's own
+		class := l.class
+		if !known {
+			class = provider.QuotaUnread
+		}
 		seats[i] = routes.Seat{Key: c.rest, Account: c.p.Account != nil, Known: known, Learns: learns(c, wg.lefts),
 			Used: l.used, Soon: l.soon, Lapse: l.lapse, Pace: pace, Weight: keyWeight(c), Resting: resting(c), Tokens: routed.used[c.restKey()].now(now), Credits: l.credits, First: l.first,
 			Vendor: c.p.ID, Failures: max(routed.failures[c.restKey()], routed.failures[c.restID()]),
-			Left: l.bal, LeftIn: l.balIn, Spent: spentRest(c)}
+			Left: l.bal, LeftIn: l.balIn, Spent: spentRest(c), Class: class, Loses: l.loses}
 		if f := seats[i].Failures; f > 0 {
 			if wg.fails == nil {
 				wg.fails = map[string]int{}

@@ -103,12 +103,65 @@ func TestBalancedTiers(t *testing.T) {
 	}
 }
 
+// What comes back soonest to spend is spent first: points, credits or a
+// day's quota before a plan's five hours, that before its week and that
+// before its month, and a wallet's money last, which never comes back. A
+// paid plan's windows keep for when the rest is out, so a month isn't
+// drained by the first chat of the day.
+func TestBalancedSpendsWhatComesBackSoonest(t *testing.T) {
+	seat := func(key string, class provider.QuotaClass, used float64) Seat {
+		return Seat{Key: key, Known: true, Class: class, Used: used, Pace: 0.5}
+	}
+	s := []Seat{
+		seat("month", provider.QuotaMonth, 20),
+		seat("wallet", provider.QuotaWallet, 20),
+		seat("day", provider.QuotaDay, 20),
+		seat("week", provider.QuotaWeek, 20),
+		seat("five", provider.QuotaFive, 20),
+		{Key: "unread", Class: provider.QuotaUnread, Pace: 0.5}, // a key, nothing read for it
+	}
+	if got := keys(s, Apply(Balanced, "p", s)); !slices.Equal(got, []string{"day", "five", "week", "month", "wallet", "unread"}) {
+		t.Fatalf("classes: %v, want [day five week month wallet unread]", got)
+	}
+	// a seat that failed since it last answered goes behind one that
+	// answered since, though its quota is the cheaper: one that keeps
+	// failing must not spend the paid plan's quota quicker
+	seats := []Seat{
+		{Key: "failing-day", Known: true, Class: provider.QuotaDay, Pace: 0.5, Failures: 2},
+		{Key: "month", Known: true, Class: provider.QuotaMonth, Pace: 0.5},
+	}
+	if got := keys(seats, Apply(Balanced, "p", seats)); !slices.Equal(got, []string{"month", "failing-day"}) {
+		t.Fatalf("a failing cheap seat: %v, want [month failing-day]", got)
+	}
+	// and one all but used up is last of all, whatever it has left to come
+	seats = []Seat{seats[1], seats[0], {Key: "spent-month", Known: true, Class: provider.QuotaMonth, Used: 99, Pace: 0.5}}
+	if got := keys(seats, Apply(Balanced, "p", seats)); !slices.Equal(got, []string{"month", "failing-day", "spent-month"}) {
+		t.Fatalf("a spent month: %v, want [month failing-day spent-month]", got)
+	}
+}
+
+// A week or a month about to renew with much of it unspent goes before them
+// all, whatever class it is and whatever the others have: what is left is
+// lost at the reset, so it is spent now — the month at the end of its days,
+// not left to expire.
+func TestBalancedSpendsWhatIsAboutToBeLostFirst(t *testing.T) {
+	s := []Seat{
+		{Key: "day", Known: true, Class: provider.QuotaDay, Pace: 0.9, Tokens: 10},
+		{Key: "low-day", Known: true, Class: provider.QuotaDay, Used: 92, Pace: 0.9},
+		{Key: "learner", Learns: true},
+		{Key: "month", Known: true, Class: provider.QuotaMonth, Used: 40, Pace: 0.1, Tokens: 9000, Loses: true},
+	}
+	if got := keys(s, Apply(Balanced, "p", s)); !slices.Equal(got, []string{"month", "learner", "day", "low-day"}) {
+		t.Fatalf("about to be lost: %v, want [month learner day low-day]", got)
+	}
+}
+
 // A key that reads no windows has no pace, so it is in the last band of those
 // with room: it is spent after subscriptions spending quota they would lose
 // at their reset, and not before, as #4535 asked.
 func TestBalancedKeyGoesBehindSubscriptions(t *testing.T) {
 	s := []Seat{
-		{Key: "key"},
+		{Key: "key", Class: provider.QuotaUnread},
 		{Key: "sub", Known: true, Used: 20, Pace: 0.1, Tokens: 1000},
 	}
 	if got := keys(s, Apply(Balanced, "p", s)); !slices.Equal(got, []string{"sub", "key"}) {

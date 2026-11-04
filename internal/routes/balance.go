@@ -3,18 +3,20 @@ package routes
 import "sort"
 
 // Balanced weighs a pool's accounts and keys together rather than by one
-// measure: what each seat would lose at its reset, how it has answered
-// lately, how its vendor's other seats have, and what magpie has sent it
-// against its weight. No seat is used up while the others sit idle, one
-// that keeps failing is not asked again while healthy ones can answer, and
-// a vendor that is refusing magpie is left to the others once its accounts
-// say so.
+// measure: what each seat would lose at its reset, which quota spending it
+// uses up, how it has answered lately, how its vendor's other seats have,
+// and what magpie has sent it against its weight. No seat is used up while
+// the others sit idle, one that keeps failing is not asked again while
+// healthy ones can answer, and a vendor that is refusing magpie is left to
+// the others once its accounts say so.
 //
 // Its tiers are Smart's: a seat with room goes before one at 90% or more of
 // a window, and that before one all but used up (98%), so nothing running
 // out is spent while there is room elsewhere; one running low goes by the
 // share used, and one all but used up that goes on on its credits first
-// (spentBefore). Within a tier:
+// (spentBefore). One whose window is about to renew with a fifth of it
+// unspent goes before them all, whatever its tier or class (Seat.Loses):
+// what it has is lost at the reset, so it is spent now. Within a tier:
 //
 //   - a seat that failed since it last answered goes behind those that
 //     have answered since, the one failing most last: it rests meanwhile
@@ -28,6 +30,14 @@ import "sort"
 //     were refused one after another before their vendor was still (AI
 //     11140). One provider's seats are one vendor, so a pool of one
 //     provider goes by the seat's own failures alone.
+//   - the quota that comes back soonest goes first (Seat.Class): what a
+//     check-in, points or credits leave, or a day's window, before a
+//     plan's five hours, that before its week and that before its month,
+//     with a wallet's money last, which never comes back. A paid plan's
+//     windows keep for when the rest is out, and the month of it is spent
+//     in its last days rather than left to the reset. A seat no window was
+//     read for (QuotaUnread) goes after them all: what spending it costs
+//     is unknown, and may be money.
 //   - the seat with the highest pace goes first, as in Use before expiry,
 //     those within a tenth of each other in one band: what has the most to
 //     lose soonest is spent first, so little is lost at resets and to
@@ -81,6 +91,9 @@ var Balanced = Strategy{ByUse: true, BySpeed: true, Order: func(_ string, seats 
 		if fa, fb := failing[sa.Vendor], failing[sb.Vendor]; fa != fb {
 			return fa < fb
 		}
+		if sa.Class != sb.Class {
+			return sa.Class < sb.Class
+		}
 		if band[idx[a]] != band[idx[b]] {
 			return band[idx[a]] < band[idx[b]]
 		}
@@ -97,23 +110,25 @@ var Balanced = Strategy{ByUse: true, BySpeed: true, Order: func(_ string, seats 
 	return idx
 }}
 
-// Where a seat lands in Balanced's order: a learning account first, once,
-// then those with room, then those running low, then those all but used up.
+// Where a seat lands in Balanced's order: one whose window is about to
+// renew with much of it left, then a learning account, once, then the
+// tiers, those all but used up last of all whatever their class.
 const (
-	placeLearns = iota
+	placeLoses = iota
+	placeLearns
 	placeFine
 	placeLow
 	placeSpent
 )
 
 func balancePlace(s Seat) int {
-	if s.Learns {
+	switch {
+	case s.Loses:
+		return placeLoses
+	case s.Learns:
 		return placeLearns
 	}
-	if t := seatTier(s); t > 0 {
-		return placeFine + t
-	}
-	return placeFine
+	return placeFine + seatTier(s)
 }
 
 // loadLess is what Balanced spreads a band by: the tokens magpie sent a

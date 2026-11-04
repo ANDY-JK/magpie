@@ -71,3 +71,58 @@ func TestBalancedWeighsFailuresAndVendors(t *testing.T) {
 		t.Fatalf("vendors alike: %s, want v1#k1 v1#k2 v2#k3", got)
 	}
 }
+
+// Balanced spends the quota that comes back soonest first: points and
+// credits, or a day's window, before a plan's week and that before its
+// month, so a paid plan is kept for when the rest is out; and one whose
+// window is about to renew with much of it left goes first of all, since
+// what it has is lost at the reset. The gateway reads each candidate's
+// allowance into the class the order goes by, and the Routing page shows it
+// (Weighed.Class, Loses).
+func TestBalancedSpendsWhatComesBackSoonest(t *testing.T) {
+	now := time.Now()
+	of := map[string]provider.Allowance{}
+	keyWindows(t, of)
+	defer func() {
+		routed.Lock()
+		for _, k := range []string{"bv#credits", "bv#week", "bv#month", "bv#pay"} {
+			delete(routed.used, k)
+			delete(routed.failures, k)
+		}
+		routed.Unlock()
+	}()
+	key := func(k string) candidate {
+		return candidate{p: provider.Provider{ID: "bv", Key: k}, model: "m", rest: "bv#" + k}
+	}
+	// pay is a plain key: no window is read for it, so what spending it
+	// costs is unknown and may be money — it goes after the plan's own
+	// quota, not before it (#4535)
+	cs := []candidate{key("month"), key("week"), key("credits"), key("pay")}
+	of["credits"] = provider.Allowance{{Used: 50, Unit: "credits", Of: 600, Amount: 300}} // Qoder's add-on credits
+	of["week"] = week(20, now.Add(3*24*time.Hour))                                        // Claude's week
+	of["month"] = provider.Allowance{{Used: 20, Span: 30 * 24 * time.Hour, Resets: now.Add(20 * 24 * time.Hour)}}
+	p := provider.Provider{ID: "bv", Routing: provider.Balanced}
+	got, wg := weigh(p, cs, "m", provider.Chat)
+	if order := restsOf(got); order != "bv#credits bv#week bv#month bv#pay " {
+		t.Fatalf("by class: %s, want bv#credits bv#week bv#month bv#pay", order)
+	}
+	if w := weighed(cs[2], p, wg, false, provider.Chat); w.Class != int(provider.QuotaDay) || w.Loses {
+		t.Fatalf("the trace of the credits seat: class %d, loses %v", w.Class, w.Loses)
+	}
+	if w := weighed(cs[0], p, wg, false, provider.Chat); w.Class != int(provider.QuotaMonth) {
+		t.Fatalf("the trace of the month seat: class %d", w.Class)
+	}
+	if w := weighed(cs[3], p, wg, false, provider.Chat); w.Class != int(provider.QuotaUnread) {
+		t.Fatalf("the trace of a key nothing was read for: class %d", w.Class)
+	}
+	// the week is in its last ten hours with a fifth of it unspent: first,
+	// though the credits are the cheaper quota
+	of["week"] = week(20, now.Add(10*time.Hour))
+	got, wg = weigh(p, cs, "m", provider.Chat)
+	if order := restsOf(got); order != "bv#week bv#credits bv#month bv#pay " {
+		t.Fatalf("about to be lost: %s, want bv#week bv#credits bv#month bv#pay", order)
+	}
+	if w := weighed(cs[1], p, wg, false, provider.Chat); !w.Loses {
+		t.Fatalf("the trace doesn't say the week is about to be lost: %+v", w)
+	}
+}

@@ -104,6 +104,108 @@ func TestAllowancePace(t *testing.T) {
 	}
 }
 
+// Class is which quota spending an account's allowance uses up, by how soon
+// it is made good again: the longest window that counts the model decides,
+// the month a five-hour window sits in; points and credits that say nothing
+// of when they come back, and a window of a day, are spent first, then a
+// plan's five hours, its week and its month; a balance with no window is
+// money, spent last. A window that says no span goes by when it renews. Its
+// window about to renew with a fifth of it unspent, it is about to lose what
+// it has: the span's last tenth, or a day for one that says no span.
+func TestAllowanceClass(t *testing.T) {
+	now := time.Now()
+	m := "deepseek-v4.1-flash"
+	// OpenCode Go's: five hours, seven days and a month that says no span
+	open := Allowance{
+		{Used: 0, Span: 5 * time.Hour},
+		{Used: 44, Span: 7 * 24 * time.Hour, Resets: now.Add(5 * 24 * time.Hour)},
+		{Used: 95, Resets: now.Add(13 * 24 * time.Hour)},
+	}
+	if c, loses := open.Class(m, now); c != QuotaMonth || loses {
+		t.Fatalf("opencode-go's month: %v %v", c, loses)
+	}
+	// Claude's and Codex's: five hours and a week
+	if c, _ := (Allowance{{Span: 5 * time.Hour}, {Span: 7 * 24 * time.Hour, Resets: now.Add(3 * 24 * time.Hour)}}).Class(m, now); c != QuotaWeek {
+		t.Fatalf("a week beside its five hours: %v", c)
+	}
+	// Claude Enterprise's: five hours alone
+	if c, _ := (Allowance{{Span: 5 * time.Hour, Used: 10}}).Class(m, now); c != QuotaFive {
+		t.Fatalf("five hours alone: %v", c)
+	}
+	// a day, and a month
+	if c, _ := (Allowance{{Span: 24 * time.Hour, Used: 0}}).Class(m, now); c != QuotaDay {
+		t.Fatalf("a day: %v", c)
+	}
+	if c, _ := (Allowance{{Span: 30 * 24 * time.Hour, Used: 5}}).Class(m, now); c != QuotaMonth {
+		t.Fatalf("thirty days: %v", c)
+	}
+	// points and credits that say nothing of when: Qoder's add-on credits,
+	// CodeArts' points with no reset
+	if c, _ := (Allowance{{Used: 66, Unit: "credits", Of: 600}}).Class(m, now); c != QuotaDay {
+		t.Fatalf("add-on credits: %v", c)
+	}
+	// CodeArts' points, whose reset says when and not how long
+	if c, _ := (Allowance{{Used: 100, Unit: "credits", Of: 9600, Resets: now.Add(19 * 24 * time.Hour)}}).Class(m, now); c != QuotaMonth {
+		t.Fatalf("points renewing in 19 days: %v", c)
+	}
+	if c, _ := (Allowance{{Used: 40, Resets: now.Add(6 * 24 * time.Hour)}}).Class(m, now); c != QuotaWeek {
+		t.Fatalf("no span, renewing in six days: %v", c)
+	}
+	if c, _ := (Allowance{{Used: 40, Resets: now.Add(5 * time.Hour)}}).Class(m, now); c != QuotaFive {
+		t.Fatalf("no span, renewing in five hours: %v", c)
+	}
+	// MiniMax's credits, which expire and hold a balance too: the window
+	// says, not the money
+	left := 142.32
+	if c, _ := (Allowance{{Used: 94, Of: 2600, Unit: "credits", RunsOut: now.Add(29 * 24 * time.Hour), Balance: &left}}).Class(m, now); c != QuotaDay {
+		t.Fatalf("credits that expire: %v", c)
+	}
+	// only a balance: money, spent last
+	if c, loses := (Allowance{{Balance: &left, Unit: "credits"}}).Class(m, now); c != QuotaWallet || loses {
+		t.Fatalf("a wallet: %v %v", c, loses)
+	}
+	if c, _ := (Allowance{}).Class(m, now); c != QuotaDay {
+		t.Fatalf("nothing told: %v", c)
+	}
+	// a window for another model doesn't count
+	if c, _ := (Allowance{{Model: "opus", Span: 30 * 24 * time.Hour}, {Span: 5 * time.Hour}}).Class("claude-sonnet-5", now); c != QuotaFive {
+		t.Fatalf("another model's month: %v", c)
+	}
+	// a week in its last hours with much of it left is about to be lost
+	if c, loses := (Allowance{{Used: 40, Span: 7 * 24 * time.Hour, Resets: now.Add(10 * time.Hour)}}).Class(m, now); c != QuotaWeek || !loses {
+		t.Fatalf("a week ending 60%% unspent: %v %v", c, loses)
+	}
+	if _, loses := (Allowance{{Used: 90, Span: 7 * 24 * time.Hour, Resets: now.Add(10 * time.Hour)}}).Class(m, now); loses {
+		t.Fatalf("a week ending 10%% unspent isn't lost, it is spent")
+	}
+	if _, loses := (Allowance{{Used: 40, Span: 7 * 24 * time.Hour, Resets: now.Add(3 * 24 * time.Hour)}}).Class(m, now); loses {
+		t.Fatalf("a week with three days to go isn't about to be lost")
+	}
+	// the five hours' last half hour: they come back within the hour, so a
+	// plan's five-hour cap isn't spent first for
+	if _, loses := (Allowance{{Used: 30, Span: 5 * time.Hour, Resets: now.Add(20 * time.Minute)}}).Class(m, now); loses {
+		t.Fatalf("five hours renew in twenty minutes")
+	}
+	// a day renews tomorrow: spending what is left is the next day's job
+	if _, loses := (Allowance{{Used: 10, Span: 24 * time.Hour, Resets: now.Add(time.Hour)}}).Class(m, now); loses {
+		t.Fatalf("a day about to renew isn't spent first")
+	}
+	// one that says no span: a day before its reset
+	if _, loses := (Allowance{{Used: 40, Resets: now.Add(12 * time.Hour)}}).Class(m, now); !loses {
+		t.Fatalf("a month renewing tomorrow 60%% unspent is lost")
+	}
+	if _, loses := (Allowance{{Used: 90, Resets: now.Add(12 * time.Hour)}}).Class(m, now); loses {
+		t.Fatalf("a month renewing tomorrow 10%% unspent isn't")
+	}
+	if _, loses := (Allowance{{Used: 40, Resets: now.Add(4 * 24 * time.Hour)}}).Class(m, now); loses {
+		t.Fatalf("one renewing in four days isn't about to be lost")
+	}
+	// an empty window, its reset passed: nothing used, so more is at stake
+	if _, loses := (Allowance{{Used: 100, Span: 7 * 24 * time.Hour, Resets: now.Add(-time.Minute)}}).Class(m, now); loses {
+		t.Fatalf("a window whose reset passed says nothing of when it runs again")
+	}
+}
+
 // A window counts only the models it is for, and one whose reset has
 // passed is empty again.
 func TestAllowanceFor(t *testing.T) {
