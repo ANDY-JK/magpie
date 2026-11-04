@@ -17,7 +17,7 @@ import (
 // every change that moved it, is in docs/gui-script-budget.md.
 const (
 	appScriptBudget  = 1_316_874
-	coreScriptBudget = 1_540_506
+	coreScriptBudget = 1_540_688
 )
 
 func TestCoreScriptBudget(t *testing.T) {

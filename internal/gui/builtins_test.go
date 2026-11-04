@@ -273,8 +273,16 @@ func TestBuiltinClientsLoaded(t *testing.T) {
 				}
 			} else if c == "page.js" {
 				// a page's code that runs on app.js's helpers: after app.js,
-				// before start.js shows the first page
-				if i := at(name); i < app || i > start {
+				// before start.js shows the first page — or, a heavy page's,
+				// named in the lazyPages template with data-page, which runs
+				// the first time the page is opened, after app.js's helpers
+				i := at(name)
+				tagEnd := strings.Index(src[i:], ">")
+				if tagEnd >= 0 && strings.Contains(src[i:i+tagEnd], "data-page=") {
+					if i < kernel || i > app {
+						t.Errorf("%s isn't in the lazyPages template, before app.js", name)
+					}
+				} else if i < app || i > start {
 					t.Errorf("%s isn't between app.js and start.js", name)
 				}
 			} else if i := at(name); i < kernel || i > app {

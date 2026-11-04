@@ -556,7 +556,9 @@
 <script src="plugins/usage/i18n.js"></script>
 <script src="plugins/usage/client.js"></script>
 <script src="plugins/redact/i18n.js"></script>
-<script src="plugins/redact/client.js"></script>
+<!-- what Settings' Try it calls of Masking before its page is opened:
+     the page's script is one of the heavy ones, below -->
+<script src="plugins/redact/shared.js"></script>
 <script src="plugins/otel/i18n.js"></script>
 <!-- the pages pages.js opens on the reader's first visit, named here so
      each is asked for by its content's hash, as the page's own scripts are
@@ -567,6 +569,8 @@
   <script src="plugins/sessions/client.js" data-page="sessions"></script>
   <script src="plugins/library/client.js" data-page="library"></script>
   <script src="plugins/routing/client.js" data-page="routing"></script>
+  <script src="plugins/redact/page.js" data-page="masking"></script>
+  <script src="plugins/redact/demo.js" data-page="masking"></script>
 </template>
 <script src="pages.js"></script>
 <script src="purposes.js"></script>
@@ -575,8 +579,6 @@
 <script src="pluginpages.js"></script>
 <script src="context.js"></script>
 <script src="plugins/usage/page.js"></script>
-<script src="plugins/redact/page.js"></script>
-<script src="plugins/redact/demo.js"></script>
 <script src="plugins/otel/page.js"></script>
 <script src="plugins/gateway/settings.js"></script>
 <script src="plugins/search/settings.js"></script>

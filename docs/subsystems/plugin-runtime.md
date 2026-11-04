@@ -84,7 +84,10 @@ plugins' scripts and `app.js`, all classic scripts sharing one scope. It is
   (`magpie.call("routing", "mount")`) and then call what it set in their
   place — a page that didn't come leaves the shim, and the call fails with
   "The Routing page didn't open." rather than calling itself. The tray
-  panel's Routing tab is the one that brings it in there, on `ptab`.
+  panel's Routing tab is the one that brings it in there, on `ptab`. Insights ›
+  Masking is one too, its eager half `assets/plugins/redact/shared.js`:
+  `maskMatches`, which Settings › Privacy's *Try it* asks of the page's own
+  records.
 - **Words.** A plugin's `i18n.js` calls `magpie.strings({zh, "zh-TW", ja,
   de})`, added to i18n.js's `I18N` before app.js translates anything. A key
   already there is logged and not taken. `tests/strings.cjs` reads them as

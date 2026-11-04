@@ -4,7 +4,8 @@
 // its script, markup and hooks come the first time the reader opens it. An
 // English page that opens none of them fetches none of their code. Routing
 // is one too, its eager half shared.js saying what the tray panel and
-// Usage's Requests draw with before the page is opened (pages.js).
+// Usage's Requests draw with before the page is opened (pages.js), and
+// Masking, its shared.js holding maskMatches for Settings' Try it.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -12,7 +13,7 @@ const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
 const assets = path.resolve(__dirname, "../assets");
-const LAZY = ["plugins/sessions/client.js", "plugins/library/client.js", "plugins/routing/client.js"];
+const LAZY = ["plugins/sessions/client.js", "plugins/library/client.js", "plugins/routing/client.js", "plugins/redact/page.js", "plugins/redact/demo.js"];
 
 function serve() {
   return async (r) => {
@@ -58,24 +59,26 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     // show() hides and shows their views, and their titles are here
     const before = await page.evaluate(() => ({
       pages: magpie.pages().sort(),
-      titles: ["sessions", "library", "routing"].map((k) => magpie.page(k)?.title),
-      views: ["sessions", "library", "routing"].map((k) => !!document.getElementById("view-" + k)),
-      empties: ["sessions", "library", "routing"].map((k) => document.getElementById("view-" + k).children.length),
+      titles: ["sessions", "library", "routing", "masking"].map((k) => magpie.page(k)?.title),
+      views: ["sessions", "library", "routing", "masking"].map((k) => !!document.getElementById("view-" + k)),
+      empties: ["sessions", "library", "routing", "masking"].map((k) => document.getElementById("view-" + k).children.length),
       nav: [...document.querySelectorAll("#nav [data-view]")].map((b) => b.dataset.view),
       // Routing's eager half says what its rows say of a request, and what
-      // opens one: the rest of the window calls these before the page comes
-      shared: [typeof window.kindName, typeof window.purposeOptions, typeof window.swapWhy, typeof window.openRoute],
+      // opens one: the rest of the window calls these before the page comes;
+      // Masking's holds maskMatches, which Settings' Try it asks
+      shared: [typeof window.kindName, typeof window.purposeOptions, typeof window.swapWhy, typeof window.openRoute, typeof maskMatches],
     }));
-    assert.deepEqual(before.pages.filter((k) => ["sessions", "library", "routing"].includes(k)), ["library", "routing", "sessions"]);
-    assert.deepEqual(before.titles, ["Sessions", "Library", "Routing"]);
-    assert.deepEqual(before.views, [true, true, true]);
-    assert.deepEqual(before.empties, [0, 0, 0], "a page not opened yet has drawn nothing");
-    assert.deepEqual(before.nav.filter((v) => ["sessions", "library", "routing"].includes(v)), ["sessions", "library", "routing"]);
+    assert.deepEqual(before.pages.filter((k) => ["sessions", "library", "routing", "masking"].includes(k)), ["library", "masking", "routing", "sessions"]);
+    assert.deepEqual(before.titles, ["Sessions", "Library", "Routing", "Masking"]);
+    assert.deepEqual(before.views, [true, true, true, true]);
+    assert.deepEqual(before.empties, [0, 0, 0, 0], "a page not opened yet has drawn nothing");
+    assert.deepEqual(before.nav.filter((v) => ["sessions", "library", "routing", "masking"].includes(v)).sort(), ["library", "masking", "routing", "sessions"]);
     assert.deepEqual(asked, [], "no heavy page's code is fetched before one is opened");
     // Routing's script is named once, in the lazyPages template: it isn't
-    // the window's (pages.js)
+    // the window's (pages.js); so are Masking's two
     assert.deepEqual(await page.evaluate(() => [document.querySelectorAll('script[src*="routing/client.js"]').length, document.getElementById("lazyPages").content.querySelectorAll('script[src*="routing/client.js"]').length]), [0, 1]);
-    assert.deepEqual(before.shared, ["function", "function", "function", "function"]);
+    assert.deepEqual(await page.evaluate(() => [document.querySelectorAll('script[src*="plugins/redact/page.js"]').length, document.getElementById("lazyPages").content.querySelectorAll('script[data-page="masking"]').length]), [0, 2]);
+    assert.deepEqual(before.shared, ["function", "function", "function", "function", "function"]);
 
     // the reader opens Library: its script comes, and the page draws
     await page.locator('#nav > button[data-view="library"]').click();

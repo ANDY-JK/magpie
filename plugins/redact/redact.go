@@ -23,8 +23,11 @@ func init() {
 		One: "Masking is on", Many: "Masking is on",
 		InUse: InUse,
 		// Insights › Masking: what masking did, request by request
-		Parts:  []pluginrt.Part{{Slot: "nav.page", Key: "masking"}},
-		Client: []string{"i18n.js", "redact.css", "client.js", "page.js"},
+		Parts: []pluginrt.Part{{Slot: "nav.page", Key: "masking"}},
+		// shared.js is the window's half: maskMatches, which Settings' Try
+		// it asks before the page's own script comes (pages.js, the lazy
+		// pages); page.js registers the page itself, and demo.js is its demo
+		Client: []string{"i18n.js", "redact.css", "shared.js", "page.js", "demo.js"},
 		Apply: func(c *pluginrt.Ctx) error {
 			c.OnDispose(gwmw.Mask(masking.Masker{}))
 			return nil

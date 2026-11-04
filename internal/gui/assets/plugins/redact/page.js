@@ -1,27 +1,51 @@
-// Insights › Masking's code (client.js has its markup and hooks): run after
-// app.js, whose masking helpers it shares (maskTip, maskColor,
-// maskShape, maskValue: Settings' Try it and the masked calls' badges use
-// them too; Try it uses this page's maskMatches in turn). What a
-// placeholder stood for is in this magpie's memory alone, never on disk,
-// so after a restart it is gone; so is the text a request went out with
-// (/api/masking/sent), kept for the newest requests only.
+// Insights › Masking's page: its markup, hooks and code, run the first time
+// the page is opened (pages.js, the lazy pages). app.js's masking helpers
+// it shares (maskTip, maskColor, maskShape, maskValue: Settings' Try it and
+// the masked calls' badges use them too; Try it uses shared.js's
+// maskMatches in turn). What a placeholder stood for is in this magpie's
+// memory alone, never on disk, so after a restart it is gone; so is the
+// text a request went out with (/api/masking/sent), kept for the newest
+// requests only.
+//
+// A page of the redact plugin (kernel.js): it registers the page its shell
+// declared (magpie.lazy). The hooks are what the shell asks of it: open,
+// refresh (the window came back), reload (Refresh in the sidebar), leave,
+// and focus (a masked call's badge opens its request).
+magpie.plugin("redact", (ctx) => {
+  ctx.slots.add("page", {
+    key: "masking",
+    title: "Masking",
+    html: `
+  <section class="msk-card" id="maskCard"></section>
+  <section class="msk-demo" id="maskDemo" data-no-pii>
+    <button type="button" class="md-row" id="mdRow" aria-expanded="false" aria-controls="mdBody">
+      <span class="md-thumb" aria-hidden="true"></span>
+      <span class="md-words"><span class="md-name" data-t>How masking works</span><span class="md-sub" data-t>Little Magpie walks one request through: passwords become placeholders before it leaves, and come back on your computer with the answer</span></span>
+      <span class="md-len">0:27</span>
+      <svg class="md-chev" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="md-body" id="mdBody" hidden></div>
+  </section>
+  <section class="msk-list" id="maskList"></section>
+  <div class="list prefs msk-prefs" id="maskPrefs">
+    <div class="row pref" id="maskAlertRow">
+      <div class="who"><div class="name" data-t>Masking alert</div><div class="sub wraps" data-t>A notification when masking swaps a value for the first time: its kind and how many, never the value itself</div></div>
+      <div id="maskAlertSegs"></div>
+    </div>
+  </div>
+  <section class="msk-one" id="maskOne" hidden></section>
+`,
+    open() { return maskPageOpen(); },
+    refresh(again) { return maskPageLoad(again); },
+    reload() { return maskPageLoad(true); },
+    leave() { maskTipOff(); },
+    focus(key) { maskOneOpen(String(key)); },
+  });
+});
 
 const stillMotion = calm;
-// maskMatches is text's stand-ins as matchAll gives them: its {{…}}
-// placeholders, and the made-up keys "Keep a key's form" sent (redact's
-// shape.go), the keys of info that are no placeholder, which only the
-// record's own list tells from the text around them (#3599)
-const maskLookRes = new WeakMap();
-function maskMatches(text, info) {
-  let re = maskLookRes.get(info);
-  if (!re) {
-    const looks = [...info.keys()].filter((p) => p && !p.startsWith("{{")).sort((a, b) => b.length - a.length)
-      .map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    re = looks.length ? new RegExp(PLACEHOLDER.source + "|" + looks.join("|"), "g") : PLACEHOLDER;
-    maskLookRes.set(info, re);
-  }
-  return text.matchAll(re);
-}
+// maskMatches, which Try it asks too, is shared.js's: it is there before
+// this page is opened
 // the providers' names, read once when the page opened before any page
 // that loads them
 let maskProv = null, maskProvAsked = false;
