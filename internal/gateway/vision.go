@@ -233,13 +233,68 @@ type rankedSeer struct {
 	ready bool
 }
 
+// seerMissFor is how long a describer that failed to describe an image
+// ranks behind those that haven't (seersRanked, ranked.failed).
+//
+// AutoVision's pick is the cheapest small model that sees, which can be
+// one that takes an image and doesn't answer it: qoder's qfmodel, on a
+// Coding Plan, described one in 56 seconds when it did, and was still at
+// it when a request held for it was given up for after unroutedMost (2
+// minutes) — 2436 descriptions in a day at ~41 seconds each, every retry
+// asking it again, on the two accounts the user's own sessions use. The
+// models that did answer described one in 7 seconds.
+//
+// Not given up for good, as a pick that failed once isn't: after
+// seerMissFor it is AutoVision's again, and it clears itself the moment
+// it describes an image (a fallback ask, or the Settings pick, which is
+// always asked first).
+var seerMissFor = 30 * time.Minute
+
+// seerMiss is when a describer last failed to describe an image and has
+// described none since (missedDescribing, describedImage); seerMiss.mu
+// guards m.
+var seerMiss = struct {
+	mu sync.Mutex
+	m  map[string]time.Time
+}{}
+
+// missedDescribing records that model failed to describe an image, now:
+// the next pick ranks it behind the models that haven't.
+func missedDescribing(model string, now time.Time) {
+	seerMiss.mu.Lock()
+	if seerMiss.m == nil {
+		seerMiss.m = map[string]time.Time{}
+	}
+	seerMiss.m[model] = now
+	seerMiss.mu.Unlock()
+}
+
+// describedImage records that model described one, so it is picked as its
+// place says again.
+func describedImage(model string) {
+	seerMiss.mu.Lock()
+	delete(seerMiss.m, model)
+	seerMiss.mu.Unlock()
+}
+
+// missedDescribingYet is whether model failed to describe an image within
+// seerMissFor.
+func missedDescribingYet(model string, now time.Time) bool {
+	seerMiss.mu.Lock()
+	defer seerMiss.mu.Unlock()
+	at, ok := seerMiss.m[model]
+	return ok && now.Sub(at) < seerMissFor
+}
+
 // seersRanked is each switched-on provider's small model that sees, in
-// the order AutoVision picks among them: allowance left first, then a
+// the order AutoVision picks among them: allowance left first, then one
+// that hasn't just failed to describe an image (seerMissFor), then a
 // Claude account's, a Codex account's, an API key's, another account's,
 // then the cheaper, then the provider listed first. A model skip holds is
 // passed over for the provider's next one (the describers a failed
 // description already asked, describeWith).
 func seersRanked(skip func(string) bool) []rankedSeer {
+	now := time.Now()
 	tier := func(p provider.Provider) int {
 		switch {
 		case p.Account != nil && p.Account.Agent == "claude":
@@ -253,8 +308,9 @@ func seersRanked(skip func(string) bool) []rankedSeer {
 	}
 	type ranked struct {
 		rankedSeer
-		tier int
-		cost float64
+		tier   int
+		cost   float64
+		failed bool
 	}
 	var rs []ranked
 	for _, p := range provider.All() {
@@ -269,12 +325,20 @@ func seersRanked(skip func(string) bool) []rankedSeer {
 		if c.id == "" {
 			continue
 		}
-		rs = append(rs, ranked{rankedSeer{p.ID + "/" + c.id, ready}, tier(p), c.cost})
+		rs = append(rs, ranked{rankedSeer{p.ID + "/" + c.id, ready}, tier(p), c.cost, missedDescribingYet(p.ID+"/"+c.id, now)})
 	}
 	slices.SortStableFunc(rs, func(a, b ranked) int {
 		switch {
 		case a.ready != b.ready:
 			if a.ready {
+				return -1
+			}
+			return 1
+		case a.failed != b.failed:
+			// one that just failed to describe an image last, but a model
+			// with allowance before one without still: that tier is a
+			// refusal waiting, this one a wait that ended with nothing
+			if b.failed {
 				return -1
 			}
 			return 1
@@ -555,6 +619,7 @@ func (s *Server) describeWith(ctx context.Context, model, src, system, text stri
 	for {
 		said, err = s.askVisionWith(askCtx, ask, src, system, text, time.Until(deadline))
 		if err == nil {
+			describedImage(ask)
 			return said, ask, nil
 		}
 		fails = append(fails, visionTry{ask, err})
@@ -577,6 +642,13 @@ func (s *Server) describeWith(ctx context.Context, model, src, system, text stri
 		askCtx = describingInstead(ctx, ask, model, err)
 		tried = append(tried, next)
 		ask = next
+	}
+	// none of them described it: the next pick of magpie's own is another
+	// model that sees, while one that answered stays where it is. The
+	// Settings pick is asked first whatever this says (seer).
+	now := time.Now()
+	for _, f := range fails {
+		missedDescribing(f.model, now)
 	}
 	return "", model, visionFailed(fails)
 }

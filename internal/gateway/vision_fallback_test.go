@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -105,6 +106,170 @@ func TestAutoDescriberThatFailsGivesWayToTheNext(t *testing.T) {
 	}
 	if f := visionRow(t, s, next); f == nil || f.Instead != first || f.Picked {
 		t.Fatalf("the answering description's row is for %+v", f)
+	}
+}
+
+// askedOf is how many descriptions u's models were asked.
+func askedOf(u *eyeUp) int { return len(u.sent("eye")) + len(u.sent("bigeye")) }
+
+// holdingEye is eyeUp whose model that sees holds a description until its
+// request ends while hold is set, saying when one arrived.
+type holdingEye struct {
+	eyeUp
+	arrived chan struct{}
+	hmu     sync.Mutex
+	hold    bool
+}
+
+func (u *holdingEye) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	u.hmu.Lock()
+	hold := u.hold && strings.HasSuffix(modelOf(body), "eye")
+	u.hmu.Unlock()
+	if hold {
+		u.arrived <- struct{}{}
+		<-r.Context().Done()
+		return
+	}
+	r.Body = io.NopCloser(strings.NewReader(string(body)))
+	u.eyeUp.ServeHTTP(w, r)
+}
+
+func (u *holdingEye) holding(on bool) {
+	u.hmu.Lock()
+	u.hold = on
+	u.hmu.Unlock()
+}
+
+// A describer magpie picked itself whose description never came — the
+// agent gave up on the request, or magpie gave it up for — is not picked
+// for the next image while another that hasn't failed is there. A model
+// that takes an image and doesn't answer it had every request held for it
+// and every retry asked it again (a qoder Coding Plan's qfmodel: 2436
+// descriptions in a day at ~41 seconds each, on the two accounts the
+// user's own sessions use, while a model that answered described one in
+// 7 seconds).
+func TestADescriptionThatNeverCameMovesThePickOn(t *testing.T) {
+	fresh(t)
+	u := &holdingEye{arrived: make(chan struct{}, 1), hold: true}
+	up := httptest.NewServer(u)
+	t.Cleanup(up.Close)
+	if err := provider.Save(provider.Provider{ID: "probe", Name: "Probe", Chat: up.URL + "/v1", Key: "key", Models: []string{"text", "eye"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := catalog.SaveLive("probe", up.URL+"/v1", []catalog.Model{
+		{ID: "text", ImageInput: imageInputBool(false)},
+		{ID: "eye", Images: true, ImageInput: imageInputBool(true)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	u2 := &eyeUp{}
+	srv := httptest.NewServer(u2)
+	t.Cleanup(srv.Close)
+	if err := provider.Save(provider.Provider{ID: "other", Name: "Other", Chat: srv.URL + "/v1", Key: "key", Models: []string{"bigeye"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := catalog.SaveLive("other", srv.URL+"/v1", []catalog.Model{{ID: "bigeye", Images: true, ImageInput: imageInputBool(true)}}); err != nil {
+		t.Fatal(err)
+	}
+	s := New()
+	if first := AutoVision(); first != "probe/eye" {
+		t.Fatalf("AutoVision = %q, want probe/eye", first)
+	}
+	// a request held on its image until its agent cancels it: what the
+	// pick was asked never came
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan int, 1)
+	go func() {
+		rec := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(pastedImage)).WithContext(ctx))
+		done <- rec.Code
+	}()
+	select {
+	case <-u.arrived:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the pick was never asked")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the canceled request never ended")
+	}
+	// the description is counted against it once its own work has ended
+	deadline := time.Now().Add(10 * time.Second)
+	for AutoVision() != "other/bigeye" {
+		if time.Now().After(deadline) {
+			t.Fatalf("after a description that never came, AutoVision = %q, want other/bigeye", AutoVision())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// the next image is asked of the other one, none of the pick
+	u.holding(false)
+	asked := askedOf(&u.eyeUp)
+	if code, body := postAs(t, s, "", strings.Replace(pastedImage, "aGVsbG8=", "d29ybGQ=", 1)); code != 200 {
+		t.Fatalf("next image: %d %s", code, body)
+	}
+	if got := askedOf(&u.eyeUp); got != asked {
+		t.Fatalf("probe/eye, whose description never came, was asked for the next image %d times", got-asked)
+	}
+	if got := u2.sent("bigeye"); len(got) != 1 || !strings.Contains(got[0], "image_url") {
+		t.Fatalf("other/bigeye was asked %d times", len(got))
+	}
+}
+
+// A pick that missed comes back once it describes an image, and after
+// seerMissFor passes. The Settings pick is asked first however it ranks,
+// and the only model that sees is still named with every one missed.
+func TestAMissedPickComesBack(t *testing.T) {
+	s, u, u2 := twoEyed(t, "")
+	first, next, down := AutoVision(), "other/bigeye", u
+	if first == "other/bigeye" {
+		next, down = "probe/eye", u2
+	}
+	missedDescribing(first, time.Now())
+	if got := AutoVision(); got != next {
+		t.Fatalf("with %s missed, AutoVision = %q, want %q", first, got, next)
+	}
+	// the Settings pick is asked first all the same, and describing one
+	// clears it
+	st := settings.Load()
+	st.Vision = first
+	if err := settings.Save(st); err != nil {
+		t.Fatal(err)
+	}
+	if code, body := postAs(t, s, "", strings.Replace(pastedImage, "aGVsbG8=", "d29ybGQ=", 1)); code != 200 {
+		t.Fatalf("the Settings pick: %d %s", code, body)
+	}
+	if got := askedOf(down); got != 1 {
+		t.Fatalf("the Settings pick %s was asked %d times, want 1", first, got)
+	}
+	st = settings.Load()
+	st.Vision = ""
+	if err := settings.Save(st); err != nil {
+		t.Fatal(err)
+	}
+	if got := AutoVision(); got != first {
+		t.Fatalf("after describing an image, AutoVision = %q, want %q", got, first)
+	}
+	// gone once seerMissFor passes
+	missedDescribing(first, time.Now())
+	if got := AutoVision(); got != next {
+		t.Fatalf("with %s missed again, AutoVision = %q, want %q", first, got, next)
+	}
+	seerMiss.mu.Lock()
+	seerMiss.m[first] = time.Now().Add(-seerMissFor - time.Second)
+	seerMiss.mu.Unlock()
+	if got := AutoVision(); got != first {
+		t.Fatalf("after seerMissFor, AutoVision = %q, want %q", got, first)
+	}
+	// and every one missed names the first again: routing decides between
+	// refusals then
+	missedDescribing(first, time.Now())
+	missedDescribing(next, time.Now())
+	if got := AutoVision(); got != first {
+		t.Fatalf("with every describer missed, AutoVision = %q, want %q", got, first)
 	}
 }
 

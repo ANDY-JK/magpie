@@ -1516,9 +1516,28 @@ asks no other.
   no one, whichever model is picked now (AutoVision's pick changing
   between turns had a long conversation's every image described again,
   Pkh on Discord), and a new image is asked of the pick first again, so a
-  pick that failed once is not given up for good. The same bytes sent on
-  another protocol, or under another media type, are described once
-  (`seenBody` dedupes by the key too). A failure is still not kept.
+  pick that failed once is not given up for good — a pick that described
+  nothing at all is ranked behind the rest for a while, below. The same
+  bytes sent on another protocol, or under another media type, are
+  described once (`seenBody` dedupes by the key too). A failure is still
+  not kept.
+
+A describer magpie picked itself that described nothing of an image —
+every model `describeWith` asked failed, after the agent went or the wait
+ran out — is ranked behind the models that haven't for `seerMissFor` (30
+minutes) on the next pick of magpie's (`missedDescribing`, `seerMiss`,
+`seersRanked`'s `failed`), and a model that describes an image clears
+itself (`describedImage`). A request held for a description magpie gives
+up for after `unroutedMost` (2 minutes) was one that never came, and each
+retry asked the same pick again: a qoder Coding Plan's qfmodel described
+an image in 56 seconds when it did and was still at it at 2 minutes,
+2436 descriptions in a day at ~41 seconds each, on the two accounts the
+user's own sessions use, while a model that answered described one in 7
+seconds. Not given up for good: after `seerMissFor` it is AutoVision's
+again, a Settings pick is asked first whatever this says, and with every
+model that sees missed the first is named as before, as routing decides
+between refusals then. Covered by
+`TestADescriptionThatNeverCameMovesThePickOn`, `TestAMissedPickComesBack`.
 
 This differs from a searcher named in Settings, which gives way to no other
 provider: a failed search still leaves the search APIs and the model's own

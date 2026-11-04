@@ -61,6 +61,9 @@ func fresh(t *testing.T) {
 	levelled.Lock()
 	levelled.m = map[string]levelling{}
 	levelled.Unlock()
+	seerMiss.mu.Lock()
+	seerMiss.m = map[string]time.Time{}
+	seerMiss.mu.Unlock()
 	provider.ForgetCopilotForTest()
 	provider.ForgetRemoteCardsForTest()
 	provider.ForgetKeptCardsForTest()
