@@ -12,6 +12,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -271,6 +272,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(p.body.queueWait, 0, "empty waits as long as it takes");
       assert.equal(p.body.maxConcurrency, 2, "Concurrency goes with it");
 
+      await allWords(page); // the other languages are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "Queue size", "Queue wait", "No bound", "As long as it takes",
         "How many requests may wait for each key or account; one more is turned away at once. 0 or empty is no bound",

@@ -8,8 +8,7 @@ const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
 const assets = path.resolve(__dirname, "../assets");
-const translationSource = require("node:fs").readFileSync(path.join(assets, "i18n.js"), "utf8");
-const dictionary = new Function(translationSource.slice(0, translationSource.indexOf("\n};") + 3) + "; return I18N;")();
+const dictionary = require("./strings.cjs").strings().I18N; // the language files’ words
 
 function serve(lang, posts, refusal = "") {
   const settings = {

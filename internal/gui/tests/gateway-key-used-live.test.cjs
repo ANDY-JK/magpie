@@ -5,14 +5,11 @@
 // the window coming back, and a timer while the page is in sight, read
 // them again. Both engines, en and zh.
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 const { fixture } = require("./fixtures/caller-keys.cjs");
 
-const src = fs.readFileSync(path.resolve(__dirname, "../assets/i18n.js"), "utf8");
-const I18N = new Function(src.slice(0, src.indexOf("\n};") + 3) + "; return I18N;")();
+const { I18N } = require("./strings.cjs").strings(); // the language files’ words
 
 const hour = 36e5, day = 864e5;
 // Young's shape: a key held to some models, $ caps over 5 hours and 7 days

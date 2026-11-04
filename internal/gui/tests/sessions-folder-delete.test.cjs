@@ -17,6 +17,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -257,6 +258,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await view.locator('.row.sm-sess[data-id="o-1"]').waitFor();
       assert.equal(await view.locator(".sm-folder-check").count(), 0);
 
+        await allWords(page); // every language is a file of its own now (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => ["Select every session in {folder}", "Delete all {n} sessions in {k} folders?", "Delete all {n} sessions in {folder}?"].filter((k) => !I18N.zh[k]));
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);

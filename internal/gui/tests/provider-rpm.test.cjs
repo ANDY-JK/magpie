@@ -10,6 +10,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -133,6 +134,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert(Object.hasOwn(saved.body, "maxRPM"), "an empty field is saved as no limit, not left out");
       assert.equal(saved.body.maxRPM, 0);
 
+      await allWords(page); // the other languages' words are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "Requests per minute", "Requests per minute: a whole number from 0 to 10000",
         "How many requests each key or account sends in any minute, retries included; one more waits for room, up to 2 minutes. 0 or empty is no limit",

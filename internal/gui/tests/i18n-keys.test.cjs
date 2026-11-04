@@ -1,8 +1,9 @@
 // Run with Node's test runner; needs no browser. A key written twice in one
 // language is a trap: the later one silently wins, so an edit to the first
-// does nothing. Every key appears once per language, in i18n.js or in one
-// plugin's i18n.js (strings.cjs), never in two of them, and a plugin's
-// file says every one of its keys in every language.
+// does nothing. Every key appears once per language, in its language file
+// (i18n.zh.js and the rest) or in one plugin's i18n.js (strings.cjs), never
+// in two of them, and a plugin's file says every one of its keys in every
+// language.
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const { strings } = require("./strings.cjs");
@@ -10,9 +11,10 @@ const { strings } = require("./strings.cjs");
 test("no language has a key twice", () => {
   const { files, twice } = strings();
   for (const { file, src } of files) {
-    const body = file === "i18n.js" ? src.slice(0, src.indexOf("\n};")) : src;
-    let lang, seen;
-    body.split("\n").forEach((line, i) => {
+    // a language file (i18n.zh.js and the rest) says one language, named by
+    // its file; a plugin's names each in a `  zh: {` line
+    let lang = (file.match(/^i18n\.([\w-]+)\.js$/) || [])[1], seen = lang ? new Map() : null;
+    src.split("\n").forEach((line, i) => {
       const head = line.match(/^  "?([\w-]+)"?: \{/);
       if (head) return void ((lang = head[1]), (seen = new Map()));
       const key = line.match(/^    ("(?:[^"\\]|\\.)*")\s*:/);
@@ -25,7 +27,7 @@ test("no language has a key twice", () => {
 });
 
 test("a plugin's words are said in every language", () => {
-  for (const { file, dict } of strings().files.slice(1)) {
+  for (const { file, dict } of strings().plugins) {
     assert.deepEqual(Object.keys(dict).sort(), ["de", "ja", "zh", "zh-TW"], file);
     const zh = Object.keys(dict.zh);
     assert.ok(zh.length, `${file} says nothing`);
@@ -46,7 +48,7 @@ test("a plugin's words are its own", () => {
       const p = path.join(d, e.name);
       if (e.isDirectory()) {
         if (!["node_modules", ".git", "site", "tests", "testdata", "docs"].includes(e.name)) walk(p);
-      } else if (/\.(go|js|html|css)$/.test(e.name) && e.name !== "i18n.js") texts.push([p, fs.readFileSync(p, "utf8")]);
+      } else if (/\.(go|js|html|css)$/.test(e.name) && !/^i18n(\.[\w-]+)?\.js$/.test(e.name)) texts.push([p, fs.readFileSync(p, "utf8")]);
     }
   };
   walk(repo);
@@ -61,7 +63,7 @@ test("a plugin's words are its own", () => {
     return false;
   };
   const shared = [];
-  for (const { file, dict } of strings().files.slice(1)) {
+  for (const { file, dict } of strings().plugins) {
     const own = path.join(assets, path.dirname(file)) + path.sep;
     const rest = texts.filter(([p]) => !p.startsWith(own));
     for (const k of Object.keys(dict.zh)) {
@@ -82,7 +84,7 @@ test("every word the window says has a key", () => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const p = path.join(d, e.name);
       if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith(".js") && e.name !== "i18n.js") files.push(p);
+      else if (e.name.endsWith(".js") && !/^i18n(\.[\w-]+)?\.js$/.test(e.name)) files.push(p);
     }
   };
   walk(assets);

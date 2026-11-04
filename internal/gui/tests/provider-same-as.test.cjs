@@ -6,6 +6,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -91,6 +92,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.waitForFunction(() => !document.querySelector(".mnames"));
       assert.deepEqual(posts.map((p) => p.path), ["/api/provider/save"]);
       assert.deepEqual(posts[0].body.modelPrefs, { "deepseek-v4-1-flash-260910": { same: "deepseek-v4.1-flash" }, "ep-2026-sol": { same: "" } });
+      await allWords(page); // the other languages' words are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => ["Same as",
         "The model other providers serve that {id} is the same as: the routing groups magpie finds put them together, and what no list gives for {id} is that model's: its window, reply limit, reasoning levels, images and list price. Empty: by its own id",
         "Its own name, every reasoning level it has, whether it sees images, the API it is asked on, the model it is the same as, its own id, and its list price",

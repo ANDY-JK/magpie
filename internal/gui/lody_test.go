@@ -62,17 +62,19 @@ func TestImportLinkNothingOpens(t *testing.T) {
 	}
 }
 
-// What the page says for it is a key i18n.js has in every language, with
-// the {app} and {exe} the reply fills.
+// What the page says for it is a key its language files have in every
+// language, with the {app} and {exe} the reply fills.
 func TestLinkSaidIsTranslated(t *testing.T) {
-	words, err := os.ReadFile("assets/i18n.js")
-	if err != nil {
-		t.Fatal(err)
-	}
 	for exe, said := range linkSaid {
 		key, _ := json.Marshal(said)
-		if n := strings.Count(string(words), string(key)+":"); n != 4 {
-			t.Errorf("%v: i18n.js has %q in %d languages, want zh, zh-TW, ja and de", exe, said, n)
+		for _, lang := range pageLanguages {
+			b, err := os.ReadFile("assets/i18n." + lang + ".js")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if n := strings.Count(string(b), string(key)+":"); n != 1 {
+				t.Errorf("%v: %s has %q %d times, want once", exe, lang, said, n)
+			}
 		}
 		if !strings.Contains(said, "{app}") || strings.Contains(said, "{exe}") != exe {
 			t.Errorf("%v: %q doesn't say {app}, or {exe} only when it is set", exe, said)

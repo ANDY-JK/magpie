@@ -1,48 +1,37 @@
-// Settings › Observability's own words in each language, the English the
-// key: the kernel adds them to i18n.js's (magpie.strings).
-magpie.strings({
-  zh: {
-    "Langfuse needs only its host and your project's keys; any other OTLP/HTTP collector takes its address and headers": "Langfuse 只需要地址和项目密钥；其他 OTLP/HTTP 采集服务填地址和请求头",
-    "Langfuse host": "Langfuse 地址",
-    "Langfuse Cloud's region, or the address of your own Langfuse": "Langfuse Cloud 的区域，或你自己部署的 Langfuse 地址",
-    "Cloud EU": "Cloud 欧洲",
-    "Cloud US": "Cloud 美国",
-    "Self-hosted": "自部署",
-    "Public key": "公钥",
-    "From your Langfuse project's Settings › API Keys. Traces go to {url}": "在 Langfuse 项目的 Settings › API Keys 里获取。链路数据发往 {url}",
-    "Enter your Langfuse address, such as https://langfuse.example.com": "请填写 Langfuse 地址，比如 https://langfuse.example.com",
-  },
-  "zh-TW": {
-    "Langfuse needs only its host and your project's keys; any other OTLP/HTTP collector takes its address and headers": "Langfuse 只需要位址和專案金鑰；其他 OTLP/HTTP 採集服務填位址和請求標頭",
-    "Langfuse host": "Langfuse 位址",
-    "Langfuse Cloud's region, or the address of your own Langfuse": "Langfuse Cloud 的區域，或你自行部署的 Langfuse 位址",
-    "Cloud EU": "Cloud 歐洲",
-    "Cloud US": "Cloud 美國",
-    "Self-hosted": "自行部署",
-    "Public key": "公鑰",
-    "From your Langfuse project's Settings › API Keys. Traces go to {url}": "在 Langfuse 專案的 Settings › API Keys 取得。鏈路資料傳送到 {url}",
-    "Enter your Langfuse address, such as https://langfuse.example.com": "請填寫 Langfuse 位址，例如 https://langfuse.example.com",
-  },
-  ja: {
-    "Langfuse needs only its host and your project's keys; any other OTLP/HTTP collector takes its address and headers": "Langfuse はホストとプロジェクトのキーだけで設定できます。ほかの OTLP/HTTP コレクターはアドレスとヘッダーを入力します",
-    "Langfuse host": "Langfuse のホスト",
-    "Langfuse Cloud's region, or the address of your own Langfuse": "Langfuse Cloud のリージョン、またはセルフホストした Langfuse のアドレス",
-    "Cloud EU": "Cloud EU",
-    "Cloud US": "Cloud US",
-    "Self-hosted": "セルフホスト",
-    "Public key": "公開キー",
-    "From your Langfuse project's Settings › API Keys. Traces go to {url}": "Langfuse プロジェクトの Settings › API Keys で取得します。トレースの送信先は {url} です",
-    "Enter your Langfuse address, such as https://langfuse.example.com": "Langfuse のアドレスを入力してください（例: https://langfuse.example.com）",
-  },
-  de: {
-    "Langfuse needs only its host and your project's keys; any other OTLP/HTTP collector takes its address and headers": "Langfuse braucht nur seinen Host und die Schlüssel Ihres Projekts; jeder andere OTLP/HTTP-Collector bekommt Adresse und Header",
-    "Langfuse host": "Langfuse-Host",
-    "Langfuse Cloud's region, or the address of your own Langfuse": "Die Region von Langfuse Cloud oder die Adresse Ihres eigenen Langfuse",
-    "Cloud EU": "Cloud EU",
-    "Cloud US": "Cloud US",
-    "Self-hosted": "Selbst gehostet",
-    "Public key": "Öffentlicher Schlüssel",
-    "From your Langfuse project's Settings › API Keys. Traces go to {url}": "Aus Settings › API Keys Ihres Langfuse-Projekts. Traces gehen an {url}",
-    "Enter your Langfuse address, such as https://langfuse.example.com": "Geben Sie Ihre Langfuse-Adresse ein, z. B. https://langfuse.example.com",
-  },
-});
+// Settings › Observability's words, one language to a file (i18n.zh.js and the rest):
+// the page parses only the language it is in, as i18n.js does for the
+// window's own words. English needs none of them: the key is the English
+// word. The language is the one i18n.js picked (magpieLocale), so the page
+// is never half in one language and half in another; one picked after the
+// page opened is asked of every plugin before the window is drawn again in
+// it (magpieLocaleLoaders).
+(() => {
+  const base = new URL(".", document.currentScript.src);
+  const FILES = { zh: "i18n.zh.js", "zh-TW": "i18n.zh-TW.js", ja: "i18n.ja.js", de: "i18n.de.js" };
+  const here = new Set(); // the languages whose words are here
+  const coming = {};
+  // load brings in a language's words and settles with whether they came; a
+  // file that won't come leaves English, as a key with no word does.
+  function load(lang) {
+    const file = FILES[lang];
+    if (!file || here.has(lang)) return null;
+    if (coming[lang]) return coming[lang];
+    coming[lang] = new Promise((settle) => {
+      const s = document.createElement("script");
+      s.src = new URL(file, base).href;
+      s.onload = () => { here.add(lang); delete coming[lang]; settle(true); };
+      s.onerror = () => { delete coming[lang]; settle(false); };
+      document.head.append(s);
+    });
+    return coming[lang];
+  }
+  // while the page is parsed, the language's words are written in, so the
+  // page's first paint is in it and no English flashes
+  const lang = window.magpieLocale;
+  if (lang && FILES[lang] && document.readyState === "loading") {
+    document.write('<script src="' + new URL(FILES[lang], base).href + '"></script>');
+    here.add(lang);
+  }
+  // i18n.js asks every plugin for a language picked after the page opened
+  (window.magpieLocaleLoaders ||= []).push(load);
+})();

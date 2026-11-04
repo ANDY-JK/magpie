@@ -10,6 +10,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 const { reach } = require("./reader.cjs");
@@ -131,6 +132,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.equal(await view.locator(".sess-export").count(), 0);
 
         if (lang === "zh") {
+          // every language is a file of its own now (i18n.js, plugins/<id>/i18n.js)
+          await allWords(page);
           const missing = await page.evaluate(() => ["Export Markdown", "Save the whole conversation as a Markdown file"]
             .filter((k) => !I18N.zh[k] || !I18N["zh-TW"][k] || !I18N.ja[k] || !I18N.de[k]));
           assert.deepEqual(missing, [], "every string has its Chinese, Traditional Chinese, Japanese and German");

@@ -9,6 +9,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -167,6 +168,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await minutes.isVisible(), false);
       assert.equal((await save()).firstToken, 60);
 
+      await allWords(page); // the other languages' words are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "Wait", "30 s", "1 min", "2 min", "Slow to start", "slow to start", "Next after {n} without a first token",
         "Every member is waited for, however long it takes to begin answering.",

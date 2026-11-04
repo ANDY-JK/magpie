@@ -13,6 +13,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 const reader = require("./reader.cjs");
@@ -202,6 +203,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
 
       const border = await page.evaluate(() => [...document.querySelectorAll(".led-head, .led-head *")].map((e) => getComputedStyle(e).borderLeftWidth).filter((b) => parseFloat(b) > 1));
       assert.deepEqual(border, [], "no left-border accent");
+      await allWords(page); // the other languages' words are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "Request archive", "Upload failed", "Last upload failed: {e}", "Not saved", "Last save failed: {e}",
         "Keeps each call’s headers and bodies, secrets taken out, in {where}",

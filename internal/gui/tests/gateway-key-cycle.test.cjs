@@ -3,14 +3,11 @@
 // usage, after a confirm, counts the key from 0 again, tokens and cost
 // together. In every language, both engines, and at a narrow width.
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 const { fixture } = require("./fixtures/caller-keys.cjs");
 
-const src = fs.readFileSync(path.resolve(__dirname, "../assets/i18n.js"), "utf8");
-const I18N = new Function(src.slice(0, src.indexOf("\n};") + 3) + "; return I18N;")();
+const { I18N } = require("./strings.cjs").strings(); // the language files’ words
 
 const day = 864e5;
 const limits = () => ({

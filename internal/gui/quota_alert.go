@@ -27,8 +27,8 @@ var (
 	daysName  = regexp.MustCompile(`^(\d+) days?$`)
 )
 
-// alertWindowZh is a window's name in Chinese, as the page's i18n.js has
-// the common ones; one it doesn't know stays as the vendor named it.
+// alertWindowZh is a window's name in Chinese, as the page's i18n.zh.js
+// has the common ones; one it doesn't know stays as the vendor named it.
 func alertWindowZh(name string) string {
 	if m := hoursName.FindStringSubmatch(name); m != nil {
 		return m[1] + " 小时"

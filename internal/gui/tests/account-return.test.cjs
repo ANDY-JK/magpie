@@ -111,6 +111,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.match(note, w.stays);
       assert.doesNotMatch(note, w.note);
       assert.equal(await page.locator(".editor .acc", { hasText: "work@example.com" }).locator(".using").count(), 0);
+      // the other languages' words are files of their own now (i18n.<lang>.js,
+      // plugins/<id>/i18n.<lang>.js): asked for before they are read
+      await page.evaluate(async () => {
+        for (const l of ["zh", "zh-TW", "ja", "de"]) { await loadLocaleWords(l); await pluginLocaleWords(l); }
+      });
       const missing = await page.evaluate((k) => ["zh", "zh-TW", "ja", "de"].filter((l) => !I18N[l][k]), stays);
       assert.deepEqual(missing, [], "every language has the note");
       assert.deepEqual(errors, []);
