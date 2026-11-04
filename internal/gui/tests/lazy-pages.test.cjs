@@ -2,9 +2,9 @@
 // The heavy pages are declared before their scripts (pages.js, kernel.js's
 // magpie.lazy): the page and its view are in the window from the start, and
 // its script, markup and hooks come the first time the reader opens it. An
-// English page that opens neither Sessions nor Library fetches neither one's
-// code. Routing is not one of them: its script hands the tray panel and
-// Usage's Requests what they draw with (pages.js).
+// English page that opens none of them fetches none of their code. Routing
+// is one too, its eager half shared.js saying what the tray panel and
+// Usage's Requests draw with before the page is opened (pages.js).
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -12,7 +12,7 @@ const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
 const assets = path.resolve(__dirname, "../assets");
-const LAZY = ["plugins/sessions/client.js", "plugins/library/client.js"];
+const LAZY = ["plugins/sessions/client.js", "plugins/library/client.js", "plugins/routing/client.js"];
 
 function serve() {
   return async (r) => {
@@ -60,30 +60,44 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       pages: magpie.pages().sort(),
       titles: ["sessions", "library", "routing"].map((k) => magpie.page(k)?.title),
       views: ["sessions", "library", "routing"].map((k) => !!document.getElementById("view-" + k)),
-      empties: ["sessions", "library"].map((k) => document.getElementById("view-" + k).children.length),
+      empties: ["sessions", "library", "routing"].map((k) => document.getElementById("view-" + k).children.length),
       nav: [...document.querySelectorAll("#nav [data-view]")].map((b) => b.dataset.view),
-      dirty: magpie.call("routing", "dirty"),
+      // Routing's eager half says what its rows say of a request, and what
+      // opens one: the rest of the window calls these before the page comes
+      shared: [typeof window.kindName, typeof window.purposeOptions, typeof window.swapWhy, typeof window.openRoute],
     }));
     assert.deepEqual(before.pages.filter((k) => ["sessions", "library", "routing"].includes(k)), ["library", "routing", "sessions"]);
     assert.deepEqual(before.titles, ["Sessions", "Library", "Routing"]);
     assert.deepEqual(before.views, [true, true, true]);
-    assert.deepEqual(before.empties, [0, 0], "a page not opened yet has drawn nothing");
+    assert.deepEqual(before.empties, [0, 0, 0], "a page not opened yet has drawn nothing");
     assert.deepEqual(before.nav.filter((v) => ["sessions", "library", "routing"].includes(v)), ["sessions", "library", "routing"]);
     assert.deepEqual(asked, [], "no heavy page's code is fetched before one is opened");
-    // what a page that hasn't come says of unsaved work is not "true": the
-    // window's guards ask with === true (app.js)
-    assert.notEqual(before.dirty, true);
-    // Routing's script is the window's: it isn't self-contained (pages.js)
-    assert.equal(await page.evaluate(() => document.querySelectorAll('script[src*="routing/client.js"]').length), 1);
-    assert.equal(await page.evaluate(() => typeof window.kindName), "function");
+    // Routing's script is named once, in the lazyPages template: it isn't
+    // the window's (pages.js)
+    assert.deepEqual(await page.evaluate(() => [document.querySelectorAll('script[src*="routing/client.js"]').length, document.getElementById("lazyPages").content.querySelectorAll('script[src*="routing/client.js"]').length]), [0, 1]);
+    assert.deepEqual(before.shared, ["function", "function", "function", "function"]);
 
     // the reader opens Library: its script comes, and the page draws
     await page.locator('#nav > button[data-view="library"]').click();
     await page.locator("#view-library .lib-head").waitFor();
     assert.deepEqual(asked, ["plugins/library/client.js"]);
-    assert.deepEqual(errors, []);
     // the rest stay unasked until their pages are
     assert.deepEqual(asked.filter((u) => u !== "plugins/library/client.js"), []);
+
+    // the window closing asks Routing's editor whether it is dirty only once
+    // its script has come (app.js, beforeunload): asking a lazy page's hook
+    // would bring the page in as the window goes
+    assert.equal(await page.evaluate(() => magpie.came("routing")), false);
+    assert.equal(await page.evaluate(() => { const e = new Event("beforeunload", { cancelable: true }); dispatchEvent(e); return e.defaultPrevented; }), false);
+    assert.deepEqual(asked, ["plugins/library/client.js"], "closing the window asks nothing of a page that hasn't come");
+    // a hook of a page that hasn't come is answered by its script coming
+    // in, the page not opened: Routing's own answer, not the promise the
+    // window's guards would read as not true (app.js asks with === true)
+    assert.equal(await page.evaluate(() => magpie.call("routing", "dirty")), false);
+    assert.equal(await page.evaluate(() => magpie.came("routing")), true);
+    assert.deepEqual(asked, ["plugins/library/client.js", "plugins/routing/client.js"]);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('script[src*="routing/client.js"]').length), 1, "the one the page ran from");
+    assert.deepEqual(errors, []);
     await page.close();
   });
 

@@ -550,7 +550,9 @@
 <script src="plugins/sessions/i18n.js"></script>
 <script src="plugins/library/i18n.js"></script>
 <script src="plugins/routing/i18n.js"></script>
-<script src="plugins/routing/client.js"></script>
+<!-- what the rest of the window calls of Routing before its page is
+     opened: the page's script is one of the heavy ones, below -->
+<script src="plugins/routing/shared.js"></script>
 <script src="plugins/usage/i18n.js"></script>
 <script src="plugins/usage/client.js"></script>
 <script src="plugins/redact/i18n.js"></script>
@@ -564,6 +566,7 @@
 <template id="lazyPages">
   <script src="plugins/sessions/client.js" data-page="sessions"></script>
   <script src="plugins/library/client.js" data-page="library"></script>
+  <script src="plugins/routing/client.js" data-page="routing"></script>
 </template>
 <script src="pages.js"></script>
 <script src="purposes.js"></script>

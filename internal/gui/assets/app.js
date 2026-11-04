@@ -7627,7 +7627,9 @@ async function cancelEdit(keep) {
   return true;
 }
 window.addEventListener("beforeunload", (e) => {
-  if (providerDirty() || magpie.call("routing", "dirty") === true || ((view === "library" || importing || importingApps) && modalFormDirty())) {
+  // Routing's page comes with its script (pages.js): asking its hook before
+  // that would bring it in as the window closes
+  if (providerDirty() || (magpie.came("routing") && magpie.call("routing", "dirty") === true) || ((view === "library" || importing || importingApps) && modalFormDirty())) {
     e.preventDefault();
     e.returnValue = "";
   }
@@ -24300,7 +24302,9 @@ window.noteAccounts = noteAccounts;
       c = c === "1" || p === "1" ? "1" : "0";
       try { localStorage.setItem(k, c); localStorage.removeItem("magpie.maskProviders"); } catch {}
     }
-    return { k, c, on: c === "1", btns: mode === "panel" ? [] : bs.map((b) => $(b)).filter(Boolean) };
+    // Routing's comes with its script (pages.js, the lazy pages), so the
+    // buttons are looked for as they are needed, not once at the start
+    return { k, c, on: c === "1", btns: () => mode === "panel" ? [] : bs.map((b) => $(b)).filter(Boolean) };
   });
   const cur = () => sw[0];
   let masked = false;
@@ -24372,31 +24376,46 @@ window.noteAccounts = noteAccounts;
       else { watch.disconnect(); unmask(); }
     };
   })();
-  function setMasked(s, on, keep) {
-    s.on = on;
-    if (!keep) { s.c = on ? "1" : "0"; try { localStorage.setItem(s.k, s.c); } catch {} }
-    for (const btn of s.btns) {
-      btn.setAttribute("aria-pressed", String(on));
+  // what each button of the switch says of it: its pressed state, its icon
+  // and words, and how to have the accounts back (a button that came with a
+  // lazy page is painted as it comes, by maskSync below)
+  function paintSwitch(s) {
+    for (const btn of s.btns()) {
+      btn.setAttribute("aria-pressed", String(s.on));
       // what it is now, in its icon and its words: an open eye while the
       // accounts show, struck through once they're hidden
-      btn.querySelector("path").setAttribute("d", on ? EYE_OFF : EYE);
+      btn.querySelector("path").setAttribute("d", s.on ? EYE_OFF : EYE);
       const label = btn.querySelector("[data-t]");
-      label.dataset.en = on ? "Accounts hidden" : "Hide accounts";
+      label.dataset.en = s.on ? "Accounts hidden" : "Hide accounts";
       label.textContent = t(label.dataset.en);
       // and how to have them back, for one who never turned it on (#653)
-      btn.dataset.enTitle = on ? "Accounts are masked for a screenshot — click to show them"
+      btn.dataset.enTitle = s.on ? "Accounts are masked for a screenshot — click to show them"
         : "Mask the accounts on every page — email addresses and account names — for a screenshot to share";
       btn.title = t(btn.dataset.enTitle);
     }
+  }
+  function setMasked(s, on, keep) {
+    s.on = on;
+    if (!keep) { s.c = on ? "1" : "0"; try { localStorage.setItem(s.k, s.c); } catch {} }
+    paintSwitch(s);
     page(cur().on);
   }
-  for (const s of sw) for (const btn of s.btns) btn.onclick = () => {
+  // a page declared ahead of its script brings its button with it (Routing,
+  // pages.js): said by the page as it mounts, and painted as it would have
+  // been at the start
+  window.maskSync = () => { for (const s of sw) paintSwitch(s); };
+  // the switch's buttons are asked for where a click lands, not wired one by
+  // one at the start, so a button that came later is the same switch
+  document.addEventListener("click", (e) => {
+    const btn = mode === "panel" ? null : e.target.closest?.("#rtMask, #usageMask, #pvMask");
+    if (!btn) return;
+    const s = cur();
     setMasked(s, !s.on);
     // pixelated in when asked for, not again each time the page redraws
     document.body.classList.add("masking");
     clearTimeout(btn._t);
     btn._t = setTimeout(() => document.body.classList.remove("masking"), 450);
-  };
+  });
   const kin = (u, pid) => {
     const k = [u];
     for (const p of providers?.providers || []) if (p.id === pid) for (const m of [p.accountNames, p.accountUsers]) for (const [a, n] of Object.entries(m || {})) if (a === low(u) || n === u) k.push(a, n);

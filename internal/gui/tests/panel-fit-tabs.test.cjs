@@ -103,8 +103,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // scrolls in the height the panel asked for
       for (const agents of [8, 2]) {
         const { page, fits } = await open(agents);
-        await page.locator("#panelRouting .pr-req").first().waitFor({ state: "attached" });
         await page.locator("#agents .row.agent").nth(agents - 1).waitFor();
+        // Routing is one of the pages declared ahead of its script (pages.js):
+        // its tab draws when it is first shown, as a reader shows it
+        await page.locator('#ptabs [data-ptab="routing"]').click();
+        await page.locator("#panelRouting .pr-req").first().waitFor({ state: "attached" });
         await settled(page, fits);
         const over = await overflows(page);
         for (const [tab, px] of Object.entries(over)) assert(px <= 0, `${agents} agents: the ${tab} tab overflows the fitted panel by ${px}px (${JSON.stringify(over)}, fits ${fits.join(" ")})`);
@@ -117,7 +120,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const trace = new Promise((r) => { release = r; });
       const { page, fits } = await open(2, { trace });
       await page.locator("#agents .row.agent").nth(1).waitFor();
-      await page.waitForFunction(() => /42/.test(document.querySelector("#panelRouting .pr-today")?.textContent || ""), null, { timeout: 3000 })
+      // shown for the first time: its page comes, and its skeleton with it,
+      // while the trace it waits for is held
+      await page.locator('#ptabs [data-ptab="routing"]').click();
+      await page.waitForFunction(() => /42/.test(document.querySelector("#panelRouting .pr-today")?.textContent || ""), null, { timeout: 8000 })
         .catch(() => assert.fail("today's line waited for the trace: " + JSON.stringify(fits)));
       const before = await settled(page, fits);
       release();

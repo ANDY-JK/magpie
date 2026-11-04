@@ -15,8 +15,10 @@ func init() {
 		ID: "routing", API: "^1", Requires: []string{"window", "gateway"}, Essential: true,
 		Name: "Routing", Sub: "Each request as the gateway routes it, the accounts it weighed and what each answered, and your routing groups",
 		One: "1 group in use", Many: "{n} groups in use",
-		InUse:  provider.NamedGroups,
-		Parts:  []pluginrt.Part{{Slot: "nav.page", Key: "routing"}},
-		Client: []string{"i18n.js", "routing.css", "client.js"},
+		InUse: provider.NamedGroups,
+		Parts: []pluginrt.Part{{Slot: "nav.page", Key: "routing"}},
+		// shared.js is the window's half: what other pages call of Routing
+		// before its own script comes (pages.js, the lazy pages)
+		Client: []string{"i18n.js", "routing.css", "shared.js", "client.js"},
 	})
 }

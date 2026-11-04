@@ -107,6 +107,7 @@ magpie.strings({
     "magpie keeps the request and response of only the last 40 requests, until it quits. To keep every request's, turn on Request archive at the top of Usage › Requests.": "magpie behält Anfrage und Antwort nur der letzten 40 Anfragen, bis es beendet wird. Um sie für jede Anfrage zu behalten, schalte oben unter Nutzung › Anfragen das Anfragearchiv ein.",
     "magpie keeps the request and response of only the last 40 requests, until it quits. Request archive is on, but this request isn't in it: it was made while the archive was off, or it couldn't be saved.": "magpie behält Anfrage und Antwort nur der letzten 40 Anfragen, bis es beendet wird. Das Anfragearchiv ist an, aber diese Anfrage ist nicht darin: Sie kam, während das Archiv aus war, oder konnte nicht gespeichert werden.",
     "Routing history for this request is no longer available.": "Der Weiterleitungsverlauf dieser Anfrage ist nicht mehr verfügbar.",
+    "The Routing page didn't open.": "Die Routing-Seite wurde nicht geöffnet.",
     "Token breakdown": "Token-Aufschlüsselung",
     "Input (uncached)": "Eingabe (nicht gecacht)",
     "No token breakdown was recorded": "Keine Token-Aufschlüsselung aufgezeichnet",

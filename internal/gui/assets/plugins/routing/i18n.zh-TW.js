@@ -119,6 +119,7 @@ magpie.strings({
     "magpie keeps the request and response of only the last 40 requests, until it quits. To keep every request's, turn on Request archive at the top of Usage › Requests.": "magpie 只保留最近 40 個請求的請求體和回應體，且結束後不再保留。要保留每個請求的，請在「用量 › 請求」頂部開啟「請求存檔」。",
     "magpie keeps the request and response of only the last 40 requests, until it quits. Request archive is on, but this request isn't in it: it was made while the archive was off, or it couldn't be saved.": "magpie 只保留最近 40 個請求的請求體和回應體，且結束後不再保留。「請求存檔」已開啟，但存檔裡沒有這個請求：它是在存檔關閉時發出的，或者沒能儲存下來。",
     "Routing history for this request is no longer available.": "此請求的路由歷史已不可用。",
+    "The Routing page didn't open.": "路由頁面沒有開啟。",
     "Token breakdown": "Token 明細",
     "Input (uncached)": "輸入（未快取）",
     "No token breakdown was recorded": "沒有記錄 Token 明細",

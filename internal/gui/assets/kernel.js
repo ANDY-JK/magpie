@@ -331,6 +331,13 @@
       const page = pages.get(key);
       return page && page.lazy ? load(page).then(() => !page.lazy) : Promise.resolve(true);
     },
+    // whether a page declared before its script has come (ready's answer,
+    // asked without bringing it in): a caller that can't load it — the
+    // window closing — asks this first
+    came(key) {
+      const page = pages.get(key);
+      return !!page && !page.lazy;
+    },
     // a page's hook, behind the boundary; nothing for a page no plugin has
     call(key, hook, ...args) {
       const page = pages.get(key);
