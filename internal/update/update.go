@@ -107,10 +107,34 @@ func LatestIn(ctx context.Context, lang string) (*Release, error) {
 	return &r, nil
 }
 
+// this checkout is maintained apart from yetone/magpie's releases: it
+// pulls no release feed, installs no update, whatever its version reads
+// as. Set it to false only with a decision to follow upstream again.
+const independent = true
+
+// Independent reports whether this build follows no release feed: this
+// checkout's does not (see independent), so no update is offered, no
+// notes are shown and nothing installs, whatever the version reads as and
+// whatever feed the environment names. A feed the user configures is no
+// exception: following one again is the decision independent records.
+func Independent() bool { return independent }
+
 // Released reports whether v is a release version rather than a build from
 // source ("dev", "0bcb2cc-dirty", git describe's "v0.1.0-3-g0bcb2cc");
-// only releases update themselves.
+// only releases update themselves. This checkout is maintained apart from
+// yetone/magpie's releases, so it is false whatever the version: the feed
+// is the upstream's, and updating from it would overwrite this checkout's
+// work.
 func Released(v string) bool {
+	if independent {
+		return false
+	}
+	return releaseVersion(v)
+}
+
+// releaseVersion says whether v reads as a release version, whatever feed
+// it: the shape the notes' between-versions diff goes by.
+func releaseVersion(v string) bool {
 	s := parse(v)
 	return s != nil && !describe.MatchString(s.pre) && !strings.Contains(s.pre, "dirty")
 }

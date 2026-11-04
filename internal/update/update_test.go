@@ -39,9 +39,11 @@ func TestNewer(t *testing.T) {
 }
 
 func TestReleased(t *testing.T) {
-	for v, want := range map[string]bool{"0.1.0": true, "v1.2.3": true, "dev": false, "0bcb2cc-dirty": false, "v0.1.0-3-g0bcb2cc": false} {
-		if Released(v) != want {
-			t.Errorf("Released(%q) != %v", v, want)
+	// this repository is maintained independently: whatever its version
+	// says, it follows no release feed, so nothing counts as released
+	for _, v := range []string{"0.1.0", "v1.2.3", "dev", "0bcb2cc-dirty", "v0.1.0-3-g0bcb2cc"} {
+		if Released(v) {
+			t.Errorf("Released(%q) = true, but the release feed is not this repository's", v)
 		}
 	}
 }

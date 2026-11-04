@@ -22,6 +22,10 @@ import (
 // says why; the clock's checks don't download that version again, and
 // a check asked for tries it once more.
 func TestUpdateThatWontStart(t *testing.T) {
+
+	if update.Independent() {
+		t.Skip("this build follows no release feed (update.independent)")
+	}
 	body := []byte("new magpie")
 	sum := sha256.Sum256(body)
 	var downloads atomic.Int32

@@ -18,6 +18,10 @@ import (
 // https:// address only, and the Settings page's save keeps it. A download
 // that fails through it says so (the page's mirror), which a check clears.
 func TestUpdateMirrorSetting(t *testing.T) {
+
+	if update.Independent() {
+		t.Skip("this build follows no release feed (update.independent)")
+	}
 	h := t.TempDir()
 	t.Setenv("HOME", h)
 	t.Setenv("USERPROFILE", h)

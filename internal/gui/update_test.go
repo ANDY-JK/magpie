@@ -17,6 +17,10 @@ import (
 // A version downloaded and waiting for a restart gives way to a newer one
 // out since, so the restart goes straight to the latest.
 func TestUpdateStagedGivesWayToNewer(t *testing.T) {
+
+	if update.Independent() {
+		t.Skip("this build follows no release feed (update.independent)")
+	}
 	body := []byte("new magpie")
 	sum := sha256.Sum256(body)
 	var latest atomic.Value

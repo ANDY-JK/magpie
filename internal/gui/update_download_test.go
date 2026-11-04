@@ -24,6 +24,10 @@ import (
 // update downloads it, and nothing else does. Off, as by default, a check
 // downloads as before.
 func TestUpdateDownloadWaitsForAClick(t *testing.T) {
+
+	if update.Independent() {
+		t.Skip("this build follows no release feed (update.independent)")
+	}
 	h := t.TempDir()
 	t.Setenv("HOME", h)
 	t.Setenv("USERPROFILE", h)

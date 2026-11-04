@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/gateway"
+	"github.com/yetone/magpie/internal/update"
 )
 
 // resetSkew forgets what the tests' fakes left of another magpie seen
@@ -152,6 +153,22 @@ func TestAppReplacesItsOlderGatewayOnceIdle(t *testing.T) {
 		t.Fatal("the older magpie was quit with a request in flight")
 	case <-time.After(15 * time.Second):
 		t.Fatal("the stream never ended")
+	}
+
+	if update.Independent() {
+		// this build follows no release feed (update.Independent): no
+		// version of it counts as released, so the older copy is nobody's
+		// to quit — it keeps serving, and the swap is done by hand
+		time.Sleep(2 * time.Second)
+		select {
+		case <-ended:
+			t.Fatal("an independent build quit the older copy of the app")
+		default:
+		}
+		if v := gateway.ServedBy().Version; v != "0.1.2400" {
+			t.Fatalf("an independent build took the gateway over: %s", v)
+		}
+		return
 	}
 
 	// then it is quit, and this one serves the gateway

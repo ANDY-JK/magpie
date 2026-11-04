@@ -166,6 +166,15 @@ func TestRestartWhenIdleIntoTheNewest(t *testing.T) {
 	u := &updater{}
 	quick(t, busy, u)
 	waitRecheck = (*updater).recheck
+	if update.Independent() {
+		// this build follows no release feed: nothing is downloaded, so
+		// there is nothing to restart into when the gateway is idle
+		u.check()
+		if j := u.json(); j.State != "source" || j.Latest != "" {
+			t.Fatalf("an independent build offered an update: %+v", j)
+		}
+		return
+	}
 	body := []byte("new magpie")
 	sum := sha256.Sum256(body)
 	var latest atomic.Value

@@ -99,6 +99,18 @@ func TestWhatsNewBackRanges(t *testing.T) {
 	}
 
 	// the default is as it was: the notes since the last update
+	if update.Independent() {
+		// this build follows no release feed (update.Independent): no
+		// version of it counts as released, so the ranges come back empty
+		// and the site is never asked
+		for _, q := range []string{"", "&before=10"} {
+			j, asked := ask(q)
+			if vs := versions(j); len(vs) != 0 || j.Error != "" || len(asked) != 0 {
+				t.Fatalf("an independent build (%q): %v, asked %q", q, vs, asked)
+			}
+		}
+		return
+	}
 	j, _ := ask("")
 	if got := versions(j); !slices.Equal(got, []string{"0.1.1410", "0.1.1409"}) {
 		t.Fatalf("default: %v", got)

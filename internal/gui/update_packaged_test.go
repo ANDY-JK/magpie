@@ -19,6 +19,10 @@ import (
 // that updates it, and never downloads or replaces anything, even where
 // it may write or ask for the password.
 func TestUpdatePackagedLeavesItToTheManager(t *testing.T) {
+
+	if update.Independent() {
+		t.Skip("this build follows no release feed (update.independent)")
+	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/asset" {
 			t.Errorf("a packaged binary downloaded the release")

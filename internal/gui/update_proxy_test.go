@@ -47,6 +47,15 @@ func TestSettingsProxyRechecksAFailedUpdate(t *testing.T) {
 	old := updates
 	updates = &updater{}
 	defer func() { updates = old }()
+	if update.Independent() {
+		// no release feed is followed: the proxy is never asked for one,
+		// and nothing is offered through it
+		updates.check()
+		if j := updates.json(); j.State != "source" || j.Latest != "" || j.Error != "" || hits.Load() != 0 {
+			t.Fatalf("an independent build asked the feed: %+v, %d hits", j, hits.Load())
+		}
+		return
+	}
 	updates.check()
 	if j := updates.json(); j.State != "error" {
 		t.Fatalf("direct: %+v", j)

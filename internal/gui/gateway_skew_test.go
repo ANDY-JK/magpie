@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/gateway"
+	"github.com/yetone/magpie/internal/update"
 )
 
 func init() {
@@ -34,6 +35,22 @@ func TestGatewaySkewOfAnotherIsSaidNotQuit(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			go watchGateway(ctx, 50*time.Millisecond)
+			if update.Independent() {
+				// this build follows no release feed (update.Independent):
+				// no version of it counts as released, so another magpie
+				// serving the gateway is nobody's to judge — the page isn't
+				// told of a skew, and nothing is quit
+				time.Sleep(time.Second)
+				if skew := gatewayOther.Load(); skew != nil {
+					t.Fatalf("an independent build told of a skew: %+v", skew)
+				}
+				select {
+				case <-ended:
+					t.Fatal("quit a magpie beside a build that follows no feed")
+				default:
+				}
+				return
+			}
 			var sk *gatewaySkew
 			for deadline := time.Now().Add(5 * time.Second); sk == nil; time.Sleep(20 * time.Millisecond) {
 				sk = gatewayOther.Load()

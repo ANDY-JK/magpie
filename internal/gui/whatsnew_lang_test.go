@@ -56,6 +56,19 @@ func TestWhatsNewInPageLang(t *testing.T) {
 	Version = "0.1.604"
 	n := &whatsNew{}
 	n.start()
+	if update.Independent() {
+		// this build follows no feed: the notes are never asked for, in any
+		// language, and no page is shown any
+		if j := n.get(context.Background(), true, "zh"); j.Show || len(j.Releases) != 0 || j.Error != "" {
+			t.Fatalf("an independent build showed notes: %+v", j)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if len(asked) != 0 {
+			t.Fatalf("an independent build asked the notes feed: %v", asked)
+		}
+		return
+	}
 
 	if j := n.get(context.Background(), false, "zh"); !j.Show || len(j.Releases) != 1 || j.Releases[0].Notes != notesZh {
 		t.Fatalf("zh: %+v", j)
@@ -157,6 +170,22 @@ func TestWhatsNewAsksAgainForTranslation(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		return asked[k]
+	}
+	if update.Independent() {
+		// this build follows no feed: nothing is asked, in any language,
+		// and nothing is shown for it
+		if j := n.get(context.Background(), true, "zh"); j.Show || len(j.Releases) != 0 || j.Error != "" {
+			t.Fatalf("an independent build showed notes: %+v", j)
+		}
+		if j := n.before(context.Background(), 10, "zh"); len(j.Releases) != 0 || j.Error != "" {
+			t.Fatalf("an independent build asked the site again: %+v", j)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if len(asked) != 0 {
+			t.Fatalf("an independent build asked the notes feed: %v", asked)
+		}
+		return
 	}
 
 	if j := n.get(context.Background(), true, "zh"); len(j.Releases) != 1 || j.Releases[0].Notes != notesEn {

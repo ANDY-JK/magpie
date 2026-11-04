@@ -53,6 +53,20 @@ func TestStaleLatestIsNotUpToDate(t *testing.T) {
 		u.mu.Unlock()
 	}
 
+	if update.Independent() {
+		// this build follows no release feed (update.Independent): the
+		// check asks nothing and stays "source", fresh or stale alike
+		u.check()
+		if j := get("/api/update?fresh=1&lang=zh"); j.State != "source" || j.Latest != "" {
+			t.Fatalf("an independent build said a check: %+v", j)
+		}
+		age()
+		if j := get("/api/update?lang=zh"); j.State != "source" || asks.Load() != 0 {
+			t.Fatalf("an independent build asked a stale feed: %+v, %d asks", j, asks.Load())
+		}
+		return
+	}
+
 	u.check()
 	if j := get("/api/update?fresh=1&lang=zh"); j.State != "latest" {
 		t.Fatalf("just checked: %+v", j)

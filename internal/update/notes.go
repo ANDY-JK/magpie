@@ -297,7 +297,9 @@ func StripInstall(md string) string {
 // it was already in use (existed) its own version's notes are shown, from
 // "", which Between takes as upto's alone.
 func ShowNotes(last, current string, existed bool) (after string, show bool) {
-	if !Released(current) {
+	// releaseVersion, not Released: what changed is this checkout's own
+	// news, shown whatever the update feed it doesn't follow says
+	if !releaseVersion(current) {
 		return "", false
 	}
 	if last == "" {

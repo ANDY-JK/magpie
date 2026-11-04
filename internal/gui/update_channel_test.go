@@ -23,6 +23,10 @@ import (
 // version is dropped for Stable's, never restarted into. A save from a
 // page that doesn't send the channel keeps it.
 func TestUpdateChannelSwitch(t *testing.T) {
+
+	if update.Independent() {
+		t.Skip("this build follows no release feed (update.independent)")
+	}
 	sandboxHome(t)
 	body := []byte("new magpie")
 	sum := sha256.Sum256(body)
@@ -147,6 +151,14 @@ func TestWhatsNewKeyedByChannel(t *testing.T) {
 		list = append(list, update.Note{Version: fmt.Sprintf("0.1.%d", 100-i), Notes: "- x"})
 	}
 	waiting := updateJSON{State: "available", Latest: "0.1.200", Notes: "- the next one"}
+	if update.Independent() {
+		// this build follows no release feed (update.Independent): a
+		// waiting update is never offered, so none is merged into the list
+		if got := withWaiting(t.Context(), list, waiting, "en"); len(got) != 100 {
+			t.Fatalf("an independent build merged a waiting update: %d", len(got))
+		}
+		return
+	}
 	if got := withWaiting(t.Context(), list, waiting, "en"); len(got) != 101 || got[0].Version != "0.1.200" {
 		t.Fatalf("stable keeps %d of 101", len(got))
 	}
@@ -166,6 +178,10 @@ func TestWhatsNewKeyedByChannel(t *testing.T) {
 // dropped 0.1.12's download, so nothing was restarted into and the app
 // stayed on 0.1.10. The version found stands, download and all.
 func TestUpdateFeedBehindKeepsDownload(t *testing.T) {
+
+	if update.Independent() {
+		t.Skip("this build follows no release feed (update.independent)")
+	}
 	sandboxHome(t)
 	body := []byte("new magpie")
 	sum := sha256.Sum256(body)
