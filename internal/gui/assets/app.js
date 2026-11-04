@@ -18917,9 +18917,13 @@ function fmtBytes(n) {
   return (i && n < 10 ? n.toFixed(1) : Math.round(n)) + " " + u[i];
 }
 
+// ago()'s format, made once a language, not for every row a list draws
+let agoFmt, agoFmtLang;
 function ago(when) {
   const sec = (new Date(when) - Date.now()) / 1000;
-  const rtf = new Intl.RelativeTimeFormat(intlLang(), { numeric: "auto" });
+  const lang = intlLang();
+  if (agoFmtLang !== lang) { agoFmtLang = lang; agoFmt = new Intl.RelativeTimeFormat(lang, { numeric: "auto" }); }
+  const rtf = agoFmt;
   for (const [unit, n] of [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]]) {
     if (Math.abs(sec) >= n) return rtf.format(Math.round(sec / n), unit);
   }
