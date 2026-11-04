@@ -129,8 +129,12 @@ func TestTranslatedStreamKeepsClientAlive(t *testing.T) {
 			// timeout counts: Codex hangs up on response.completed, and the
 			// clients that read on to the close wait minutes, not idleFor.
 			// Then the stream closes within closeAfterLast, or the test
-			// fails rather than hangs.
-			const closeAfterLast = 5 * time.Second
+			// fails rather than hangs. That work writes to the disk (the
+			// served file, flushed), and a loaded machine's flush of a few
+			// bytes was seconds: the full run's close came past 5s after the
+			// stream's last event, with the same 5s bound for a stream that
+			// wouldn't close at all. The bound is the hang's, not the disk's
+			const closeAfterLast = 30 * time.Second
 			wait := idle.C
 			timedOut, completed, unclosed, pings := false, false, false, 0
 			// openai-go v2 (Crush) reads every blank line as an event and
