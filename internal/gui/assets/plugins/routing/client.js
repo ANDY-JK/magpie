@@ -1395,6 +1395,11 @@ function routingPage(part) {
         { who: name, status: tr.status, agent });
     if (tr.fail === "canceled")
       return t("{agent} canceled the request while {who} was answering: nobody failed, so nobody rests and nobody else is asked.", { who: name, agent });
+    if (tr.rest?.by === "key")
+      // a key its vendor won't take (keyRefusedRest): not a sign-in to
+      // renew, and asked again once its rest is over
+      return t("{who} answered {status}: the vendor doesn't accept its key. {how}. Replace the key in magpie, or rest it now.",
+        { who: name, status: tr.status, how: restHow(tr.rest, at(tr.start) + (tr.ms || 0)) });
     if (tr.fail === "auth")
       return next
         ? t("{who} could not authenticate. Sign in again in magpie; this login is not retried. The request went to {next}.", { who: name, next: nw ? who(nw) : t("the next") })

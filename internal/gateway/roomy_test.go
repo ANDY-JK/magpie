@@ -93,6 +93,10 @@ func TestMemberTooSmallIsTheLastResort(t *testing.T) {
 		t.Fatalf("paid's key refused: %d %s (free %d, paid %d)", code, body, free.n, paid.n)
 	}
 
+	// the key its vendor refused rests (keyRefusedRest) and is held: this
+	// second case is about a paid member out of its allowance, so it starts
+	// with the key asked again
+	s.UnrestAll("paid")
 	paid.replies = []reply{{429, "", `{"error":{"code":"insufficient_quota","message":"You exceeded your current quota, please check your plan and billing details."}}`}}
 	paid.n = 0
 	code, body = postAs(t, s, "", `{"model":"group/g","messages":[{"role":"user","content":"`+past+`"}]}`)

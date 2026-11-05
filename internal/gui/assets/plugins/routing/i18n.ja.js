@@ -410,6 +410,7 @@ magpie.strings({
     "{who} takes no request for a reply as short as this one asked for, so it is asked again for the shortest it gives, before any of the reply reaches {agent}.": "{who} はこのリクエストほど短い応答長を受け付けないため、許容される最短の長さで再度リクエストします。応答が {agent} に届く前に処理されます。",
     "{who} couldn't read the reasoning another account wrote earlier in this conversation, so it is asked again without it, before any of the reply reaches {agent}.": "{who} はこの会話で以前に別のアカウントが書いた推論を読めなかったため、それを除いて再度リクエストします。応答が {agent} に届く前に処理されます。",
     "{agent} canceled the request while {who} was answering: nobody failed, so nobody rests and nobody else is asked.": "{who} の応答中に {agent} がリクエストをキャンセルしました。誰も失敗していないため、休止する相手も、他に問い合わせる相手もいません。",
+    "{who} answered {status}: the vendor doesn't accept its key. {how}. Replace the key in magpie, or rest it now.": "{who} は {status} を返しました。ベンダーがこのキーを受け付けません。{how}。magpie でキーを交換するか、今すぐ休止を解除してください。",
     "{who} answered {status} · {fail}, and nobody else is left to ask — a failure that may pass, so it is tried again in {d}, before any of the reply reaches {agent}.": "{who} が {status} · {fail} を返し、他に問い合わせる相手もいません。一時的な失敗の可能性があるため、{d} 後にもう一度試します。応答はまだ {agent} に届いていません。",
     "{who} answered {status} · {fail}, and was to be asked again in {d}, but {agent} canceled the request before then, so nobody is asked again.": "{who} が {status} · {fail} を返し、{d} 後に再試行する予定でしたが、その前に {agent} がリクエストをキャンセルしたため、再試行しません。",
     "Back to live": "ライブに戻る",

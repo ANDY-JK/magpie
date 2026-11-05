@@ -223,3 +223,38 @@ func TestDeadChainWalksEachOnce(t *testing.T) {
 		t.Errorf("warm walk asked %v", got)
 	}
 }
+
+// An account out of credit is answered from its rest, from the first
+// refusal: a balance comes back by a top-up, not by waiting, so every
+// request asking again was one more refusal (a pool of nine walked one
+// account per request, and each was refused again every half hour). Its
+// words are given again; a held answer names the vendor's words, not a
+// sign-in.
+func TestAccountOutOfCreditIsAnsweredFromItsRest(t *testing.T) {
+	fresh(t)
+	srv := New()
+	body := []byte(`{"error":{"message":"insufficient credit"}}`)
+	acct := candidate{p: provider.Provider{ID: "acme", Name: "Acme", Account: &provider.Account{Agent: "acme", User: "u1"}}, rest: "acme#u1"}
+	rest := srv.restAfter(acct, 402, nil, body)
+	if rest.Why != failCredit || rest.By != "credit" {
+		t.Fatalf("rests %+v", rest)
+	}
+	r, back, ok := quotaHeld([]candidate{acct})
+	if !ok {
+		t.Fatal("an account out of credit isn't held: every request asks it again")
+	}
+	if !strings.Contains(heldWords(r, back), "insufficient credit") || !strings.Contains(heldWords(r, back), "out of its allowance") {
+		t.Fatalf("the agent is told %q", heldWords(r, back))
+	}
+	// a key out of credit is held only from its second refusal, as
+	// before: a first one may be the relay's moment
+	key := candidate{p: provider.Provider{ID: "k9", Name: "K9"}, rest: "k9"}
+	srv.restAfter(key, 402, nil, body)
+	if _, _, ok := quotaHeld([]candidate{key}); ok {
+		t.Error("a key refused once is held")
+	}
+	srv.restAfter(key, 402, nil, body)
+	if _, _, ok := quotaHeld([]candidate{key}); !ok {
+		t.Error("a key out of credit twice isn't held")
+	}
+}

@@ -204,13 +204,25 @@ const (
 	verifyHold = time.Minute
 	// restrictedRest: an account its vendor restricted (WorkBuddy's 403
 	// 11140, #1849) is out until the vendor lifts it, which takes an
-	// appeal, not a wait: hours, not the minutes of a backoff, so a group
-	// stops walking every restricted account on every request. Two hours
-	// costs one refused request per account every two hours, and a
-	// restriction lifted (or a refusal read wrong) is back the same
-	// afternoon without anyone acting; the Routing page lifts it at once
-	// (Unrest) for a user whose appeal went through
-	restrictedRest = 2 * time.Hour
+	// appeal, not a wait. A day: two hours had each restricted account
+	// refused again twelve times a day, and every request that walked the
+	// pool before that asked one of them anyway. Requests meanwhile are
+	// answered from the rest (quotaHeld) — the account isn't asked to find
+	// out — and a user whose appeal went through lifts it at once
+	// (Unrest)
+	restrictedRest = 24 * time.Hour
+	// keyRefusedRest: a key its vendor refuses outright (401, saying
+	// nothing of an allowance or a verification) is no wait's to mend. The
+	// backoff of the last one left asks it again on every request — a dead
+	// key was sent 1743 requests in two days, each refused, and an agent
+	// left on it had nothing but the vendor's 401 — so it rests this long
+	// (by "key"), and every request is answered from the rest meanwhile
+	// (quotaHeld). A request it serves clears it, replacing the key lifts
+	// it at once (UnrestAll, gui/key_replace.go), and the app's Rest now
+	// does too, for a 401 a relay gave for a moment. Its why stays
+	// failOther: another vendor's key may carry a token its own app renews
+	// (#716), which a sign-in's mark would never ask again.
+	keyRefusedRest = 30 * time.Minute
 	// slowRests is how many slow starts in a row (restSlow) rest a model
 	// on an account or key, and slowForget how long after the last one
 	// the next starts a new run
@@ -606,6 +618,17 @@ func failureOf(c candidate, status int, body []byte) string {
 	return failure(status, body)
 }
 
+// keyRefused says a reply is a key the vendor doesn't take: a 401 that says
+// nothing else (failureOf reads it as failOther — no allowance, no credit,
+// no verification, no model it doesn't serve), from a key rather than a
+// signed-in account. A subscription's sign-in has its own marks for this
+// (signin_revoked.go, claude_auth.go, copilot_lapsed.go); a key has none,
+// and without this it rested for a backoff at most, or not at all as the
+// last one left (restAfterMarked, keyRefusedRest).
+func keyRefused(c candidate, status int, why string) bool {
+	return status == http.StatusUnauthorized && why == failOther && c.p.Account == nil && c.p.Key != ""
+}
+
 // restrictedSaid says an error is one magpie already put in words as an
 // account its vendor restricted: WorkBuddy's 11140 as the built-in
 // translates it, or as the plugin does, both ending in
@@ -665,9 +688,10 @@ type Rest struct {
 	// (the allowance window it filled renews), "quota" (no word of when),
 	// "cooldown" (a minute), "backoff" (longer each time it fails again,
 	// or is rate limited again as soon as it is back), "restricted" (the
-	// vendor restricted the account: two hours, or until lifted by hand),
-	// "off" (no rest: its provider is set not to rest after an unknown
-	// failure, provider.RestCapOff).
+	// vendor restricted the account: a day, or until lifted by hand),
+	// "key" (a key its vendor refuses with a 401 that says nothing else:
+	// keyRefusedRest), "off" (no rest: its provider is set not to rest
+	// after an unknown failure, provider.RestCapOff).
 	By       string `json:"by"`
 	Failures int    `json:"failures,omitempty"` // in a row, for a backoff
 	// Key is what it rests by, for the app to lift the rest (Unrest)
@@ -1255,6 +1279,12 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 	// the vendor too busy for the request: the model's moment, not the
 	// account's fault (vendorOverloaded)
 	overloaded := why == failOther && !unserved && c.model != "" && vendorOverloaded(status, body)
+	// a key the vendor doesn't take is not out of an allowance: it rests
+	// longer than a backoff, and every request is answered from the rest
+	// meanwhile (keyRefusedRest, quotaHeld). It stays failOther: another
+	// vendor's key can carry a token its own app renews (#716), so it is
+	// not said to need a sign-in magpie never tries again
+	refused := keyRefused(c, status, why)
 	r := Rest{Why: why, Status: status, By: "cooldown", Error: restError(status, body)}
 	// out of allowance or credit for as long as magpie guessed: the vendor
 	// named no time, nor did the user (asksAt)
@@ -1275,13 +1305,18 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 		r.By, r.Until = "off", now
 		return r
 	}
-	if why == failCredit || why == failQuota {
+	if why == failCredit || why == failQuota || why == failRestricted || refused {
 		// the vendor's words, for quotaHeld to give again
 		r.said = provider.APIError(body, http.StatusText(status))
 	}
 	switch why {
 	case failCredit:
-		d, r.By, guessed = creditRest, "credit", true
+		// a balance comes back when someone tops it up, not while a clock
+		// runs: an account is held from the first refusal to the rest's
+		// end (quotaHeld answers meanwhile), a key climbs the ladder, and
+		// a vendor that says when it is back says better, as out of quota
+		// believes it
+		d, r.By = creditRest, "credit"
 		if a := c.p.Account; a != nil && a.UsageAgent() == "codex" {
 			// a ChatGPT account out of the credits its plan gives: they
 			// come again with the plan, and the account answers again
@@ -1455,6 +1490,13 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 		}
 		routed.Unlock()
 		d, r.By, r.Failures = min(fallbackCooldown<<min(n-1, 10), c.p.RestCapOr(longestRetry)), "backoff", n
+		if refused {
+			// a key the vendor doesn't take (refused, above) is no ladder's
+			// to mend: it rests keyRefusedRest, and requests meanwhile are
+			// answered from the rest (quotaHeld). A request it serves
+			// clears it, and replacing the key lifts it at once
+			d, r.By = keyRefusedRest, "key"
+		}
 		// a subscription that failed with a window full is out of it,
 		// whatever it said; a key isn't: a relay out of accounts for
 		// everyone (sub2api's 503) says nothing of the key's own windows.
@@ -1479,7 +1521,10 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 			codexMayBeUsedUp(a.User)
 		}
 	} else if a == nil && why != failOther && why != failVerify && why != failRestricted {
-		staleKeyAllowance(c.p) // a key that reads its windows, too
+		// a key that reads its windows, too. A refused key (refused) is one
+		// why == failOther leaves out already: its windows say nothing of a
+		// key the vendor won't take
+		staleKeyAllowance(c.p)
 	}
 	r.Until = now.Add(d)
 	if a := c.p.Account; a != nil {

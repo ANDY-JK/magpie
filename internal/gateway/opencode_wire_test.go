@@ -87,6 +87,10 @@ func TestOpenCodeGoModelsGoOnTheirOwnAPI(t *testing.T) {
 	}
 	for _, model := range []string{"gpt-6-luna", "grok-4.7", "muse-spark-1.3-contributor", "minimax-m2.7", "glm-5.3"} {
 		for path, body := range clients {
+			// Go's 401 rests the key it refused (keyRefusedRest) and holds
+			// the rest: each of these requests is about the API its model
+			// goes on, so each starts with the key asked again
+			s.UnrestAll("opencode-go")
 			mu.Lock()
 			asked = map[string][]string{}
 			mu.Unlock()

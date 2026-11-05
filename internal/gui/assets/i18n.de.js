@@ -2301,6 +2301,7 @@ I18N.de = Object.assign(I18N.de || {}, {
     "GitHub refused this Copilot sign-in; sign in again": "GitHub hat diese Copilot-Anmeldung abgelehnt; bitte erneut anmelden",
     "The vendor revoked this sign-in; sign in again": "Der Anbieter hat diese Anmeldung widerrufen; bitte erneut anmelden",
     "sign-in required": "Anmeldung erforderlich",
+    "key refused": "Schlüssel abgelehnt",
     "Sign in again to use this account": "Melden Sie sich erneut an, um dieses Konto zu verwenden",
     "Claude Code is no longer signed in; sign in again in magpie": "Claude Code ist nicht mehr angemeldet; melden Sie sich in magpie erneut an",
     "its sign-in is gone; sign in again": "die Anmeldung ist nicht mehr vorhanden; melden Sie sich erneut an",

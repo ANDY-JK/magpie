@@ -2310,6 +2310,7 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "GitHub refused this Copilot sign-in; sign in again": "GitHub 拒絕了這個 Copilot 登入，請重新登入",
     "The vendor revoked this sign-in; sign in again": "服務商已撤銷這個登入，請重新登入",
     "sign-in required": "需要重新登入",
+    "key refused": "金鑰被拒絕",
     "Sign in again to use this account": "重新登入後才能使用此帳號",
     "Claude Code is no longer signed in; sign in again in magpie": "Claude Code 已退出登入，請在 magpie 中重新登入",
     "its sign-in is gone; sign in again": "登入資訊已不存在，請重新登入",

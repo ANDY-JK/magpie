@@ -2291,6 +2291,7 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "GitHub refused this Copilot sign-in; sign in again": "GitHub がこの Copilot のサインインを拒否しました。再度サインインしてください",
     "The vendor revoked this sign-in; sign in again": "ベンダーがこのサインインを取り消しました。再度サインインしてください",
     "sign-in required": "サインインが必要です",
+    "key refused": "キーが拒否されました",
     "Sign in again to use this account": "このアカウントを使うには再度サインインしてください",
     "Claude Code is no longer signed in; sign in again in magpie": "Claude Code はサインインしていません。magpie で再度サインインしてください",
     "its sign-in is gone; sign in again": "サインイン情報がありません。再度サインインしてください",

@@ -3344,13 +3344,17 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			noteMember(hw, r, c.p, c.model)
 			writeError(hw, from, call.Status, said)
 		} else if rested, back, ok := quotaHeld(cands[i:]); ok && last {
-			// it rests out of its allowance, and so does every key that
+			// it rests for a reason no request mends — out of its
+			// allowance, out of credit, restricted by its vendor, a key
+			// the vendor won't take — and so does every candidate that
 			// was left (#1772: four Ollama Cloud keys out for the week,
-			// each asked again, and refused, on every request): its
-			// refusal is given again without asking, with when the first
-			// of them is back as Retry-After, for an agent that waits as
-			// told to ask then rather than at once
-			msg := fmt.Sprintf("%s (out of its allowance: not asked again before %s)", rested.said, heldClock(back, time.Now()))
+			// each asked again, and refused, on every request; a dead key
+			// asked on every request; an account out of credit or
+			// restricted, which no wait but a top-up or an appeal mends):
+			// its refusal is given again without asking, with when the
+			// first of them is back as Retry-After, for an agent that
+			// waits as told to ask then rather than at once
+			msg := heldWords(rested, back)
 			held, heldBack, call.Status, call.Error = true, back, rested.Status, c.p.Name+": "+msg
 			// the answer names who held it, as one asked would: a magpie
 			// using this one rests that model of it alone (remoteModelRest)
@@ -4426,17 +4430,22 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				continue
 			}
 		}
-		if last && !held && !hw.passing && hw.failed() && quotaStatus(hw.code()) && (c.p.Account == nil || !hw.turnedAway && try.Fail != failPrompt) && (try.Fail == failQuota || try.Fail == failCredit || failure(hw.code(), hw.errBody()) == failQuota || failure(hw.code(), hw.errBody()) == failCredit) {
-			// the last key left is out of its allowance: it rests as the
+		refusedKey := c.p.Account == nil && c.p.Key != "" && hw.code() == http.StatusUnauthorized && keyRefused(c, hw.code(), failureOf(c, hw.code(), hw.errBody()))
+		if last && !held && !hw.passing && hw.failed() && (refusedKey ||
+			try.Fail == failRestricted || failure(hw.code(), hw.errBody()) == failRestricted ||
+			quotaStatus(hw.code()) && (c.p.Account == nil || !hw.turnedAway && try.Fail != failPrompt) && (try.Fail == failQuota || try.Fail == failCredit || failure(hw.code(), hw.errBody()) == failQuota || failure(hw.code(), hw.errBody()) == failCredit)) {
+			// the last one left is out of its allowance, a key the vendor
+			// won't take, or one its vendor restricted: it rests as the
 			// ones before it did, for the next request to be answered
-			// from the rests until the first of them is back (#1772). An
-			// account too: not resting, it stayed the one a relay's moment
-			// of failure went on to, and its 429 the agent's, request
-			// after request, while the relay before it would answer
-			// (dbydd on Discord), once its own refusal is read as out of
-			// quota or credit (not Antigravity's 429 to a prompt).
-			// quotaHeld still holds keys alone, and autoReset lifts the
-			// rest of an account it spends a reset of
+			// from the rests until the first of them is back (#1772,
+			// keyRefusedRest). An account out of quota or credit too: not
+			// resting, it stayed the one a relay's moment of failure went
+			// on to, and its 429 the agent's, request after request,
+			// while the relay before it would answer (dbydd on Discord),
+			// once its own refusal is read as out of quota or credit (not
+			// Antigravity's 429 to a prompt). quotaHeld still holds keys
+			// alone out of quota, and autoReset lifts the rest of an
+			// account it spends a reset of
 			rest := s.restAfterMarked(c, hw.code(), hw.header, hw.errBody(), hw.sharedPool)
 			try.Fail, try.Rest = rest.Why, &rest
 		}

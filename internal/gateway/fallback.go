@@ -1219,19 +1219,22 @@ func restingOf(c candidate) (Rest, bool) {
 	return r, ok
 }
 
-// quotaHeld is, when every candidate of cs is a key resting out of its
-// allowance or its credit — refused with a 429 or a 402 for it, the
-// vendor's words kept — the rest of the first, and when the first of them
-// is asked again: asked before then, each would be refused the same
-// (#1772). A key whose rest magpie guessed the length of, the vendor and
-// the user naming no time, is asked again all the same after its first
-// refusal, and a minute on after the next (Rest.asksAt): zoecats on Discord, a local aggregator said "quota
-// exhausted" for the moment it switched upstreams, and every request,
-// the agent's retry first, was answered from its 15-minute rest. A
-// subscription account isn't held so: its resets may be spent for it
-// (autoReset), and its windows are read again as it is planned. Nor is a
-// model of another computer's magpie (Rest.there): that magpie holds its
-// own rests, and the user may have changed what it serves since
+// quotaHeld is, when every candidate of cs is resting for a reason no
+// request can mend, the rest of the first, and when the first of them is
+// asked again: asked before then, each would be refused the same (#1772,
+// and a dead key asked on every request). Held so are a key out of its
+// allowance (refused with a 429 or a 402 for it, the vendor's words
+// kept), a key the vendor refuses outright (a 401 that says nothing of an
+// allowance: keyRefusedRest), an account or key out of credit — a balance
+// comes back when it is topped up by hand, so asking again only spends a
+// refused request — and an account or key its vendor restricted
+// (failRestricted): the vendor lifts that on an appeal, not on a clock,
+// and each request asking it again is one more refusal. A subscription
+// account out of quota isn't held so: its resets may be spent for it
+// (autoReset), and its windows are read again as it is planned, a reading
+// that brings it back before its rest ends (renewed). Nor is a model of
+// another computer's magpie (Rest.there): that magpie holds its own
+// rests, and the user may have changed what it serves since
 // (zaidu259434 on X: a group there moved off a spent vendor, and its
 // refusal was still given here until the time it named).
 func quotaHeld(cs []candidate) (Rest, time.Time, bool) {
@@ -1240,7 +1243,29 @@ func quotaHeld(cs []candidate) (Rest, time.Time, bool) {
 	now := time.Now()
 	for i, c := range cs {
 		r, ok := restingOf(c)
-		if !ok || c.p.Account != nil || r.there || r.Why != failQuota && r.Why != failCredit || !quotaStatus(r.Status) || r.said == "" {
+		if !ok || r.there {
+			return Rest{}, time.Time{}, false
+		}
+		switch {
+		case r.Why == failQuota:
+			// keys alone, and only the vendor's own 429 or 402: an
+			// account's quota is read again as it is planned, and its
+			// resets may be spent for it (autoReset)
+			if c.p.Account != nil || !quotaStatus(r.Status) || r.said == "" {
+				return Rest{}, time.Time{}, false
+			}
+		case r.Why == failCredit:
+			// whatever status the refusal came with (Cline's 502 in its
+			// envelope included): the vendor's words are given again, and
+			// nothing is asked
+			if r.said == "" {
+				return Rest{}, time.Time{}, false
+			}
+		case r.Why == failRestricted:
+			// no status to check: a restriction says nothing of an
+			// allowance
+		case r.By == "key" && r.Status == http.StatusUnauthorized && r.said != "":
+		default:
 			return Rest{}, time.Time{}, false
 		}
 		at := r.asksAt(now)
@@ -1260,6 +1285,24 @@ func quotaHeld(cs []candidate) (Rest, time.Time, bool) {
 // quotaStatus is a status a vendor says a key is out of its allowance with.
 func quotaStatus(status int) bool {
 	return status == http.StatusTooManyRequests || status == http.StatusPaymentRequired
+}
+
+// heldWords is what an agent is told when nobody is left to ask: the
+// vendor's words when they were kept, why nothing is asked, and when the
+// first of them is back.
+func heldWords(r Rest, back time.Time) string {
+	when := heldClock(back, time.Now())
+	switch {
+	case r.By == "restricted" && r.said == "":
+		return "restricted by its vendor (not asked again before " + when + ")"
+	case r.By == "restricted":
+		// the vendor lifts a restriction on an appeal, not on a clock
+		return fmt.Sprintf("%s (restricted by its vendor: not asked again before %s)", r.said, when)
+	case r.By == "key":
+		// a key the vendor refuses is not out of an allowance
+		return fmt.Sprintf("%s (its key was refused: not asked again before %s)", r.said, when)
+	}
+	return fmt.Sprintf("%s (out of its allowance: not asked again before %s)", r.said, when)
 }
 
 // soonestBack is when the first of cs is back from its rest, or asked

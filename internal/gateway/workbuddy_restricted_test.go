@@ -215,3 +215,25 @@ func TestPluginRestrictedAccountSkipped(t *testing.T) {
 		})
 	}
 }
+
+// The rest a restriction takes answers its requests too: asked again to
+// find out whether the vendor lifted it, a restricted account is refused
+// every time (a pool of nine walked one of them on every request). The
+// agent is given the vendor's words and why.
+func TestRestrictedAccountIsAnsweredFromItsRest(t *testing.T) {
+	fresh(t)
+	s := New()
+	p := provider.Provider{ID: provider.WorkBuddyAIID, Name: "WorkBuddy AI", Account: &provider.Account{Agent: provider.WorkBuddyAIID, User: "u1"}}
+	c := candidate{p: p, model: "deepseek-v4.1-flash", rest: p.ID + "#u1"}
+	now := time.Now()
+	r := s.restAfter(c, 403, nil, []byte(wbRestrictedBody))
+	if d := restedFor(r, now); d < restrictedRest-time.Minute || d > restrictedRest+time.Minute {
+		t.Fatalf("rests %v, want %v", d.Round(time.Second), restrictedRest)
+	}
+	if _, _, ok := quotaHeld([]candidate{c}); !ok {
+		t.Fatal("a restricted account isn't held: every request asks it again")
+	}
+	if msg := heldWords(r, r.Until); !strings.Contains(msg, "request illegal") || !strings.Contains(msg, "restricted by its vendor") {
+		t.Fatalf("the agent is told %q, want the vendor's words and why", msg)
+	}
+}

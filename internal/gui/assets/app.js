@@ -14535,7 +14535,7 @@ function renderKeyAccounts(p) {
     // a line of its own under the key's, so the row's controls stay in reach
     let restLine = null;
     if (k.rest && new Date(k.rest.until) > Date.now()) {
-      const r = el("span", "key-rest", t("Resting · {why} · back at {time}", { why: (k.rest.status ? k.rest.status + " " : "") + t(KEY_FAIL[k.rest.why] || "failed"), time: restBack(k.rest.until) }) + (k.rest.probed ? " · " + t("checked in the background, back as soon as it answers") : ""));
+      const r = el("span", "key-rest", t("Resting · {why} · back at {time}", { why: (k.rest.status ? k.rest.status + " " : "") + keyRestWords(k.rest), time: restBack(k.rest.until) }) + (k.rest.probed ? " · " + t("checked in the background, back as soon as it answers") : ""));
       r.title = t("The gateway passes this key over until then, and tries the next one");
       // lifted by hand (#1869): the next request asks it again, and a
       // refusal then rests it again as before
@@ -14729,13 +14729,14 @@ function keyMatches(k, q) {
   if (!words.length) return true;
   const resting = k.rest && new Date(k.rest.until) > Date.now();
   const text = [k.name, k.masked, k.on ? "" : "off " + t("turned off"),
-    resting ? "resting " + t("resting") + " " + (KEY_FAIL[k.rest.why] || "failed") + " " + t(KEY_FAIL[k.rest.why] || "failed") + " " + (k.rest.status || "") : ""].join(" ").toLowerCase();
+    resting ? "resting " + t("resting") + " " + keyRestWords(k.rest) + " " + (k.rest.status || "") : ""].join(" ").toLowerCase();
   return words.every((w) => text.includes(w));
 }
 // keyDead: a key the gateway is passing over for good reason, not a rate
-// limit that ends by itself: its sign-in refused, or its credit gone
+// limit that ends by itself: its sign-in refused, its credit gone, or its
+// vendor refusing the key itself (by "key", keyRefusedRest)
 function keyDead(k) {
-  return !!k.rest && (k.rest.why === "auth" || k.rest.why === "credit") && new Date(k.rest.until) > Date.now();
+  return !!k.rest && (k.rest.why === "auth" || k.rest.why === "credit" || k.rest.by === "key") && new Date(k.rest.until) > Date.now();
 }
 // keyFoldRows: under the rows a folded list shows, All N keys; opened,
 // above them the filter and removing many at once, and under them how many
@@ -14817,6 +14818,9 @@ function splitKeys(text) {
 }
 // a key's rest, worded as the Routing page words a failure
 const KEY_FAIL = { rate: "rate limited", credit: "out of credit", quota: "quota used up", other: "failed", auth: "sign-in required", verify: "needs verification", refused: "refused (safety filter)", proxy: "proxy not reachable", slow: "slow to start" };
+// keyRestWords is that, or a key its vendor refuses outright (by "key",
+// keyRefusedRest): not out of an allowance, and not a sign-in to renew
+const keyRestWords = (r) => r.by === "key" ? t("key refused") : t(KEY_FAIL[r.why] || "failed");
 
 // protoPicker: which protocol a key works with. Some relays hand out one
 // key for Anthropic and another for OpenAI; a key set to one is used on

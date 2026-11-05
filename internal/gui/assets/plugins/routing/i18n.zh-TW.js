@@ -412,6 +412,7 @@ magpie.strings({
     "{who} takes no request for a reply as short as this one asked for, so it is asked again for the shortest it gives, before any of the reply reaches {agent}.": "{who} 不接受這麼短的回覆長度（max_tokens），已在回覆到達 {agent} 前按其允許的最小值重問。",
     "{who} couldn't read the reasoning another account wrote earlier in this conversation, so it is asked again without it, before any of the reply reaches {agent}.": "{who} 無法讀取此會話中另一個帳號先前寫下的推理，已在回覆到達 {agent} 前去掉這部分重問。",
     "{agent} canceled the request while {who} was answering: nobody failed, so nobody rests and nobody else is asked.": "{who} 回答時 {agent} 取消了請求：無人出錯，不休息，也不再問其他帳號。",
+    "{who} answered {status}: the vendor doesn't accept its key. {how}. Replace the key in magpie, or rest it now.": "{who} 傳回 {status}：廠商不接受它的金鑰。{how}。請在 magpie 中更換金鑰，或立即解除休息。",
     "{who} answered {status} · {fail}, and nobody else is left to ask — a failure that may pass, so it is tried again in {d}, before any of the reply reaches {agent}.": "{who} 返回 {status} · {fail}，且無其他可問；這可能是暫時性錯誤，{d} 後重試一次，此時尚未向 {agent} 傳送任何回覆。",
     "{who} answered {status} · {fail}, and was to be asked again in {d}, but {agent} canceled the request before then, so nobody is asked again.": "{who} 回傳 {status} · {fail}，原定 {d} 後重試，但 {agent} 在此之前取消了請求，因此不再重試。",
     "Back to live": "回到即時",

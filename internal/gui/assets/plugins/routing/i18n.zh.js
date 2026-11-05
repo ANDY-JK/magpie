@@ -412,6 +412,7 @@ magpie.strings({
     "{who} takes no request for a reply as short as this one asked for, so it is asked again for the shortest it gives, before any of the reply reaches {agent}.": "{who} 不接受这么短的回复长度（max_tokens），已在回复到达 {agent} 前按其允许的最小值重问。",
     "{who} couldn't read the reasoning another account wrote earlier in this conversation, so it is asked again without it, before any of the reply reaches {agent}.": "{who} 无法读取此会话中另一个账号先前写下的推理，已在回复到达 {agent} 前去掉这部分重问。",
     "{agent} canceled the request while {who} was answering: nobody failed, so nobody rests and nobody else is asked.": "{who} 回答时 {agent} 取消了请求：无人出错，不休息，也不再问其他账号。",
+    "{who} answered {status}: the vendor doesn't accept its key. {how}. Replace the key in magpie, or rest it now.": "{who} 返回 {status}：厂商不接受它的密钥。{how}。请在 magpie 中更换密钥，或立即解除休息。",
     "{who} answered {status} · {fail}, and nobody else is left to ask — a failure that may pass, so it is tried again in {d}, before any of the reply reaches {agent}.": "{who} 返回 {status} · {fail}，且无其他可问；这可能是暂时性错误，{d} 后重试一次，此时尚未向 {agent} 发送任何回复。",
     "{who} answered {status} · {fail}, and was to be asked again in {d}, but {agent} canceled the request before then, so nobody is asked again.": "{who} 返回 {status} · {fail}，原定 {d} 后重试，但 {agent} 在此之前取消了请求，因此不再重试。",
     "Back to live": "回到实时",
