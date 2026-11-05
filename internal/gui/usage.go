@@ -36,6 +36,7 @@ var (
 	ledgerPage   = usageapi.LedgerPage
 	periodOf     = usageapi.PeriodOf
 	ledgerFilter = usageapi.FilterIn
+	rankingOf    = usageapi.Rank
 )
 
 func init() {
@@ -181,6 +182,14 @@ func usageRoutes(mux *http.ServeMux, w Windows) {
 		offset, _ := strconv.Atoi(q.Get("offset"))
 		limit, _ := strconv.Atoi(q.Get("limit"))
 		writeJSON(rw, ledgerPage(periodOf(q.Get("period")), ledgerFilter(r), offset, limit))
+	}))
+	// the ranking: each provider's and each of its models' standing in a
+	// period, read in the browser's zone like the ledger is. It reads the
+	// same log, through the same clears and filters, and names a provider
+	// for removal only after long use that is still failing now.
+	mux.HandleFunc("GET /api/usage/rank", coldTurn(func(rw http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		writeJSON(rw, rankingOf(periodOf(q.Get("period")), provider.All(), usageapi.ZoneOf(r)))
 	}))
 	// the heatmap (#1369): the last 53 weeks a day each, of the requests the
 	// page's filters keep, read from the same index as the page

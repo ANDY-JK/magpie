@@ -144,16 +144,16 @@ as" (#3897).
   Latest request; a panel left on its Routing tab shows Agents.
 - **Usage** (`plugins/usage`, `Client: i18n.js, client.js, page.js`):
   the page that was the largest part of app.js (about 3000 lines: the
-  Overview's cards, the Requests ledger, the Sessions tab and the Agents
-  list). Its part's `html` is the page's markup that was index.html's
-  `#view-usage`. Its code builds on app.js at the top level (its timers,
-  `?view=usage`'s tab and filters), so `page.js` is the one script a
-  plugin loads after app.js: index.html loads kernel.js, the plugins'
-  other scripts, app.js and the scripts beside it, then each `page.js`,
-  then `start.js`, which is app.js's old tail (`magpie.start()`, the
-  first page shown, the first `load()`), so the first page has its code.
-  `TestBuiltinClientsLoaded` holds that order. Its hooks: `open` loads
-  it, `refresh(again)` is `load()`'s read of it (coming back to the
+  Overview's cards, the Requests ledger, the Sessions and Standings tabs
+  and the Agents list). Its part's `html` is the page's markup that was
+  index.html's `#view-usage`. Its code builds on app.js at the top level
+  (its timers, `?view=usage`'s tab and filters), so `page.js` is the one
+  script a plugin loads after app.js: index.html loads kernel.js, the
+  plugins' other scripts, app.js and the scripts beside it, then each
+  `page.js`, then `start.js`, which is app.js's old tail (`magpie.start()`,
+  the first page shown, the first `load()`), so the first page has its
+  code. `TestBuiltinClientsLoaded` holds that order. Its hooks: `open`
+  loads it, `refresh(again)` is `load()`'s read of it (coming back to the
   Overview is opening the allowances, #1588), `reload` is Refresh now,
   `costs` draws the costs again when Settings' currency changes, and
   `tab` says which tab it is on, for `focusQuotaCard`, and `leave`, which
@@ -161,7 +161,10 @@ as" (#3897).
   Requests (`ledLeave`, TJHHHH on Discord): a filter a ranking or chart
   click set, or one brought in by the address or Routing's View usage,
   goes when the reader leaves the Requests for another page or tab. One
-  picked in its own menu or typed stays. Still in app.js,
+  picked in its own menu or typed stays. The Standings tab's ranking
+  (its fifth tab) is described under [gui-shell](gui-shell.md): its words
+  are this plugin's i18n keys (`RANK_WORDS` names them), and its removal
+  button posts the Providers page's `provider/delete`. Still in app.js,
   since the tray panel draws them too: the allowance cards,
   `quotasOpened`, `panelQuotaFocus` and `panelUseFocus`. With the plugin
   off, its nav tab goes, and so do the ways to the page

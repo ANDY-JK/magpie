@@ -1307,6 +1307,50 @@ body.masked :hover > .acct-eye, body.masked .pq-card:hover .acct-eye, body.maske
 .usage-clear button { font-size: 11px; }
 .usage-pane { display: flex; flex-direction: column; flex: none; }
 .usage-pane[hidden] { display: none; }
+/* ---- provider standings ---- */
+.rank-intro { margin: 2px 0 0; }
+.rank-empty, .rank-note, .rank-foot { margin: 6px 0; }
+.rank-list { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+.rank-card { padding: 10px 11px 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); min-width: 0; }
+.rank-card.rank-drop { border-color: var(--line-2); background: var(--card-2); }
+.rank-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.rank-place { flex: none; width: 19px; height: 19px; border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; background: var(--pill); color: var(--muted); font: var(--code-style, normal) var(--code-weight, 600) 10px var(--code-font, var(--code)); font-variant-numeric: tabular-nums; }
+.rank-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 13px; }
+.rank-score { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rank-tags, .rank-causes { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.rank-tag { letter-spacing: .02em; text-transform: none; white-space: nowrap; }
+.rank-tag.warn { background: var(--amber-soft); color: var(--amber); }
+.rank-tag.free { background: var(--green-soft); color: var(--green); }
+.rank-tag.ctx { background: var(--pill); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+.rank-details { margin-top: 7px; }
+.rank-metrics { display: flex; flex-wrap: wrap; gap: 4px 9px; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.rank-metric { white-space: nowrap; }
+.rank-parts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }
+.rank-part { min-width: 0; }
+.rank-part-name { display: block; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+.rank-track { height: 3px; margin: 3px 0 2px; border-radius: 2px; background: var(--line-2); overflow: hidden; }
+.rank-track i { display: block; height: 100%; border-radius: 0 2px 2px 0; background: var(--accent); }
+.rank-part-points { display: block; color: var(--muted); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+.rank-label { width: 100%; color: var(--muted); font-size: 10.5px; }
+.rank-advice { margin: 6px 0 0; color: var(--muted); font-size: 11.5px; }
+.rank-card.rank-drop .rank-advice { color: var(--amber); }
+.rank-models { margin-top: 8px; }
+.rank-model { border-top: 1px solid var(--line-2); padding-top: 5px; margin-top: 5px; }
+.rank-model-head { display: flex; align-items: center; gap: 7px; min-height: 24px; cursor: pointer; }
+.rank-model-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.rank-model-score, .rank-model-head .rank-metric { color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.grade { flex: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; background: var(--pill); color: var(--fg-2); font: var(--code-style, normal) var(--code-weight, 600) 10px var(--code-font, var(--code)); }
+.grade.a { background: var(--green-soft); color: var(--green); }
+.grade.b { background: var(--accent-soft); color: var(--accent); }
+.grade.c { background: var(--pill); color: var(--fg-2); }
+.grade.d, .grade.e { background: var(--amber-soft); color: var(--amber); }
+.rank-sk { height: 86px; margin-bottom: 7px; border: 1px solid var(--line); border-radius: 9px; }
+@media (max-width: 700px), (pointer: coarse) and (max-width: 1024px) {
+  .rank-card { padding: 8px 9px; }
+  .rank-parts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 9px; }
+  .rank-name { font-size: 12.5px; }
+  .rank-tags, .rank-causes, .rank-metrics { gap: 3px 6px; }
+}
 
 /* ---- requests, a segment of usage: the ledger ------------------------------ */
 #ledgerPane { min-width: 0; }

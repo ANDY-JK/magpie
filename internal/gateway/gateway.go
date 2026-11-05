@@ -930,6 +930,7 @@ func (s *Server) routes() *routeMux {
 	mux.HandleFunc("POST /api/generate", s.ollamaChat(true))
 	mux.HandleFunc("GET /v1/magpie/quotas", s.quotas)
 	mux.HandleFunc("GET /v1/magpie/usage", s.usageSummary)
+	mux.HandleFunc("GET /v1/magpie/usage/rank", s.usageRank)
 	mux.HandleFunc("GET /v1/magpie/usage/requests", s.usageRequests)
 	mux.HandleFunc("POST /v1/magpie/usage/requests", s.usageIngest)
 	mux.HandleFunc("GET /v1/magpie/quotas/history", s.quotasHistory)

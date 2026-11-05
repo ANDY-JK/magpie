@@ -515,12 +515,23 @@ Claude Code 2.1.310 and Codex 0.162.1 files in `testdata/carry`),
 the Usage page's summary and request ledger from the same builders as the
 window's `/api/usage` and `/api/usage/requests`
 ([`internal/usageapi`](../../internal/usageapi/usageapi.go)), read-only and
-without conversation text. They follow `/v1/magpie/quotas`' guard: this
+without conversation text. `GET /v1/magpie/usage/rank` is the window's
+`/api/usage/rank` the same way: the ranking tab's `usageapi.Rank` of a
+period (`?period=`, an unknown name read as the month), read in the reader's
+zone (`?tz=`). It counts each provider's calls and models, what they failed
+with, and names a long-used still-failing one for removal — the tab's own
+behaviour is described under [gui-shell](gui-shell.md). Unlike the two
+routes above, it is one of the read-only key's own routes
+(`readOnlyRoutes`), and it names no key: `TestUsageOverGateway` reads it
+with a read-only key and holds every key's secret out of its answer. They
+follow `/v1/magpie/quotas`' guard: this
 machine, or another with an enabled gateway key, behind the same Host check.
 A key that is held (`heldKey`: a budget, models or accounts) is refused the
 summary and gets the ledger filtered to its own `CallerKey`, with its filter
 lists cut to its own rows (`usageapi.OwnPage`): the ledger's facets are drawn
 from every call in the period, so without the cut they would name other keys.
+A held key is refused the ranking too, with the same pointer to
+`/v1/magpie/usage/requests`.
 `TestUsageOverGateway` covers both, and a red when either cut is removed.
 A held key is refused (`refuseHeld`, 403 `provider.KeyHeldCode`) the
 quotas, their history, kept cards and refresh, and `/v1/magpie/concurrency`

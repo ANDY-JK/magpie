@@ -8,7 +8,10 @@
 // the pages ask the server for what they show; Export CSV posts the same
 // filters. A click with the page scrolled moves nothing, and a narrow window
 // scrolls the table in its box, never the page sideways. No left-border
-// stripe. English and Chinese, light and dark; no backend, the API is faked.
+// stripe. The Standings tab ranks the same log by provider and model, names
+// a provider used long and still failing, and its Remove asks before it
+// posts provider/delete. English and Chinese, light and dark; no backend,
+// the API is faked.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -32,6 +35,40 @@ for (let i = 0; i < 126; i++) {
 }
 ROWS.forEach((r, i) => { r.callerKeyId = i % 2 ? "server" : "laptop"; });
 
+// The Standings tab's ranking: one provider used long and still failing
+// (drop, removable), a good one, one too little used, one deleted. The
+// numbers stand in for the real ones the backend ranks from the log; the
+// page only says what they are given.
+const RANK = {
+  period: "today", since: new Date(now - 86400e3).toISOString(),
+  tier: { needs: 5, days: 7, calls: 100, errors: 0.2, still: 7 },
+  providers: [
+    {
+      id: "relay", name: "Relay", icon: "generic", rank: 1, score: 23, grade: "E",
+      calls: 120, errors: 40, retried: 8, input: 90000, output: 9000, cost: 1.2, unpriced: 2,
+      days: 9, first: new Date(now - 9 * 86400e3).toISOString(), last: new Date(now - 3600e3).toISOString(),
+      recentCalls: 30, recentErrors: 12,
+      causes: [{ key: "rate_limit", count: 25 }, { key: "credit", count: 9 }],
+      parts: [{ key: "served", points: 10, most: 25 }, { key: "stood", points: 6, most: 25 }, { key: "fast", points: 4, most: 25 }, { key: "soon", points: 3, most: 25 }],
+      tags: [{ key: "failing", tone: "warn" }, { key: "slow-start", tone: "info" }],
+      models: [{ model: "gpt-6-sol", at: "relay", score: 30, grade: "E", calls: 100, errors: 35, parts: [{ key: "served", points: 12, most: 25 }] }],
+      accounts: ["team"],
+      removable: true, drop: true,
+    },
+    {
+      id: "anthropic", name: "Claude", icon: "claude-color", rank: 2, score: 91, grade: "A",
+      calls: 60, errors: 1, retried: 1, input: 40000, output: 5000, cost: 0.9,
+      days: 4, first: new Date(now - 4 * 86400e3).toISOString(), last: new Date(now - 7200e3).toISOString(),
+      recentCalls: 20, recentErrors: 0,
+      parts: [{ key: "served", points: 24, most: 25 }, { key: "stood", points: 23, most: 25 }, { key: "fast", points: 22, most: 25 }, { key: "soon", points: 22, most: 25 }],
+      tags: [{ key: "steady", tone: "good" }],
+      removable: false,
+    },
+  ],
+  thin: [{ id: "deepseek", name: "DeepSeek", icon: "generic" }],
+  gone: [{ id: "old-vendor", name: "Old Vendor", icon: "generic", deleted: new Date(now - 2 * 86400e3).toISOString() }],
+};
+
 function page(q) {
   let rows = ROWS;
   if (q.get("route")) rows = rows.filter((r) => r.route_id === Number(q.get("route")));
@@ -52,10 +89,17 @@ function page(q) {
   };
 }
 
-function server(lang, theme, asked) {
+function server(lang, theme, asked, deleted = new Set()) {
   return async (route) => {
     const req = route.request(), url = new URL(req.url());
     const json = (data) => route.fulfill({ json: data });
+    if (url.pathname === "/api/usage/rank") {
+      return json({ ...RANK, providers: RANK.providers.filter((p) => !deleted.has(p.id)) });
+    }
+    if (url.pathname === "/api/provider/delete") {
+      deleted.add(req.postDataJSON().id);
+      return json({ ok: true });
+    }
     if (url.pathname === "/boot.js") return route.fulfill({ contentType: "text/javascript", body: `window.bootPrefs = {lang:"${lang}",theme:"${theme}",web:false};` });
     if (url.pathname === "/wails/runtime.js") return route.fulfill({ contentType: "text/javascript", body: "export const Window = {};" });
     if (url.pathname === "/api/gateway/trace") {
@@ -70,7 +114,7 @@ function server(lang, theme, asked) {
         tries: [{ id: "relay", model: "gpt-6-sol", start: new Date(now - 86400e3).toISOString(), done: true, status: 200, ms: 50 }],
         done: true, status: 200, ms: 50 });
     }
-    if (url.pathname === "/api/providers") return json({ providers: [], presets: [], excluded: [], models: [], gateway: { running: false } });
+    if (url.pathname === "/api/providers") return json({ providers: [{ id: "relay", name: "Relay" }], presets: [], excluded: [], models: [], gateway: { running: false } });
     if (url.pathname === "/api/state") return json({ agents: [], profiles: [], settings: { lang, theme }, fx: { rate: 7.2, at: new Date().toISOString() } });
     if (url.pathname === "/api/usage/requests") {
       asked.push(url.searchParams);
@@ -100,18 +144,40 @@ function server(lang, theme, asked) {
 
 const L = {
   en: {
-    tabs: ["Overview", "Requests", "Sessions", "Context"],
+    tabs: ["Overview", "Requests", "Sessions", "Context", "Standings"],
     cols: ["Time", "Agent", "Requested", "Provider · account", "Sent", "Served", "Effort", "In", "Out", "Cache write", "Cache read", "Cost", "TTFT", "Duration", "Speed", "Status"],
     sum: "130 requests", pager: "1–100 of 130", older: "Older", newer: "Newer", failed: "Failed", export: "Export CSV",
     why: "The vendor was asked for gpt-6-sol, but its reply says gpt-6-luna answered",saved: "Saved 130 requests to ~/Downloads/magpie-requests-30d-2026-09-29.csv",
     none: "No requests match these filters.", bad: "Failed: the agent was answered 429", via: "Codex · via office-mac",
+    rankHead: "Relay",
+    rankNeed: "Standings come from gateway calls in this period. A provider needs 5 requests; the four parts are answered, first try, writing pace and first token.",
+    rankDropRule: "A provider is named for removal only after 7 days of use, 100 requests, and 20% failures both over the period and in its last 7 days.",
+    rankAdvice: "Relay has been used for a long time and is still failing. Review its accounts, then remove it if you no longer need it.",
+    rankRemoveBtn: "Remove this provider", rankAsk: "Remove Relay?", rankRemoved: "Relay removed",
+    rankDropTag: "Think about removal", rankGoneTag: "Already gone",
+    rankWhy: "Why it failed", rankRateLimit: "Rate limited · 25", rankCredit: "Out of credit · 9",
+    rankLast: "Last 7 days: 30 requests, 12 failed",
+    rankFoot: "Too little use: DeepSeek · Already gone: Old Vendor",
+    rankEmpty: "No provider has enough gateway calls in this period.",
+    rankModelBtn: "gpt-6-sol",
   },
   zh: {
-    tabs: ["概览", "请求", "会话", "上下文"],
+    tabs: ["概览", "请求", "会话", "上下文", "排行榜"],
     cols: ["时间", "Agent", "请求模型", "供应商 · 账号", "发送模型", "实际模型", "推理强度", "输入", "输出", "缓存写入", "缓存读取", "费用", "首字耗时", "耗时", "速度", "状态"],
     sum: "130 个请求", pager: "第 1–100 条，共 130 条", older: "较早", newer: "较新", failed: "失败", export: "导出 CSV",
     why: null, saved: "已将 130 个请求保存到 ~/Downloads/magpie-requests-30d-2026-09-29.csv",
     none: "没有符合这些筛选条件的请求。", bad: "失败：Agent 收到的是 429", via: "Codex · 来自 office-mac",
+    rankHead: "Relay",
+    rankNeed: "排行只统计本时间段内经网关发出的请求。至少 5 次请求才参与；评分由成功应答、一次成功、输出速度、首字耗时四部分组成。",
+    rankDropRule: "只有用满 7 天、累计 100 次请求，且整个时间段和最近 7 天失败率都不低于 20%，才会建议考虑移除。",
+    rankAdvice: "Relay 用了很久，现在仍经常失败。先检查账号，不需要了就移除。",
+    rankRemoveBtn: "移除此供应商", rankAsk: "移除 Relay？", rankRemoved: "已移除 Relay",
+    rankDropTag: "考虑移除", rankGoneTag: "已经移除",
+    rankWhy: "失败原因", rankRateLimit: "被限流时 · 25", rankCredit: "额度用尽 · 9",
+    rankLast: "最近 7 天：30 次请求，12 次失败",
+    rankFoot: "用量太少：DeepSeek · 已经移除：Old Vendor",
+    rankEmpty: "这个时间段还没有足够的网关请求可供排行。",
+    rankModelBtn: "gpt-6-sol",
   },
 };
 
@@ -137,13 +203,13 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     const shots = process.env.ARTIFACT_DIR;
     if (shots) await fs.mkdir(shots, { recursive: true });
 
-    const open = async (lang, theme, asked, width = 1180, height = 640) => {
+    const open = async (lang, theme, asked, deleted, width = 1180, height = 640) => {
       const errors = [];
       const page = await (await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" })).newPage();
       page.setDefaultTimeout(5000);
       page.setDefaultNavigationTimeout(60000);
       page.on("pageerror", (e) => errors.push(e.message));
-      await page.route("**/*", server(lang, theme, asked));
+      await page.route("**/*", server(lang, theme, asked, deleted));
       await page.goto("http://magpie.test/");
       await page.locator('nav [data-view="usage"], [data-view="usage"]').first().click();
       await page.locator(":is(#usageTab .opt, .nav-s):visible").nth(1).click();
@@ -409,6 +475,76 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.deepEqual(errors, []);
         await page.close();
       });
+      await t.test(lang + ": the Standings tab ranks and removes", async () => {
+        const asked = [];
+        const deleted = new Set();
+        const { page, errors } = await open(lang, "light", asked, deleted);
+        const w = L[lang];
+        const tab = page.locator(":is(#usageTab .opt, .nav-s):visible").nth(4);
+        await click(page, tab);
+        await page.locator(".rank-card").first().waitFor();
+        // the two intro lines name the tier the period holds providers to
+        const notes = await page.locator(".rank-intro .usage-note").allTextContents();
+        assert.equal(notes[0], w.rankNeed);
+        assert.equal(notes[1], w.rankDropRule);
+        // the ranked cards, best first: Relay named for removal
+        const cards = page.locator(".rank-card");
+        assert.equal(await cards.count(), 2);
+        assert.equal(await cards.nth(0).locator(".rank-name").textContent(), w.rankHead);
+        assert.equal(await cards.nth(0).locator(".rank-head .grade").textContent(), "E");
+        assert.equal(await cards.nth(0).locator(".badge", { hasText: w.rankDropTag }).count(), 1);
+        assert.equal(await cards.nth(1).locator(".rank-name").textContent(), "Claude");
+        assert.equal(await cards.nth(1).locator(".rank-head .grade").textContent(), "A");
+        // its details: the failure kinds, the last days, the advice, the button
+        const first = cards.nth(0);
+        assert.equal(await first.locator(".rank-causes .rank-label").textContent(), w.rankWhy);
+        const causes = await first.locator(".rank-causes .badge").allTextContents();
+        assert.deepEqual(causes, [w.rankRateLimit, w.rankCredit]);
+        assert(await first.locator(".rank-note", { hasText: w.rankLast }).count() === 1);
+        assert.equal(await first.locator(".rank-advice").textContent(), w.rankAdvice);
+        assert.equal(await first.locator("button", { hasText: w.rankRemoveBtn }).count(), 1);
+        // Claude is not removable here (hidden, not deleted) and has no advice
+        assert.equal(await cards.nth(1).locator(".rank-advice").count(), 0);
+        assert.equal(await cards.nth(1).locator("button", { hasText: w.rankRemoveBtn }).count(), 0);
+        // the model under the provider, ranked on its own
+        await click(page, first.locator("summary", { hasText: w.rankModelBtn }));
+        assert(await first.locator(".rank-model .rank-details").isVisible());
+        // the foot line: the too-little-used and the deleted, by name
+        assert.equal(await page.locator(".rank-foot").textContent(), w.rankFoot);
+
+        // Remove asks first; the answer takes the provider off the list
+        page.once("dialog", () => assert.fail("confirmAction is a dialog element, not window.confirm"));
+        await click(page, first.locator("button", { hasText: w.rankRemoveBtn }));
+        const dialog = page.locator("dialog.action-confirm");
+        await dialog.waitFor();
+        assert(await dialog.locator("h2", { hasText: w.rankAsk }).isVisible());
+        // no request yet
+        assert(!deleted.size, "removing asks before it posts");
+        await click(page, dialog.locator("button", { hasText: lang === "zh" ? "移除" : "Remove" }));
+        await page.waitForFunction((s) => document.querySelector("#status").textContent === s, w.rankRemoved);
+        assert.deepEqual([...deleted], ["relay"], "provider/delete carries the provider");
+        // the list is read again without it
+        await page.locator(".rank-card").first().waitFor();
+        assert.equal(await page.locator(".rank-card").count(), 1);
+        assert.equal(await page.locator(".rank-card .rank-name").textContent(), "Claude");
+        // the status line clears itself: the next tab opens on nothing left over
+        await page.waitForFunction(() => document.querySelector("#status").textContent === "");
+        assert.deepEqual(errors, []);
+        await page.close();
+      });
+
+      await t.test(lang + ": the Standings tab with nothing ranked", async () => {
+        const asked = [];
+        const deleted = new Set();
+        const { page, errors } = await open(lang, "light", asked, deleted);
+        await page.route("**/api/usage/rank**", (route) => route.fulfill({ json: { period: "today", since: new Date().toISOString(), tier: { needs: 5, days: 7, calls: 100, errors: 0.2, still: 7 }, providers: [] } }));
+        await click(page, page.locator(":is(#usageTab .opt, .nav-s):visible").nth(4));
+        await page.locator(".rank-empty").waitFor();
+        assert.equal(await page.locator(".rank-empty").textContent(), L[lang].rankEmpty);
+        assert.deepEqual(errors, []);
+        await page.close();
+      });
+
       await t.test(lang + ": newest live route needs no return-to-live button", async () => {
         const asked = [];
         const { page, errors } = await open(lang, "light", asked);
@@ -445,8 +581,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert(!wider && !wide.length, `the page does not scroll sideways: ${wide}`);
         assert(wrap[0] > wrap[1], `the table scrolls in its box: ${wrap}`);
         if (shots) await page.screenshot({ path: path.join(shots, `${engine}-usage-ledger-${lang}-narrow-dark.png`) });
-        // nor with the tab bar's other tabs, now three
-        for (const i of [0, 2]) {
+        // nor with the tab bar's other tabs, the ranking among them
+        for (const i of [0, 2, 4]) {
           await page.locator(":is(#usageTab .opt, .nav-s):visible").nth(i).click();
           await page.waitForTimeout(300);
           const [wider, wide] = await sideways();

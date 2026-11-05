@@ -409,6 +409,17 @@ columns, `cache_write_5m_tokens` and `cache_write_1h_tokens`, split it by how
 long Anthropic keeps it (a record from before the split is all 5-minute).
 The app shows the split on a request's Cache and the usage tiles' tooltips.
 
+The Usage page's Standings tab is the same log ranked by provider and model
+(only gateway calls, never the agents' session files or a client's reported
+ones): each provider with at least five requests is scored out of 100 in
+served, stood, fast and soon, its models are ranked under it, and a provider
+used for a long time and still failing is named for removal — an advice and
+a button that asks first, never a silent delete. The counts are the Requests
+tab's own (`usageapi.Rank`, in
+[`rank.go`](../internal/usageapi/rank.go)); the tab and its tier are
+described under the GUI shell. `magpie usage` has no such ranking: it reads
+the same records and does not judge a provider by them.
+
 **Requests and failures** count requests, each once by how it ended: a
 request failed when the agent got an error. One that a later try answered
 (the next member of a group, another account) is not a failure; the Usage

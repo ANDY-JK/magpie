@@ -178,6 +178,7 @@ async function loadUsage(asked) {
   if (usageTab === "sessions") return loadSessions();
   if (usageTab === "requests") return loadLedger(asked && ledger && ledgerWant === ledParams({ offset: ledOffset, limit: LED_PAGE }) ? "open" : false);
   if (usageTab === "context") return window.loadContext?.();
+  if (usageTab === "rank") return loadRank();
   renderUsageLoading();
   if (!asked) loadQuotas();
   const p = period, read = ++usageRead;
@@ -431,6 +432,7 @@ const unpricedCallsWhy = (n) => n ? t(n === 1 ? "{n} call had no known price and
 function renderCosts() {
   if (usage) renderUsage();
   if (ledger && usageTab === "requests") renderLedger();
+  if (rank && usageTab === "rank") renderRank();
   if (sessions) renderSessions();
   document.dispatchEvent(new Event("magpie-costs-changed"));
 }
@@ -1294,6 +1296,173 @@ function ledTime(when) {
   const opts = { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false };
   if (d.toDateString() !== now.toDateString()) Object.assign(opts, { month: "short", day: "numeric" });
   return d.toLocaleString(intlLang(), opts);
+}
+
+// The provider standings are read from the same gateway log as Requests,
+// so a period pick and a Clear usage change every number here too. The
+// quiet reads hold the list drawn until the JSON changes: a standing is
+// read every few seconds, not rebuilt every few seconds. As on Requests,
+// only the newest answer to the period and tab shown draws.
+let rank = null, rankAt = "", rankRead = 0;
+const RANK_WORDS = {
+  served: "Answers reached", stood: "First try", fast: "Writing pace", soon: "First token",
+  steady: "Reliable", failing: "Still failing", "slow-start": "Late start", unpriced: "No prices held",
+  rate_limit: "Rate limited", quota: "Allowance spent", credit: "Out of credit", auth: "Sign-in refused",
+  overflow: "Context too long", loop: "Reply loop", restricted: "Account restricted", verify: "Verification asked",
+  refused: "Content refused", prompt: "Prompt refused", cut: "Reply cut short", upstream: "Vendor error", failed: "Failed",
+};
+const rankWord = (key) => t(RANK_WORDS[key] || "Failed");
+const rankNum = (n) => Number(n || 0).toLocaleString(intlLang());
+const rankPct = (n, of) => t("{n}% of requests failed", { n: of > 0 ? Math.round(100 * (n || 0) / of) : 0 });
+const rankInt = (n) => n ? Math.round(n).toLocaleString(intlLang()) : "";
+const rankSpeed = (x) => x.decode_ms > 0 ? rankInt(x.decode_out / (x.decode_ms / 1000)) : "";
+const rankWait = (x) => x.timed > 0 ? rankInt(x.ttft_ms / x.timed) : "";
+const rankDate = (when) => when ? new Date(when).toLocaleDateString(intlLang(), { month: "short", day: "numeric" }) : "";
+const rankKey = () => period + "|" + usageZone();
+let rankFlight = null;
+const rankRead = () => {
+  const at = rankKey();
+  const was = rankFlight;
+  if (was?.at === at) return was.p;
+  was?.ctl.abort();
+  const ctl = new AbortController();
+  const p = api("usage/rank?period=" + encodeURIComponent(period) + usageZoneQ(), undefined, undefined, ctl.signal);
+  rankFlight = { at, ctl, p };
+  p.catch(() => {}).finally(() => { if (rankFlight?.p === p) rankFlight = null; });
+  return p;
+};
+const rankPart = (p) => {
+  const box = el("div", "rank-part");
+  box.append(el("span", "rank-part-name", rankWord(p.key)), el("div", "rank-track"), el("span", "rank-part-points", `${rankInt(p.points)}/${rankInt(p.most)}`));
+  box.querySelector(".rank-track").appendChild(el("i")).style.width = (100 * (p.points || 0) / (p.most || 1)).toFixed(1) + "%";
+  box.title = t("{points} of {most} possible points", { points: rankInt(p.points), most: rankInt(p.most) });
+  return box;
+};
+const rankMetrics = (x) => {
+  const box = el("div", "rank-metrics");
+  const add = (label, value) => { if (value !== "" && value != null) box.append(el("span", "rank-metric", `${t(label)} ${value}`)); };
+  add("Requests", rankNum(x.calls));
+  add("Failed", `${rankNum(x.errors)} · ${rankPct(x.errors, x.calls)}`);
+  add("Retried", rankNum(x.retried));
+  if (x.timed) add("First token", t("{n} ms", { n: rankWait(x) }));
+  if (rankSpeed(x)) add("Speed", t("{n} tok/s", { n: rankSpeed(x) }));
+  if (x.cost) add("Cost", fmtCost(x));
+  if (x.unpriced) add("No prices", rankNum(x.unpriced));
+  return box;
+};
+const rankBadge = (word, tone = "info") => el("span", `badge rank-tag ${tone}`, word);
+const rankTags = (x) => {
+  const box = el("div", "rank-tags");
+  for (const tag of x.tags || []) box.append(rankBadge(rankWord(tag.key), tag.tone === "warn" ? "warn" : tag.tone === "good" ? "free" : "ctx"));
+  if (x.drop) box.append(rankBadge(t("Think about removal"), "warn"));
+  if (x.removed) box.append(rankBadge(t("Already gone"), "ctx"));
+  return box;
+};
+const rankCauses = (x) => {
+  if (!x.causes?.length) return null;
+  const box = el("div", "rank-causes");
+  box.append(el("span", "rank-label", t("Why it failed")));
+  for (const c of x.causes) box.append(rankBadge(`${rankWord(c.key)} · ${rankNum(c.count)}`, "warn"));
+  return box;
+};
+const rankDetails = (x, name) => {
+  const box = el("div", "rank-details");
+  box.append(rankMetrics(x));
+  const parts = el("div", "rank-parts");
+  for (const p of x.parts || []) parts.append(rankPart(p));
+  box.append(parts);
+  const causes = rankCauses(x);
+  if (causes) box.append(causes);
+  if (x.accounts?.length) box.append(el("p", "rank-note", t("Accounts seen: {names}", { names: x.accounts.join(" · ") })));
+  const when = x.first && x.last ? t("Used {days} days, {from} – {to}", { days: x.days || 0, from: rankDate(x.first), to: rankDate(x.last) }) : "";
+  if (when) box.append(el("p", "rank-note", when));
+  if (x.recentCalls) box.append(el("p", "rank-note", t("Last {days} days: {calls} requests, {errors} failed", { days: rank?.tier.still || 7, calls: rankNum(x.recentCalls), errors: rankNum(x.recentErrors) })));
+  if (x.drop) box.append(el("p", "rank-advice", t("{name} has been used for a long time and is still failing. Review its accounts, then remove it if you no longer need it.", { name })));
+  if (x.removable && !x.removed) {
+    const b = el("button", "text danger-fill", t("Remove this provider"));
+    b.type = "button";
+    b.onclick = () => rankRemove(x, b);
+    box.append(b);
+  }
+  return box;
+};
+const rankModel = (m) => {
+  const row = el("details", "rank-model");
+  const head = el("summary", "rank-model-head");
+  head.append(el("span", "rank-model-name", m.model), el("span", "grade " + m.grade.toLowerCase(), m.grade), el("span", "rank-model-score", t("{n} points", { n: rankNum(m.score) })), el("span", "rank-metric", t("{n} requests", { n: rankNum(m.calls) })));
+  row.append(head, rankDetails(m, m.model));
+  return row;
+};
+const rankCard = (x) => {
+  const card = el("article", "rank-card" + (x.drop ? " rank-drop" : ""));
+  const head = el("div", "rank-head");
+  head.append(el("span", "rank-place", String(x.rank)), el("span", "rank-name", x.name || x.id), el("span", "grade " + (x.grade || "e").toLowerCase(), x.grade || "E"), el("span", "rank-score", t("{n} points", { n: rankNum(x.score) })));
+  card.append(head, rankTags(x), rankDetails(x, x.name || x.id));
+  if (x.models?.length) {
+    const models = el("div", "rank-models");
+    models.append(el("div", "rank-label", t("Models on it")));
+    for (const m of x.models) models.append(rankModel(m));
+    card.append(models);
+  }
+  return card;
+};
+function renderRank() {
+  const pane = $("#rankPane");
+  const view = $("#view-usage");
+  view.classList.remove("loading");
+  view.removeAttribute("aria-busy");
+  renderPeriod(false);
+  $("#usageCost").replaceChildren();
+  pane.replaceChildren();
+  if (!rank) return;
+  const head = el("div", "rank-intro");
+  head.append(el("p", "usage-note", t("Standings come from gateway calls in this period. A provider needs {needs} requests; the four parts are answered, first try, writing pace and first token.", { needs: rank.tier.needs })));
+  head.append(el("p", "usage-note", t("A provider is named for removal only after {days} days of use, {calls} requests, and {errors}% failures both over the period and in its last {still} days.", { days: rank.tier.days, calls: rank.tier.calls, errors: Math.round(100 * rank.tier.errors), still: rank.tier.still })));
+  pane.append(head);
+  const list = el("div", "rank-list");
+  for (const x of rank.providers || []) list.append(rankCard(x));
+  if (!list.childElementCount) pane.append(el("p", "rank-empty", t("No provider has enough gateway calls in this period.")));
+  else pane.append(list);
+  const others = [];
+  if (rank.thin?.length) others.push(t("Too little use: {names}", { names: rank.thin.map((x) => x.name || x.id).join(" · ") }));
+  if (rank.gone?.length) others.push(t("Already gone: {names}", { names: rank.gone.map((x) => x.name || x.id).join(" · ") }));
+  if (others.length) pane.append(el("p", "rank-note rank-foot", others.join(" · ")));
+}
+function renderRankLoading() {
+  const view = $("#view-usage");
+  view.classList.add("loading");
+  view.setAttribute("aria-busy", "true");
+  renderPeriod(true);
+  $("#usageCost").replaceChildren();
+  const pane = $("#rankPane");
+  pane.replaceChildren();
+  for (let i = 0; i < 4; i++) pane.append(el("div", "rank-sk skeleton"));
+}
+async function loadRank(quiet = false) {
+  if (!rank || !quiet) renderRankLoading();
+  const at = rankKey(), read = ++rankRead;
+  const next = await rankRead();
+  if (read !== rankRead || view !== "usage" || usageTab !== "rank" || at !== rankKey()) return;
+  const changed = JSON.stringify(next) !== JSON.stringify(rank);
+  rank = next;
+  rankAt = at;
+  if (changed || !quiet || $("#view-usage").classList.contains("loading")) renderRank();
+}
+async function rankRemove(x, btn) {
+  const ok = await confirmAction(t("Remove {name}?", { name: x.name || x.id }),
+    t("Its saved configuration will be removed. Agents using it may switch to another provider or their default model."), t("Remove"));
+  if (!ok) return;
+  btn.disabled = true;
+  try {
+    await api("provider/delete", { id: x.id });
+    providers = await api("providers");
+    state = await api("state");
+    status(t("{name} removed", { name: x.name || x.id }), "ok");
+    rank = null;
+    await loadRank();
+  } catch (e) {
+    status(e.message, "err");
+  } finally { btn.disabled = false; }
 }
 // the model the reply named: amber, as the Routing page's tag, when it is
 // another than the one sent; plain when it is that one under a dated name,
@@ -2729,7 +2898,7 @@ function ledSaid(p, model) {
   return part;
 }
 
-const USAGE_TABS = [["usage", "Overview"], ["requests", "Requests"], ["sessions", "Sessions"], ["context", "Context"]];
+const USAGE_TABS = [["usage", "Overview"], ["requests", "Requests"], ["sessions", "Sessions"], ["context", "Context"], ["rank", "Standings"]];
 let usageTab = "usage";
 try { const k = localStorage.getItem("magpie.usageTab"); if (USAGE_TABS.some(([id]) => id === k)) usageTab = k; } catch {}
 let sessAgent = "all";
@@ -2807,6 +2976,7 @@ function renderUsageTab() {
   $("#ledgerPane").hidden = usageTab !== "requests";
   $("#sessionsPane").hidden = !on;
   $("#contextPane").hidden = usageTab !== "context";
+  $("#rankPane").hidden = usageTab !== "rank";
 }
 
 const sessDays = () => SESS_RANGES.find(([id]) => id === sessRange)[2];
@@ -4107,6 +4277,7 @@ function usageDrawn() {
   if (usageTab === "sessions") return !!(sessions && sessStats);
   if (usageTab === "requests") return !!ledger;
   if (usageTab === "context") return true; // loadContext keeps what it drew when nothing changed
+  if (usageTab === "rank") return !!rank && rankAt === rankKey();
   return !!usage && !$("#view-usage").classList.contains("loading");
 }
 function refreshUsage(now = false) {
@@ -4125,6 +4296,8 @@ function refreshUsage(now = false) {
         if (ledger && (want || !ledOffset)) await loadLedger(true);
       } else if (usageTab === "context") {
         await window.loadContext?.();
+      } else if (usageTab === "rank") {
+        await loadRank(true);
       } else {
         // the reader asking reads the allowances afresh, a Claude account's by
         // running Claude Code's own /usage (the backend runs it at most once in 30s)
@@ -4180,7 +4353,7 @@ usageTicks();
 if (mode === "window" && params.get("view") === "usage") {
   // An explicit destination takes precedence over the remembered tab.
   const tab = params.get("tab");
-  if (tab === "requests" || tab === "usage") usageTab = tab;
+  if (tab === "requests" || tab === "usage" || tab === "rank") usageTab = tab;
   // a total in the menu bar opens the Overview at its period
   const per = params.get("period");
   if (PERIODS.some(([id]) => id === per)) period = per;

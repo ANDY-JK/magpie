@@ -12,8 +12,10 @@ import (
 // The usage log, as the Usage page reads it (HoGee_xxl on X: an app of
 // their own reading magpie's usage over its gateway, as they can't over
 // the GUI's /api/usage): GET /v1/magpie/usage is the page's summary of a
-// ?period=, the same JSON as /api/usage, and GET /v1/magpie/usage/requests
-// its requests a page at a time, with /api/usage/requests' filters. Both
+// ?period=, the same JSON as /api/usage, GET /v1/magpie/usage/rank the
+// period's ranking of providers and their models, the same JSON as
+// /api/usage/rank, and GET /v1/magpie/usage/requests
+// its requests a page at a time, with /api/usage/requests' filters. All
 // are read-only, and what was said in a call is not told here.
 //
 // They name accounts, keys and sessions, so, as /v1/magpie/quotas, they
@@ -61,6 +63,18 @@ func (s *Server) usageSummary(w http.ResponseWriter, r *http.Request) {
 		out.Path = "" // where the log is on this machine
 	}
 	writeJSON(w, 200, out)
+}
+
+func (s *Server) usageRank(w http.ResponseWriter, r *http.Request) {
+	if !local(r) && !sharedWith(r) {
+		writeError(w, provider.Chat, http.StatusForbidden, usageRefused)
+		return
+	}
+	if refuseHeld(w, r, "this gateway key is held to a budget, models or accounts, so it is told its own calls alone: GET /v1/magpie/usage/requests") {
+		return
+	}
+	q := r.URL.Query()
+	writeJSON(w, 200, usageapi.Rank(usageapi.PeriodOf(q.Get("period")), provider.All(), usageapi.ZoneOf(r)))
 }
 
 func (s *Server) usageRequests(w http.ResponseWriter, r *http.Request) {

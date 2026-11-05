@@ -33,6 +33,7 @@ var readOnlyRoutes = map[string]bool{
 	"GET /v1/magpie/quotas/history":   true,
 	"GET " + provider.RemoteCardsPath: true,
 	"GET /v1/magpie/usage":            true,
+	"GET /v1/magpie/usage/rank":       true,
 	"GET /v1/magpie/usage/requests":   true,
 	"GET /v1/magpie/limit":            true,
 	"GET /v1/magpie/concurrency":      true,
@@ -68,7 +69,7 @@ func readOnlyGuard(mux *routeMux, next http.Handler) http.Handler {
 			if _, pattern := mux.Handler(r); !readOnlyRoutes[pattern] {
 				log.Printf("refused %s %s: gateway key %q is read-only", r.Method, r.URL.Path, who.KeyName)
 				writeJSON(w, http.StatusForbidden, map[string]any{"error": map[string]any{
-					"message": "this gateway key is read-only: it may read magpie's quotas and usage (GET /v1/magpie/quotas, /v1/magpie/quotas/history, /v1/magpie/usage, /v1/magpie/usage/requests, /v1/magpie/limit, /v1/magpie/route-events) and use no model, MCP server or write. Use a key with full access for that (Gateway → Gateway keys, or magpie gateway-key access <id> full)",
+					"message": "this gateway key is read-only: it may read magpie's quotas and usage (GET /v1/magpie/quotas, /v1/magpie/quotas/history, /v1/magpie/usage, /v1/magpie/usage/rank, /v1/magpie/usage/requests, /v1/magpie/limit, /v1/magpie/route-events) and use no model, MCP server or write. Use a key with full access for that (Gateway → Gateway keys, or magpie gateway-key access <id> full)",
 					"type":    "permission_error", "code": ReadOnlyCode}})
 				return
 			}
