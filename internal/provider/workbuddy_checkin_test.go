@@ -548,3 +548,55 @@ func TestWorkBuddyCheckinEarlyDoneAskedAgain(t *testing.T) {
 		t.Fatalf("status %d, claims %d", s, cl)
 	}
 }
+
+// The look the day's turn brings waits the day's wait (checkinDayDelay)
+// before it asks: a check-in at the same minute every night reads as
+// automation.
+func TestCheckinDayTurnWaitsItsDay(t *testing.T) {
+	f := &fakeWBCheckin{active: true}
+	srv := f.serve(t)
+	ctx := context.Background()
+	now := time.Date(2026, 3, 1, 22, 0, 0, 0, beijing)
+	c := wbCheckinFixture(t, srv, &now)
+	var l wbCheckinLoop
+	l.by = "workbuddy"
+	if rs := l.tick(ctx, c); len(rs) != 1 || rs[0].Outcome != CheckinClaimed {
+		t.Fatalf("first look: %+v", rs)
+	}
+	// just past midnight the day's wait hasn't run
+	now = time.Date(2026, 3, 2, 0, 0, 1, 0, beijing)
+	if rs := l.tick(ctx, c); rs != nil {
+		t.Fatalf("asked at 00:00:01: %+v", rs)
+	}
+	now = time.Date(2026, 3, 2, 0, 0, 0, 0, beijing).Add(checkinDayDelay(wbCheckinDay(now), l.by))
+	if rs := l.tick(ctx, c); len(rs) != 1 || !rs[0].Asked {
+		t.Fatalf("not asked at the day's minute: %+v", rs)
+	}
+}
+
+// A check-in's minute of the day is the day's and the vendor's: the same
+// for every look of the day, another the next day and for another vendor,
+// never past the window. A magpie's first look waits two minutes and up
+// to checkinStartMost more.
+func TestCheckinDayDelayVaries(t *testing.T) {
+	for _, by := range []string{"workbuddy", "trae", "minimax", "qoder", ""} {
+		d := checkinDayDelay("2026-03-01", by)
+		if d < 0 || d >= checkinDayWindow {
+			t.Fatalf("%s: %v", by, d)
+		}
+		if checkinDayDelay("2026-03-01", by) != d {
+			t.Fatalf("%s: not the same all day", by)
+		}
+		if checkinDayDelay("2026-03-02", by) == d && checkinDayDelay("2026-03-03", by) == d {
+			t.Fatalf("%s: three days the same minute", by)
+		}
+	}
+	if checkinDayDelay("2026-03-01", "workbuddy") == checkinDayDelay("2026-03-01", "trae") &&
+		checkinDayDelay("2026-03-02", "workbuddy") == checkinDayDelay("2026-03-02", "trae") &&
+		checkinDayDelay("2026-03-03", "workbuddy") == checkinDayDelay("2026-03-03", "trae") {
+		t.Fatal("two vendors the same minute three days running")
+	}
+	if w := checkinStartWait(); w < 2*time.Minute || w >= 2*time.Minute+checkinStartMost {
+		t.Fatalf("start wait %v", w)
+	}
+}

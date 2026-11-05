@@ -342,6 +342,12 @@ func TestQoderCheckinCampaignCache(t *testing.T) {
 				now = time.Date(2026, 10, 7, 23, 55, 0, 0, beijing)
 				l.tick(t.Context(), c)
 				now = time.Date(2026, 10, 8, 0, 0, 0, 0, beijing)
+				// the day's first look waits the day's wait (checkinDayDelay),
+				// so a check-in isn't at the same minute every night
+				if rs := l.tick(t.Context(), c); rs != nil {
+					t.Fatalf("asked before the day's wait: %+v", rs)
+				}
+				now = wbCheckinDayStart(now).Add(checkinDayDelay(wbCheckinDay(now), l.by))
 				rs = l.tick(t.Context(), c)
 				if len(rs) != 1 || rs[0].Outcome != CheckinDone || rs[0].Day != wbCheckinDay(now) || !rs[0].Asked || gets != 4 || posts != claims {
 					t.Fatalf("midnight kept yesterday's result: %+v, reads %d, claims %d", rs, gets, posts)

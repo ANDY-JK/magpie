@@ -31,10 +31,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/fs"
 	"log"
 	"maps"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"os"
@@ -56,7 +58,39 @@ const (
 	// wbCheckinRetry is how long a check-in that got no answer waits
 	// before it is tried again the same day.
 	wbCheckinRetry = 30 * time.Minute
+	// checkinDayWindow is how long after the Beijing day turns a vendor's
+	// daily check-in may wait: a check-in at the same minute every night
+	// reads as automation, so each day's first look starts somewhere in
+	// these ninety minutes.
+	checkinDayWindow = 90 * time.Minute
+	// checkinStartMost is the most a magpie's start adds to its first
+	// look's two minutes, so a machine that starts at the same time every
+	// day doesn't check in at the same minute either.
+	checkinStartMost = 10 * time.Minute
 )
+
+// checkinDayDelay is how far into the day the vendor's first look waits,
+// from the day and the vendor: the same for every look of that day, a
+// different minute from a day's to the next's and from one vendor's to
+// another's.
+func checkinDayDelay(day, by string) time.Duration {
+	h := fnv.New64a()
+	h.Write([]byte("magpie checkin \x00" + by + "\x00" + day))
+	return time.Duration(h.Sum64()%uint64(checkinDayWindow/time.Second)) * time.Second
+}
+
+// wbCheckinDayStart is the Beijing midnight the day t is in began at.
+func wbCheckinDayStart(t time.Time) time.Time {
+	t = t.In(beijing)
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, beijing)
+}
+
+// checkinStartWait is how long after magpie starts the first look waits:
+// two minutes, so opening the app isn't slowed, and up to
+// checkinStartMost more, by chance.
+func checkinStartWait() time.Duration {
+	return 2*time.Minute + time.Duration(rand.Int64N(int64(checkinStartMost)))
+}
 
 // WorkBuddy's check-in answers, the codes its claim refuses with.
 const (
@@ -556,18 +590,22 @@ func wbPluginAccounts(pp plugin.Provider) []wbAccount {
 }
 
 // KeepWorkBuddyCheckedIn checks the WorkBuddy accounts in each day while
-// settings say to: two minutes after it starts, every wbCheckinEvery after
-// that, and as the Beijing day turns, until ctx ends.
+// settings say to: a few minutes after it starts (checkinStartWait), every
+// wbCheckinEvery after that, and after the day's wait as the Beijing day
+// turns (checkinDayDelay), until ctx ends.
 func KeepWorkBuddyCheckedIn(ctx context.Context) {
 	keepCheckedIn(ctx, "workbuddy", newWBCheckiner(), func() bool { return settings.Load().WorkBuddyCheckin })
 }
 
 // keepCheckedIn runs c while on says to. The clock is looked at every
 // minute: a machine that slept through the day's turn notices on waking.
+// The first look waits checkinStartWait, so a machine that starts at the
+// same time every day doesn't check in at the same minute either.
 func keepCheckedIn(ctx context.Context, label string, c checkinRunner, on func() bool) {
-	t := time.NewTimer(2 * time.Minute)
+	t := time.NewTimer(checkinStartWait())
 	defer t.Stop()
 	var l wbCheckinLoop
+	l.by = label
 	for {
 		select {
 		case <-ctx.Done():
@@ -594,17 +632,31 @@ func keepCheckedIn(ctx context.Context, label string, c checkinRunner, on func()
 }
 
 // wbCheckinLoop is when keepCheckedIn last looked at the accounts, and
-// when a failure is due to be tried again, if before its next look.
-type wbCheckinLoop struct{ last, again time.Time }
+// when a failure is due to be tried again, if before its next look. By is
+// the vendor, for the day's wait (checkinDayDelay).
+type wbCheckinLoop struct {
+	last, again time.Time
+	by          string
+}
 
 // tick looks at the accounts if it is time to: the first tick,
-// wbCheckinEvery after the last look, as the Beijing day turns, or as a
-// failure comes due again. It says how they stand, or nil.
+// wbCheckinEvery after the last look, as the Beijing day turns — that
+// look after the day's wait (checkinDayDelay), so a check-in isn't at the
+// same minute every night — or as a failure comes due again. It says how
+// they stand, or nil.
 func (l *wbCheckinLoop) tick(ctx context.Context, c checkinRunner) []WorkBuddyCheckin {
 	// the wall clock, which goes on while the machine sleeps
 	now := c.clock().Round(0)
 	if !l.last.IsZero() && now.Sub(l.last) < wbCheckinEvery && wbCheckinDay(now) == wbCheckinDay(l.last) &&
 		(l.again.IsZero() || now.Before(l.again)) {
+		return nil
+	}
+	// a look the day's turn brings waits the day's wait first: checked in
+	// at 00:00 sharp every night reads as automation. A machine that
+	// starts after midnight has l.last zero, and its start time is when
+	// its user started it, so it waits only checkinStartWait
+	if !l.last.IsZero() && wbCheckinDay(now) != wbCheckinDay(l.last) &&
+		now.Sub(wbCheckinDayStart(now)) < checkinDayDelay(wbCheckinDay(now), l.by) {
 		return nil
 	}
 	l.last, l.again = now, time.Time{}
