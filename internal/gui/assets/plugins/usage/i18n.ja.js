@@ -243,5 +243,6 @@ magpie.strings({
     "Upstream provider": "上流プロバイダー",
     "The agent spoke {from}; sent upstream as {to}": "エージェントは {from} で要求し、上流へは {to} で送信",
     "Sent upstream as {to}, as the agent spoke it": "エージェントと同じ {to} で上流へ送信",
+    "What it cost in its plan's credits, as the reply said": "このリクエストが消費したプランのクレジット（応答の申告どおり）",
   },
 });

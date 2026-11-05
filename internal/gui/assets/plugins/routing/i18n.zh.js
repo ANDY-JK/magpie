@@ -667,6 +667,5 @@ magpie.strings({
     "Balanced: {who} has the most of its allowance left per hour until it is lost — {n} used.": "均衡：{who} 的剩余额度 ÷ 距作废小时数最高，已用 {n}。",
     "Balanced: {who} goes first: one of its windows renews soon with much of it unspent, so what it has is spent before it is lost.": "均衡：{who} 先走：它的某个窗口很快重置，却还剩大半没用，先花掉，免得作废。",
     "Balanced: {who} goes first: what it has comes back sooner than the others' quota, and theirs is kept for later.": "均衡：{who} 先走：它的额度比别人的更快恢复，别人的留到后面用。",
-    "Balanced: {who} goes first.": "均衡：{who} 排第一。",
   },
 });

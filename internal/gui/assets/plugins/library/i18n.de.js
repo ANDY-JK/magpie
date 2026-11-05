@@ -765,5 +765,7 @@ magpie.strings({
     "WSL {distro} isn't running: a click gives it to {agent} the next time the distro runs": "WSL {distro} läuft nicht: Ein Klick gibt es {agent}, sobald die Distribution das nächste Mal läuft",
     "WSL {distro} isn't running: its agents show what magpie last saw there, and what you change is written there the next time it runs.": "WSL {distro} läuft nicht: Seine Agenten zeigen, was magpie dort zuletzt gesehen hat, und Änderungen werden beim nächsten Start dorthin geschrieben.",
     "{agents} can be changed once it runs.": "{agents} lässt sich ändern, sobald sie läuft.",
+    "Sync to your other computers": "Mit deinen anderen Computern synchronisieren",
+    "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "Aus bleibt er nur auf diesem Computer: Die Synchronisierung bringt ihn nicht auf deine anderen Computer, und eine Synchronisierung von dort entfernt ihn weder noch ersetzt sie ihn durch ihren gleichnamigen Server",
   },
 });

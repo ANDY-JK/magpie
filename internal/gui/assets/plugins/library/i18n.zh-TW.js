@@ -765,5 +765,7 @@ magpie.strings({
     "WSL {distro} isn't running: a click gives it to {agent} the next time the distro runs": "WSL {distro} 未執行：點一下，{agent} 會在該發行版下次執行時啟用",
     "WSL {distro} isn't running: its agents show what magpie last saw there, and what you change is written there the next time it runs.": "WSL {distro} 未執行：其中的 Agent 顯示的是 magpie 上次看到的內容，你的修改會在它下次執行時寫入。",
     "{agents} can be changed once it runs.": "{agents} 要等它執行後才能修改。",
+    "Sync to your other computers": "同步到其他電腦",
+    "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "關閉後只留在這台電腦：同步不會把它帶到你的其他電腦；其他電腦同步過來時，既不會刪掉它，也不會用它們的同名伺服器取代它",
   },
 });

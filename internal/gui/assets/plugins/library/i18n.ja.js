@@ -765,5 +765,7 @@ magpie.strings({
     "WSL {distro} isn't running: a click gives it to {agent} the next time the distro runs": "WSL {distro} は起動していません。クリックすると、ディストリビューションが次に起動したときに {agent} に追加されます",
     "WSL {distro} isn't running: its agents show what magpie last saw there, and what you change is written there the next time it runs.": "WSL {distro} は起動していません。そのエージェントは magpie が最後に見た内容で表示され、変更は次に起動したときに書き込まれます。",
     "{agents} can be changed once it runs.": "{agents} は起動後に変更できます。",
+    "Sync to your other computers": "ほかのコンピュータと同期",
+    "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "オフにするとこのコンピュータだけに残ります。同期でほかのコンピュータには送られず、ほかのコンピュータからの同期で削除されたり、同じ名前のサーバーに置き換えられたりすることもありません",
   },
 });

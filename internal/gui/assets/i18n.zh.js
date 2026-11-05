@@ -4487,7 +4487,5 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "in the site's personal settings": "见站点个人设置",
     "A new-api relay also asks for your user ID with the token. It is in the site's personal settings.": "new-api 中转站查余额时还需要你的用户 ID，在站点的个人设置里可以看到。",
     "Fill in your user ID (shown in the site's personal settings) under the provider's Account balance": "请在供应商的「账户余额」处填写你的用户 ID（见站点个人设置）",
-    "Balanced": "均衡",
-    "Not synced": "不同步",
 });
 localeWordsHere.add("zh");

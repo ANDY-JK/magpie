@@ -767,11 +767,5 @@ magpie.strings({
     "{agents} can be changed once it runs.": "{agents} 要等它运行后才能修改。",
     "Sync to your other computers": "同步到其他电脑",
     "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "关闭后只留在这台电脑：同步不会把它带到你的其他电脑；其他电脑同步过来时，既不会删掉它，也不会用它们的同名服务器替换它",
-    "Sync to your other computers": "同步到其他電腦",
-    "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "關閉後只留在這台電腦：同步不會把它帶到你的其他電腦；其他電腦同步過來時，既不會刪掉它，也不會用它們的同名伺服器取代它",
-    "Sync to your other computers": "ほかのコンピュータと同期",
-    "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "オフにするとこのコンピュータだけに残ります。同期でほかのコンピュータには送られず、ほかのコンピュータからの同期で削除されたり、同じ名前のサーバーに置き換えられたりすることもありません",
-    "Sync to your other computers": "Mit deinen anderen Computern synchronisieren",
-    "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "Aus bleibt er nur auf diesem Computer: Die Synchronisierung bringt ihn nicht auf deine anderen Computer, und eine Synchronisierung von dort entfernt ihn weder noch ersetzt sie ihn durch ihren gleichnamigen Server",
   },
 });
