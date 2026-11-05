@@ -10,6 +10,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -262,6 +263,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await page.screenshot({ path: path.join(process.env.SCREENSHOT_DIR, `${engine}-${lang}-hermes.png`), fullPage: true });
       }
 
+      await allWords(page); // every language is a file of its own now (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "Sessions", "Search sessions", "No sessions yet", "Select every session shown", "Select", "Delete", "Trash", "No folder", "deleted {when}",
         "Delete this session?", "Delete {n} sessions?", "Moved to magpie's trash", "{n} sessions moved to magpie's trash", "Restore", "{title} restored",

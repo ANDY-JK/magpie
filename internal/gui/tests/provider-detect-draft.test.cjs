@@ -9,20 +9,16 @@
 // left-border accent, and at 360px nothing runs off the side. In every
 // language magpie speaks.
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
-const vm = require("node:vm");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
 const assets = path.resolve(__dirname, "../assets");
 const URL_ = "https://relay.example.com/v1";
 
-// the words as i18n.js has them
-const ctx = {};
-vm.runInNewContext(fs.readFileSync(path.join(assets, "i18n.js"), "utf8") + "\nthis.I18N = I18N;", ctx);
-const tr = (lang, s) => (lang === "en" ? s : ctx.I18N[lang][s] || assert.fail(`${lang} has no "${s}"`));
+const I18N = require("./strings.cjs").strings().I18N; // the language files’ words
+const tr = (lang, s) => (lang === "en" ? s : I18N[lang][s] || assert.fail(`${lang} has no "${s}"`));
 
 function serve(lang, posts, answer) {
   const providers = { providers: [{ id: "anthropic", name: "Anthropic", icon: "anthropic", preset: "anthropic", models: [], agents: [], key: { set: true, masked: "sk-…ab12" } }], presets: [], excluded: [], gateway: { running: true, window: true } };

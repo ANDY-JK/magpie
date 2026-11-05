@@ -19,6 +19,7 @@ import (
 	"github.com/yetone/magpie/internal/beat"
 	"github.com/yetone/magpie/internal/filelock"
 	"github.com/yetone/magpie/internal/filememo"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // plugins.yml says which built-in plugins are on, and each one's config:
@@ -303,23 +304,7 @@ func write(f File) error {
 			return fmt.Errorf("keeping %s before writing it: %w", path, err)
 		}
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".plugins.yml-*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(tmp.Name())
-	if _, err := tmp.Write(b); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
+	return steady.WriteFile(path, b, 0o600)
 }
 
 var (

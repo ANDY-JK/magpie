@@ -12,6 +12,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -116,6 +117,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
 
         // the page doesn't scroll sideways at this width
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "no sideways scroll");
+        await allWords(page); // the other languages' words are files of their own (i18n.js, plugins/<id>/i18n.js)
         const missing = await page.evaluate(() => ["zh", "zh-TW", "ja", "de"].filter((l) => !I18N[l]["This group can't be shown: {error}"]));
         assert.deepEqual(missing, [], "every language has it");
         assert.deepEqual(errors, []);

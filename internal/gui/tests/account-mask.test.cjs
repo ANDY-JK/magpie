@@ -89,6 +89,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await btn.click();
       assert.equal((await btn.textContent()).trim(), w.hidden);
       assert.match(await btn.getAttribute("title"), w.back);
+      // Routing's button comes with its page (pages.js, the lazy pages):
+      // brought in, it is the window's switch, saying what the others say
+      await page.evaluate(() => magpie.call("routing", "mount"));
       assert.match(await page.locator("#rtMask").getAttribute("title"), w.back);
       await page.waitForFunction(() => document.querySelectorAll("#sample .pii").length === 3);
       const got = await page.evaluate(() => ({

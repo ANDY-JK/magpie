@@ -22,6 +22,7 @@ import (
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/lastgood"
 	"github.com/yetone/magpie/internal/source"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // Partners are services that pay to be listed first in the add sheet,
@@ -309,10 +310,7 @@ func savePartners() {
 		return
 	}
 	_ = os.MkdirAll(filepath.Dir(partnerCacheFile()), 0o755)
-	tmp := partnerCacheFile() + ".tmp"
-	if os.WriteFile(tmp, b, 0o644) == nil {
-		_ = os.Rename(tmp, partnerCacheFile())
-	}
+	_ = steady.WriteFile(partnerCacheFile(), b, 0o644)
 }
 
 // NoticePartners keeps that the user has been shown the partners ids, so

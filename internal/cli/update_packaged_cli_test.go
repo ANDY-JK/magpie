@@ -26,6 +26,22 @@ func TestUpdatePackagedSaysTheManager(t *testing.T) {
 	}))
 	defer srv.Close()
 	t.Setenv("MAGPIE_UPDATE_FEED", srv.URL)
+	if update.Independent() {
+		// this build follows no feed: `magpie update` says so, returns
+		// without asking anything, and touches nothing, packaged or not
+		// (update.independent)
+		if err := updateCmd([]string{"update"}); err != nil {
+			t.Fatalf("%v", err)
+		}
+		exe := filepath.Join(t.TempDir(), "magpie")
+		if err := os.WriteFile(exe, []byte("magpie"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if b, _ := os.ReadFile(exe); string(b) != "magpie" {
+			t.Fatalf("the package's file was changed: %q", b)
+		}
+		return
+	}
 	exe := filepath.Join(t.TempDir(), "magpie")
 	if err := os.WriteFile(exe, []byte("magpie"), 0o755); err != nil {
 		t.Fatal(err)

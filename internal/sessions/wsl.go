@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/lastgood"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // Sessions in WSL. On Windows an agent installed in a WSL distro keeps its
@@ -265,13 +266,8 @@ func wslList(gen uint64, done chan struct{}) {
 		// copied isn't written over (#2263)
 		if err := lastgood.KeepUnparsed(p, lastgood.Into[map[string]*wslListing]); err != nil {
 			log.Printf("sessions-wsl.json wasn't written over: %v", err)
-		} else if os.MkdirAll(filepath.Dir(p), 0o755) == nil {
-			tmp := p + ".tmp"
-			if os.WriteFile(tmp, b, 0o644) == nil && os.Rename(tmp, p) == nil {
-				wslSess.kept = b
-			} else {
-				os.Remove(tmp)
-			}
+		} else if os.MkdirAll(filepath.Dir(p), 0o755) == nil && steady.WriteFile(p, b, 0o644) == nil {
+			wslSess.kept = b
 		}
 	}
 }

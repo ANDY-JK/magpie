@@ -153,10 +153,14 @@ test("compat.js is the first of the page's own scripts", async () => {
   // Use is pressed, quotaall.js when a provider has two accounts,
   // quitask.js when a Quit asks first, checkinnow.js when Settings' Check
   // in now for one account is pressed, autobackup.js when Settings draws
-  // Sync, scrollends.js on the window's first scroll, profilerename.js
-  // when a saved profile's Rename is pressed; the checks above
-  // still read them
-  for (const f of await scripts()) if (!["webfonts.js", "cfgblocked.js", "signsheets.js", "ruleedit.js", "ratewindows.js", "traywindows.js", "autoresetown.js", "registry.js", "navlamp.js", "whatsnew.js", "claudemode.js", "ctxtext.js", "resetask.js", "quotaall.js", "quitask.js", "checkinnow.js", "autobackup.js", "scrollends.js", "profilerename.js", "settingshints.js"].includes(f)) assert(all.includes(f), f + " is not loaded by index.html");
+  // Sync, scrollends.js on the window's first scroll, relang.js when a
+  // language is picked after the page opened, profilerename.js
+  // when a saved profile's Rename is pressed, and i18n.zh.js and the rest,
+  // which i18n.js writes into the page for its language; the checks above
+  // still read them; plugins/<id>/i18n.<lang>.js and the rest of a
+  // plugin's own language files the same way
+  const dynamic = ["webfonts.js", "cfgblocked.js", "signsheets.js", "ruleedit.js", "ratewindows.js", "traywindows.js", "autoresetown.js", "registry.js", "navlamp.js", "whatsnew.js", "claudemode.js", "ctxtext.js", "resetask.js", "quotaall.js", "quitask.js", "checkinnow.js", "autobackup.js", "scrollends.js", "relang.js", "profilerename.js", "settingshints.js", "i18n.zh.js", "i18n.zh-TW.js", "i18n.ja.js", "i18n.de.js"];
+  for (const f of await scripts()) if (!dynamic.includes(f) && !/^plugins\/[\w-]+\/i18n(\.[\w-]+)?\.js$/.test(f)) assert(all.includes(f), f + " is not loaded by index.html");
 });
 
 test("the styles hold up in Safari 15.0", async () => {

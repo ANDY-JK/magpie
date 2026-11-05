@@ -640,6 +640,12 @@ func (u *unroutedHold) giveUp(unknown bool) {
 		where = " its body still arriving (" + u.bodySaid() + ")"
 		msg, status = unroutedBodyMsg(held, u.bodySaid()), http.StatusRequestTimeout
 	}
+	// what held it is read before the answer goes: answering lets the
+	// client drop the connection, the request's context ends with it, and
+	// the waits and the goroutines that held it are gone by the time the
+	// report is built — a report that says every wait ended and shows no
+	// goroutine under way, of a request that was held all along
+	waits, stacks := u.waitsSaid(), heldStacks()
 	if !u.w.answer(unroutedProto(u.r.URL.Path), status, msg) {
 		f.mu.Unlock()
 		return // the handler is answering
@@ -664,7 +670,7 @@ func (u *unroutedHold) giveUp(unknown bool) {
 	asked, _ := u.asked.Load().(string)
 	who := cmpOr(u.agent, cmpOr(f.agent, "?"))
 	where = cmpOr(where, " not masking it")
-	report := u.s.heldReport(u, held, status, who, asked, where)
+	report := u.s.heldReport(u, held, status, who, asked, where, waits, stacks)
 	u.cancel(errUnrouted)
 	name, err := writeHeld(report)
 	saved := ""
@@ -674,7 +680,7 @@ func (u *unroutedHold) giveUp(unknown bool) {
 		saved = "; its report is " + filepath.Join(HeldDir(), name)
 		u.s.trace.update(shown, func(r *Route) { r.Held = name })
 	}
-	log.Printf("gateway: %s %s for %s from %s held %s before routing,%s%s; stopped with %d%s%s", u.r.Method, u.r.URL.Path, cmpOr(asked, "?"), who, held, where, u.waitsSaid(), status, saved, unroutedStacks())
+	log.Printf("gateway: %s %s for %s from %s held %s before routing,%s%s; stopped with %d%s%s", u.r.Method, u.r.URL.Path, cmpOr(asked, "?"), who, held, where, waits, status, saved, unroutedStacks())
 }
 
 // unroutedMsg is the error of a request held for held before routing:

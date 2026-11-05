@@ -11,6 +11,7 @@ import (
 
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/provider"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // quotaRefreshGap is how soon magpie quota refresh asks a card's vendor
@@ -148,12 +149,5 @@ func noteRefreshed(id, user string, now time.Time) {
 	if os.MkdirAll(filepath.Dir(path), 0o755) != nil {
 		return
 	}
-	f, err := os.CreateTemp(filepath.Dir(path), "quota-refresh-*.tmp")
-	if err != nil {
-		return
-	}
-	_, err = f.Write(b)
-	if f.Close() != nil || err != nil || os.Rename(f.Name(), path) != nil {
-		os.Remove(f.Name())
-	}
+	_ = steady.WriteFile(path, b, 0o600)
 }

@@ -3,9 +3,9 @@ package sessions
 import (
 	"database/sql"
 	"log"
-	"net/url"
-	"path/filepath"
 	"strings"
+
+	"github.com/yetone/magpie/internal/sqlitedb"
 )
 
 // Codex 0.166 resumes a thread only on the provider it was started on:
@@ -30,11 +30,7 @@ var codexBuiltinProviders = []string{"openai", "amazon-bedrock", "amazon-bedrock
 // names one.
 func codexSavedProvider(home, id, path string) string {
 	for _, p := range codexStateDBs(home) {
-		u := url.URL{Scheme: "file", Path: filepath.ToSlash(p), RawQuery: "mode=ro&_pragma=busy_timeout(2000)"}
-		if len(u.Path) >= 2 && u.Path[1] == ':' {
-			u.Path = "/" + u.Path
-		}
-		db, err := sql.Open("sqlite", u.String())
+		db, err := sql.Open("sqlite", sqlitedb.FileURL(p, "mode=ro&_pragma=busy_timeout(2000)"))
 		if err != nil {
 			continue
 		}

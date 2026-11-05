@@ -18,6 +18,7 @@ import (
 
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/filememo"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // A vendor's own /models endpoint is the truth about what it serves today;
@@ -218,7 +219,7 @@ func SaveLiveSides(provider, base string, models []Model, sides map[string][]Mod
 		return err
 	}
 	b, _ := json.MarshalIndent(liveFile{Fetched: time.Now(), Base: base, Models: models, Sides: sides}, "", "  ")
-	if err := os.WriteFile(p, b, 0o644); err != nil {
+	if err := steady.WriteFile(p, b, 0o644); err != nil {
 		return err
 	}
 	Touched()

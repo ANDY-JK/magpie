@@ -13,16 +13,10 @@ import (
 	"testing"
 )
 
-// i18nTables reads the GUI's i18n.js: each language's table, by its name,
-// and the NOTICES list tNotice matches notices against.
+// i18nTables reads the GUI's words: each language file's table, by its
+// name, and the core's NOTICES list tNotice matches notices against.
 func i18nTables(t *testing.T) (map[string]map[string]string, []string) {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join("..", "gui", "assets", "i18n.js"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	src := string(b)
-	lang := regexp.MustCompile(`^  (\w+|"[\w-]+"): \{$`)
 	entry := regexp.MustCompile(`^    ("(?:[^"\\]|\\.)*"): ("(?:[^"\\]|\\.)*"),?$`)
 	unq := func(s string) string {
 		u, err := strconv.Unquote(s)
@@ -32,24 +26,24 @@ func i18nTables(t *testing.T) (map[string]map[string]string, []string) {
 		return u
 	}
 	tables := map[string]map[string]string{}
-	var cur map[string]string
-	inTables := false
-	for _, line := range strings.Split(src, "\n") {
-		switch {
-		case line == "const I18N = {":
-			inTables = true
-		case inTables && line == "};":
-			inTables = false
-		case inTables && lang.MatchString(line):
-			name := strings.Trim(lang.FindStringSubmatch(line)[1], `"`)
-			cur = map[string]string{}
-			tables[name] = cur
-		case inTables && cur != nil:
+	for _, lang := range []string{"zh", "zh-TW", "ja", "de"} {
+		b, err := os.ReadFile(filepath.Join("..", "gui", "assets", "i18n."+lang+".js"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		cur := map[string]string{}
+		tables[lang] = cur
+		for _, line := range strings.Split(string(b), "\n") {
 			if m := entry.FindStringSubmatch(line); m != nil {
 				cur[unq(m[1])] = unq(m[2])
 			}
 		}
 	}
+	b, err := os.ReadFile(filepath.Join("..", "gui", "assets", "i18n.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
 	start := strings.Index(src, "\nconst NOTICES = [\n")
 	if start < 0 {
 		t.Fatal("i18n.js has no NOTICES list")

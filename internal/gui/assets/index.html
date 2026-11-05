@@ -536,30 +536,49 @@
     <div class="val" id="codexMemoriesPick"></div>
   </div>
 </div>
+<!-- the words: i18n.js's core, and the one language file it writes in
+     here for the page's language (i18n.zh.js and the rest), so app.js draws
+     in it from its first line and an English page parses no language at
+     all -->
 <script src="i18n.js"></script>
 <script src="kernel.js"></script>
-<!-- the built-in plugins' own scripts (pluginrt.Manifest.Client) -->
+<!-- the built-in plugins' own scripts (pluginrt.Manifest.Client), and the
+     heavy pages' declared ahead of theirs (pages.js): a page's script comes
+     when the reader first opens it -->
 <script src="plugins/gateway/keys.js"></script>
 <script src="plugins/gateway/client.js"></script>
 <script src="plugins/sessions/i18n.js"></script>
-<script src="plugins/sessions/client.js"></script>
 <script src="plugins/library/i18n.js"></script>
-<script src="plugins/library/client.js"></script>
 <script src="plugins/routing/i18n.js"></script>
-<script src="plugins/routing/client.js"></script>
+<!-- what the rest of the window calls of Routing before its page is
+     opened: the page's script is one of the heavy ones, below -->
+<script src="plugins/routing/shared.js"></script>
 <script src="plugins/usage/i18n.js"></script>
 <script src="plugins/usage/client.js"></script>
 <script src="plugins/redact/i18n.js"></script>
-<script src="plugins/redact/client.js"></script>
+<!-- what Settings' Try it calls of Masking before its page is opened:
+     the page's script is one of the heavy ones, below -->
+<script src="plugins/redact/shared.js"></script>
 <script src="plugins/otel/i18n.js"></script>
+<!-- the pages pages.js opens on the reader's first visit, named here so
+     each is asked for by its content's hash, as the page's own scripts are
+     (api.go, versionedPage): a cache in front of `magpie web` that kept an
+     older version's client.js would run it under the new page. A
+     template's scripts never run. -->
+<template id="lazyPages">
+  <script src="plugins/sessions/client.js" data-page="sessions"></script>
+  <script src="plugins/library/client.js" data-page="library"></script>
+  <script src="plugins/routing/client.js" data-page="routing"></script>
+  <script src="plugins/redact/page.js" data-page="masking"></script>
+  <script src="plugins/redact/demo.js" data-page="masking"></script>
+</template>
+<script src="pages.js"></script>
 <script src="purposes.js"></script>
 <script src="app.js"></script>
 <script src="plugins.js"></script>
 <script src="pluginpages.js"></script>
 <script src="context.js"></script>
 <script src="plugins/usage/page.js"></script>
-<script src="plugins/redact/page.js"></script>
-<script src="plugins/redact/demo.js"></script>
 <script src="plugins/otel/page.js"></script>
 <script src="plugins/gateway/settings.js"></script>
 <script src="plugins/search/settings.js"></script>

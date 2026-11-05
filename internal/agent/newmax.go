@@ -44,7 +44,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -55,7 +54,7 @@ import (
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/gateway"
 	"github.com/yetone/magpie/internal/sessions"
-	_ "github.com/yetone/magpie/internal/sqlitedb"
+	"github.com/yetone/magpie/internal/sqlitedb"
 )
 
 // newMaxApp is NewMax's macOS bundle.
@@ -259,11 +258,7 @@ func newMaxEdit(path string, fn func(app []byte, had bool) ([]byte, error)) erro
 	} else if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(path), RawQuery: "_pragma=busy_timeout(5000)&_txlock=immediate"}
-	if len(u.Path) >= 2 && u.Path[1] == ':' {
-		u.Path = "/" + u.Path
-	}
-	db, err := sql.Open("sqlite", u.String())
+	db, err := sql.Open("sqlite", sqlitedb.FileURL(path, "_pragma=busy_timeout(5000)&_txlock=immediate"))
 	if err != nil {
 		return err
 	}

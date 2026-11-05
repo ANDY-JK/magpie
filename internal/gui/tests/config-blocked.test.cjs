@@ -10,6 +10,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -101,6 +102,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await panel.waitForTimeout(500);
       assert.ok(await panel.locator("#modal").evaluate((m) => m.hidden), "the panel stays quiet");
 
+      await allWords(page); // the other languages' words are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(([ks, langs]) => langs.filter((l) => l !== "en").flatMap((l) => ks.filter((k) => !I18N[l][k]).map((k) => l + ": " + k)), [KEYS, LANGS]);
       assert.deepEqual(missing, [], "every language has the dialog's words");
       assert.deepEqual(errors, []);

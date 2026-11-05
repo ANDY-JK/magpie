@@ -150,6 +150,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.match(title, w.route);
       assert.match(title, w.usage);
       for (const l of ["zh", "zh-TW", "ja", "de"]) {
+        // the other languages' words are files of their own now (i18n.<lang>.js,
+        // plugins/<id>/i18n.<lang>.js): asked for before they are read
+        await page.evaluate(async (l) => { await loadLocaleWords(l); await pluginLocaleWords(l); }, l);
         const missing = await page.evaluate((l) => ["ClinePass route {served}", "requested {sent} · ClinePass route {served}",
           "ClinePass answered {sent} through {served}, a route it picks itself: the name is the route's, not another model's.",
           "Its reply says {upstream} answered.", "Its reply didn't say which provider answered.",

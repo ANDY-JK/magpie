@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // The Windows app is linked as a GUI program, so a double click opens no
@@ -145,9 +147,9 @@ func writeCom(launcher []byte, exe string) (string, error) {
 		err = cerr
 	}
 	if err == nil {
-		if err = os.Rename(tmp, p); err != nil && exists(p) {
-			if aerr := os.Rename(p, oldName(p)); aerr == nil {
-				err = os.Rename(tmp, p)
+		if err = steady.Rename(tmp, p); err != nil && exists(p) {
+			if aerr := steady.Rename(p, oldName(p)); aerr == nil {
+				err = steady.Rename(tmp, p)
 			}
 		}
 	}

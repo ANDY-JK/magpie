@@ -1,7 +1,9 @@
 // Package sqlitedb is the one way magpie reaches SQLite: a package that
-// opens a database imports it, blank, in place of modernc.org/sqlite.
+// opens a database imports it in place of modernc.org/sqlite, and names
+// the database through FileURL.
 //
-//	import _ "github.com/yetone/magpie/internal/sqlitedb"
+//	import "github.com/yetone/magpie/internal/sqlitedb"
+//	db, err := sql.Open("sqlite", sqlitedb.FileURL(path, "mode=ro"))
 //
 // modernc's SQLite runs on modernc's libc, which keeps its own copy of the
 // environment, taken from os.Environ at the first getenv. On macOS,
@@ -17,12 +19,26 @@
 package sqlitedb
 
 import (
+	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"modernc.org/libc"
 	_ "modernc.org/sqlite"
 )
+
+// FileURL is a database's file: URL with query q (mode=ro and the pragmas
+// the open wants): slashed, and on Windows with a slash before the drive
+// (file:///C:/…), without which the drive letter is read as a host and the
+// open fails. Every package that opens a database names it through this.
+func FileURL(path, query string) string {
+	p := filepath.ToSlash(path)
+	if len(p) >= 2 && p[1] == ':' {
+		p = "/" + p
+	}
+	return (&url.URL{Scheme: "file", Path: p, RawQuery: query}).String()
+}
 
 // init runs before any of magpie's own code, and before any goroutine of
 // it, so libc's copy is taken once, here: modernc's SetEnviron isn't safe

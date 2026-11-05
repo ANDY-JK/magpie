@@ -19,6 +19,7 @@ import (
 	"unsafe"
 
 	"github.com/tidwall/gjson"
+	"github.com/yetone/magpie/internal/provider"
 )
 
 // decodeJSON is json.Unmarshal(data, dst), made for a request body: one
@@ -97,6 +98,8 @@ var heldBodies struct {
 	facts map[*byte]heldFacts
 	// long: what longBody found of a held body, by its first byte
 	long map[*byte]heldLong
+	// scans: what a held body's byte scans found, by its first byte (scanOf)
+	scans map[*byte]*heldScan
 }
 
 // heldLong is what longBody found of a held body: valid or not, and its
@@ -155,6 +158,7 @@ func holdBody(ctx context.Context, body []byte) {
 		}
 		delete(heldBodies.facts, unsafe.SliceData(body))
 		delete(heldBodies.long, unsafe.SliceData(body))
+		delete(heldBodies.scans, unsafe.SliceData(body))
 		next := slices.Delete(slices.Clone(cur), i, i+1)
 		heldBodies.list.Store(&next)
 	})
@@ -1173,6 +1177,119 @@ func validJSONNumber(data []byte, i int) (int, bool) {
 	return i, true
 }
 
+// scanKind is one of the walks over a request body that only ask whether
+// something is in it (scanOf).
+type scanKind int8
+
+const (
+	scanHEIC  scanKind = iota // mayHoldHEIC, the same in every protocol
+	scanImage                 // anyImageTurn, by protocol
+	scanLoop                  // mayLoop, by protocol
+)
+
+// heldScan is what a held body's scans found (scanOf): whether each ran
+// and what it found, per protocol where the answer depends on one.
+type heldScan struct {
+	n     int
+	heic  int8 // 0 not scanned, 1 no, 2 yes
+	image [4]int8
+	loop  [4]int8
+}
+
+// scanOf is what one such walk of body found, kept while the body is held
+// (holdBody): each walks every byte of the body, and one request asks for
+// the same one more than once — hasImage (anyImageTurn) looks at several
+// places of serve, walked again inside textOnlyBody's walkImages, and
+// heicAsJPEG's mayHoldHEIC is asked before its walk. A body that isn't
+// held, or is shorter than validMemoMin, is walked each time: its memory
+// may be given to another body that would read as this one (factsOf). A
+// rewritten body is a different []byte, with walks of its own.
+func scanOf(proto provider.Protocol, body []byte, kind scanKind, scan func() bool) bool {
+	if len(body) < validMemoMin {
+		return scan()
+	}
+	key := unsafe.SliceData(body)
+	slot := protoSlot(proto)
+	heldBodies.Lock()
+	if e, ok := heldBodies.scans[key]; ok && e.n == len(body) {
+		if v, known := e.get(kind, slot); known {
+			heldBodies.Unlock()
+			return v
+		}
+	}
+	heldBodies.Unlock()
+	if f := scanWalked.Load(); f != nil {
+		(*f)(body, kind)
+	}
+	v := scan()
+	heldBodies.Lock()
+	defer heldBodies.Unlock()
+	// only while body is held: one released may be freed, and its memory
+	// given to another body that would read as this one (factsOf)
+	if l := heldBodies.list.Load(); l != nil {
+		for _, b := range *l {
+			if unsafe.SliceData(b) == key && len(b) == len(body) {
+				if heldBodies.scans == nil {
+					heldBodies.scans = map[*byte]*heldScan{}
+				}
+				e := heldBodies.scans[key]
+				if e == nil || e.n != len(body) {
+					e = &heldScan{n: len(body)}
+					heldBodies.scans[key] = e
+				}
+				e.set(kind, slot, v)
+				break
+			}
+		}
+	}
+	return v
+}
+
+// scanWalked, when set (tests), is told of each walk a scan of scanOf runs.
+var scanWalked atomic.Pointer[func(body []byte, kind scanKind)]
+
+// protoSlot is where a protocol's answer sits in a heldScan; an unknown
+// protocol's is Chat's, as anyImageTurn and mayLoop read one.
+func protoSlot(proto provider.Protocol) int {
+	switch proto {
+	case provider.Responses:
+		return 1
+	case provider.Anthropic:
+		return 2
+	case provider.Gemini:
+		return 3
+	}
+	return 0 // Chat
+}
+
+func (e *heldScan) get(kind scanKind, slot int) (found, known bool) {
+	var v int8
+	switch kind {
+	case scanHEIC:
+		v = e.heic
+	case scanImage:
+		v = e.image[slot]
+	case scanLoop:
+		v = e.loop[slot]
+	}
+	return v == 2, v != 0
+}
+
+func (e *heldScan) set(kind scanKind, slot int, found bool) {
+	v := int8(1)
+	if found {
+		v = 2
+	}
+	switch kind {
+	case scanHEIC:
+		e.heic = v
+	case scanImage:
+		e.image[slot] = v
+	case scanLoop:
+		e.loop[slot] = v
+	}
+}
+
 // topMember is the value of the member named key of body's top-level
 // object, as decoding body into a map[string]json.RawMessage has it: the
 // last of that name, the name read with its escapes. ok is false when
@@ -1180,26 +1297,63 @@ func validJSONNumber(data []byte, i int) (int, bool) {
 // A long body is checked and split once (longBody), so a rewrite asking
 // whether it has anything to do costs no walk over the conversation.
 func topMember(body []byte, key string) (val []byte, found, ok bool) {
+	val, _, found, ok = topMemberAt(body, key)
+	return val, found, ok
+}
+
+// topMemberAt is topMember with where the value lies: start is its first
+// byte's offset in body (0 when it wasn't found).
+func topMemberAt(body []byte, key string) (val []byte, start int, found, ok bool) {
 	var members []memberSpan
 	if len(body) >= validMemoMin {
 		var valid bool
 		if valid, members = longBody(body); !valid {
-			return nil, false, false
+			return nil, 0, false, false
 		}
 	} else if !jsonCheck(body) {
-		return nil, false, false
+		return nil, 0, false, false
 	}
 	raw := trimJSON(body)
 	if raw[0] != '{' {
-		return nil, false, false
+		return nil, 0, false, false
 	}
-	eachMemberIn(raw, members, func(k, v []byte) bool {
-		if keyIs(k, key) {
-			val, found = v, true
+	off := skipJSONSpace(body, 0)
+	if members == nil {
+		if h := topSplit.Load(); h != nil && len(raw) >= validMemoMin {
+			(*h)(body)
 		}
-		return true
-	})
-	return val, found, true
+		eachMemberAt(raw, func(k0, k1, v0, v1 int) bool {
+			if keyIs(raw[k0:k1], key) {
+				val, start, found = raw[v0:v1:v1], off+v0, true
+			}
+			return true
+		})
+		return val, start, found, true
+	}
+	for _, m := range members {
+		if keyIs(raw[m.k0:m.k1], key) {
+			val, start, found = raw[m.v0:m.v1:m.v1], off+m.v0, true
+		}
+	}
+	return val, start, found, true
+}
+
+// topString is gjson.GetBytes(body, key).String() read from the body's
+// split top level rather than by walking the body to find a member that
+// may be past a long conversation: the member's string, its JSON text for
+// a value that isn't one, "" when it is missing or null.
+func topString(body []byte, key string) string {
+	v, found, ok := topMember(body, key)
+	if !ok || !found {
+		return ""
+	}
+	if s, isStr := unquoteJSON(v); isStr {
+		return s
+	}
+	if string(v) == "null" {
+		return ""
+	}
+	return string(v)
 }
 
 // withoutTopMember is body without its top-level members named key (every
@@ -1521,6 +1675,12 @@ func appendHTMLEscaped(dst, s []byte) []byte {
 // while one is held.
 func getIn(body []byte, path string) gjson.Result {
 	return gjson.Get(unsafe.String(unsafe.SliceData(body), len(body)), path)
+}
+
+// parseInPlace is gjson.Parse read in place, as getIn is: ParseBytes
+// copies what it is given into a string, a conversation's list whole.
+func parseInPlace(data []byte) gjson.Result {
+	return gjson.Parse(unsafe.String(unsafe.SliceData(data), len(data)))
 }
 
 // marshalBody is json.Marshal of a request body being built, byte for

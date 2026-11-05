@@ -42,6 +42,7 @@ import (
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/settings"
+	"github.com/yetone/magpie/internal/sqlitedb"
 	"github.com/yetone/magpie/internal/steady"
 )
 
@@ -427,7 +428,7 @@ func saveKiro(c kiroCred) {
 	expires := c.expires.UTC().Format(time.RFC3339Nano)
 	switch {
 	case c.dbKey != "":
-		db, err := sql.Open("sqlite", (&url.URL{Scheme: "file", Path: sqlitePath(kiroCLIDB()), RawQuery: "_pragma=busy_timeout(3000)"}).String())
+		db, err := sql.Open("sqlite", sqlitedb.FileURL(kiroCLIDB(), "_pragma=busy_timeout(3000)"))
 		if err != nil {
 			return
 		}

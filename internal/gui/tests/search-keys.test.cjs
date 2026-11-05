@@ -17,11 +17,7 @@ const { watchSettingsReads, settingsDrawn, reach } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const LANGS = ["en", "zh", "zh-TW", "ja", "de"];
-// the words as i18n.js has them
-const I18N = (() => {
-  const src = require("node:fs").readFileSync(path.join(assets, "i18n.js"), "utf8");
-  return new Function(src.slice(0, src.indexOf("\n};") + 3) + "; return I18N;")();
-})();
+const I18N = require("./strings.cjs").strings().I18N; // the language files’ words
 const tr = (lang, s, vars = {}) => {
   const got = lang === "en" ? s : I18N[lang][s];
   assert(got, `"${s}" has no ${lang} translation`);

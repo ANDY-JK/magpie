@@ -43,6 +43,9 @@ magpie.plugin("routing", (ctx) => {
 function routingPage(part) {
   const box = $("#rt");
   if (!box) return;
+  // Hide accounts is the window's switch, its button here only when the page
+  // comes (app.js wires its own at the start): taken up now that it is here
+  window.maskSync?.();
   const NS = "http://www.w3.org/2000/svg";
   const still = calm;
   const shown = () => !$("#view-routing").hidden && !document.hidden;
@@ -3274,25 +3277,10 @@ function routingPage(part) {
     pick(r);
   };
 
-  // what a call was for when it isn't a turn of the conversation, as
-  // Codex names it (x-openai-subagent): its own guardian review of an
-  // approval, a thread's title, memories… — each on the model Codex picks
-  // for it, so a list of Luna calls under a Sol composer reads as it is.
-  // A web search is magpie's own, run for a model that can't search on the
-  // model it searches with (a DeepSeek chat showing GPT calls, #314)
-  const knownKind = (k) => Object.hasOwn(REQUEST_KINDS, k) ? REQUEST_KINDS[k] : null;
-  const kindName = (k) => knownKind(k) ? t(knownKind(k).name) : k;
-  window.kindName = kindName; // the Usage page's Requests say it too (#714)
-  // The catalog is generated from usage.PurposeKinds; unknown names stay literal.
-  const purposeOf = (kind) => !kind ? "unmarked" : knownKind(kind)?.purpose || "kind:" + kind;
-  const purposeOptions = (ids, selected) => [...new Set([...ids, ...(selected ? [selected] : [])])].sort().map((id) => {
-    const kind = id.slice(5);
-    return { v: id, name: id === "unmarked" ? t("Unmarked") : kindName(kind), note: id === "unmarked"
-      ? t("No purpose was recorded; this may be a conversation turn or an older record.")
-      : knownKind(kind) ? "" : t("Unrecognized request purpose") };
-  });
-  window.purposeOf = purposeOf;
-  window.purposeOptions = purposeOptions;
+  // what a call was for (kindName, purposeOf, purposeOptions) and who
+  // answered (swapWhy, routedWhy) are shared.js's: the Usage page's
+  // Requests and the context card say them before this page is opened
+  //
   // a Claude Code subagent's turn, Desktop's or a terminal's, names no kind
   // (Route.SubagentID): it is tagged and told as Codex's subagents are, its
   // purpose left unmarked as the ledger keeps it
@@ -3312,22 +3300,6 @@ function routingPage(part) {
     k.title = swapWhy(tr);
     return k;
   }
-  // ClinePass names a reply by the route it picked (its VMC,
-  // vmc/deepseek-v4p1-flash-1017-contributor-fallbacks), not by a model:
-  // such a reply is said as its route, with what was asked of it and
-  // whether it said who answered (zRain on Discord, 10-24). pin is the
-  // provider the try asked for; a Usage row doesn't keep it (pinUnknown).
-  const clineRoute = (tr) => /^vmc\//.test(tr.served || "") && /(^|\/)cline-pass\//.test(tr.model || "");
-  function swapWhy(tr, o = {}) {
-    if (!clineRoute(tr)) return t("The vendor was asked for {sent}, but its reply says {served} answered: likely another model. The same model under a dated name or spelled otherwise isn't marked.", { sent: tr.model, served: tr.served });
-    const s = t("ClinePass answered {sent} through {served}, a route it picks itself: the name is the route's, not another model's.", { sent: tr.model, served: tr.served });
-    if (tr.upstream) return s + " " + t("Its reply says {upstream} answered.", { upstream: tr.upstream });
-    if (o.pinUnknown) return s + " " + t("Its reply didn't say which provider answered.");
-    if (tr.pin) return s + " " + t("{pin} was asked for, but its reply didn't say which provider answered, so whether ClinePass kept to it is unknown.", { pin: tr.pin });
-    const tick = /(^|\/)cline-pass\/(deepseek|glm)/i.test(tr.model) ? " " + t("To ask for the maker's own API, tick “{tick}” in the provider's settings.", { tick: t("DeepSeek and GLM models only from their makers' own APIs") }) : "";
-    return s + " " + t("No provider was asked for, and its reply didn't say which one answered.") + tick;
-  }
-  window.swapWhy = swapWhy; // the Usage page's Requests say it too
   // a try that asked a remote magpie for one of its routing groups: the
   // reply names the member the group routed to, which is the group
   // picking, not a swap — shown plain, as a model that answered
@@ -3336,8 +3308,6 @@ function routingPage(part) {
     k.title = routedWhy(tr);
     return k;
   }
-  const routedWhy = (tr) => t("{sent} is a routing group of the remote magpie, and it routed the request to {served}: the group picking one of its models, not the vendor swapping the model.", { sent: tr.model, served: tr.served });
-  window.routedWhy = routedWhy;
   // the provider an aggregator (OpenRouter …) said answered behind it:
   // DeepInfra, Novita… (leslie_luo on Discord)
   function upstreamTag(tr) {

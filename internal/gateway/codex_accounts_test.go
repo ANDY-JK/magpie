@@ -702,6 +702,12 @@ func TestCallKind(t *testing.T) {
 // with a ChatGPT account"). 0.161.0 is newer than any installed here or
 // magpie's own fallback, so only the client's own version can pass.
 func TestCodexPoolSaysTheClientsVersion(t *testing.T) {
+	// the newest Codex a client said it was holds for the whole process,
+	// and another test's fake is newer than this one (additional_tools_test
+	// stands in with codex/0.165.0): signed as it, these requests pass for a
+	// reason the test isn't about
+	provider.ForgetCodexSeen()
+	t.Cleanup(provider.ForgetCodexSeen)
 	codexSignedIn(t, "spare@example.com")
 	var uas, vers []string
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

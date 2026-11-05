@@ -185,6 +185,19 @@ func (s *seenVersion) saw(v string) {
 	s.Unlock()
 }
 
+func (s *seenVersion) forget() {
+	s.Lock()
+	s.v = ""
+	s.Unlock()
+}
+
+// ForgetCodexSeen drops the version a Codex client was last seen saying it
+// was, for a caller that stood in for one (a test's own User-Agent): it
+// signs and asks as that version, newer than any Codex on the machine, for
+// the rest of the process. As with ForgetAccounts, a test in another
+// package calls it.
+func ForgetCodexSeen() { codexSeen.forget() }
+
 // SawCodexClient notes the version a Codex client's request says it is —
 // its `version` header, else the one in its User-Agent (codex_cli_rs/0.159.0,
 // Codex Desktop/0.159.0) — when the request is Codex's (it names an

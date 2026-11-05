@@ -19,6 +19,14 @@ type slowThinker struct {
 	gap    time.Duration
 	done   chan time.Time
 	sent   []time.Time // when each event was written; read after done
+	// heard, when set, holds the vendor before the event at heardAt — the
+	// first that carries the text — until the test has read a thought:
+	// whether the gateway passed the thinking on is then the vendor's own
+	// state, not how long a loaded machine's reader took to see it.
+	// wasHeard is read after done.
+	heard    chan struct{}
+	heardAt  int
+	wasHeard bool
 }
 
 func (s *slowThinker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +34,14 @@ func (s *slowThinker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.WriteHeader(200)
 	f := w.(http.Flusher)
-	for _, ev := range s.events {
+	for i, ev := range s.events {
+		if s.heard != nil && i == s.heardAt {
+			select {
+			case <-s.heard:
+				s.wasHeard = true
+			case <-time.After(5 * time.Second):
+			}
+		}
 		io.WriteString(w, ev+"\n\n")
 		f.Flush()
 		s.sent = append(s.sent, time.Now())
@@ -391,13 +406,15 @@ func TestThinkingStreamsWithNoOneElse(t *testing.T) {
 		proto  provider.Protocol
 		events []string
 		model  string
+		// textAt is the first event of its stream that carries the text
+		textAt int
 	}{
-		{"anthropic", provider.Anthropic, glmThinksSlowly, "claude-opus-5-5"},
-		{"chat", provider.Chat, glmChatThinksSlowly, "claude-opus-5-5"},
-		{"chat gpt", provider.Chat, glmChatThinksSlowly, "gpt-5.2"},
-		{"responses", provider.Responses, responsesThinks, "gpt-5.2"},
-		{"gemini", provider.Gemini, geminiThinks, "gemini-3-pro"},
-		{"chat gemini", provider.Chat, glmChatThinksSlowly, "gemini-3-pro"},
+		{"anthropic", provider.Anthropic, glmThinksSlowly, "claude-opus-5-5", 6},
+		{"chat", provider.Chat, glmChatThinksSlowly, "claude-opus-5-5", 3},
+		{"chat gpt", provider.Chat, glmChatThinksSlowly, "gpt-5.2", 3},
+		{"responses", provider.Responses, responsesThinks, "gpt-5.2", 7},
+		{"gemini", provider.Gemini, geminiThinks, "gemini-3-pro", 3},
+		{"chat gemini", provider.Chat, glmChatThinksSlowly, "gemini-3-pro", 3},
 	} {
 		for _, ask := range []struct{ path, body, thought, text string }{
 			{"/v1/messages", claudeAsks, `"thinking_delta"`, `"text_delta"`},
@@ -405,7 +422,11 @@ func TestThinkingStreamsWithNoOneElse(t *testing.T) {
 		} {
 			t.Run(x.name+ask.path, func(t *testing.T) {
 				fresh(t)
-				up := &slowThinker{events: x.events, gap: 200 * time.Millisecond, done: make(chan time.Time, 1)}
+				// the vendor says nothing of the text until the client has a
+				// thought: held, the thinking reaches it with the text, and
+				// nothing the vendor does can look like it came first
+				heard := make(chan struct{})
+				up := &slowThinker{events: x.events, gap: 200 * time.Millisecond, done: make(chan time.Time, 1), heard: heard, heardAt: x.textAt}
 				vendor := httptest.NewServer(up)
 				t.Cleanup(vendor.Close)
 				p := provider.Provider{ID: "relay", Name: "Relay", Key: "k", Models: []string{x.model}}
@@ -435,6 +456,7 @@ func TestThinkingStreamsWithNoOneElse(t *testing.T) {
 					ln, err := rd.ReadString('\n')
 					if firstThought.IsZero() && strings.Contains(ln, ask.thought) {
 						firstThought = time.Now()
+						close(heard)
 					}
 					if firstText.IsZero() && strings.Contains(ln, ask.text) {
 						firstText = time.Now()
@@ -451,8 +473,11 @@ func TestThinkingStreamsWithNoOneElse(t *testing.T) {
 				if firstThought.IsZero() || firstText.IsZero() {
 					t.Fatal("no thinking or no text reached the client")
 				}
-				if firstText.Sub(firstThought) < 300*time.Millisecond {
-					t.Fatalf("thinking held: first thought only %v before the text", firstText.Sub(firstThought))
+				// the vendor wrote the text only once the thinking had
+				// reached the client's stream: held there, the vendor waited
+				// its 5s and the text came with the thinking
+				if !up.wasHeard {
+					t.Fatal("thinking held: the client heard none of it before the vendor wrote the text")
 				}
 			})
 		}

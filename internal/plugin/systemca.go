@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // caEnv has Bun trust what this machine trusts. Bun checks TLS against
@@ -128,14 +129,7 @@ func writeCAFile(b []byte) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return ""
 	}
-	tmp, err := os.CreateTemp(dir, ".system-ca-*")
-	if err != nil {
-		return ""
-	}
-	_, werr := tmp.Write(b)
-	cerr := tmp.Close()
-	if werr != nil || cerr != nil || os.Rename(tmp.Name(), p) != nil {
-		os.Remove(tmp.Name())
+	if err := steady.WriteFile(p, b, 0o600); err != nil {
 		return ""
 	}
 	return p

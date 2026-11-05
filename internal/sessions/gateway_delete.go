@@ -11,6 +11,7 @@ import (
 
 	"github.com/yetone/magpie/internal/lastgood"
 	"github.com/yetone/magpie/internal/settings"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // Deleting a gateway session (lc on Discord: a Claude Code session seen only
@@ -66,11 +67,7 @@ func writeHidden(list []hiddenGateway) error {
 	if err := os.MkdirAll(settings.Dir(), 0o700); err != nil {
 		return err
 	}
-	tmp := gatewayHiddenPath() + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, gatewayHiddenPath())
+	return steady.WriteFile(gatewayHiddenPath(), b, 0o600)
 }
 
 // keepUnreadHidden copies a gateway-sessions-hidden.json that doesn't parse

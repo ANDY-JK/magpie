@@ -11,6 +11,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -130,6 +131,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.waitForFunction(() => document.querySelectorAll("#view-sessions .row.sm-sess .sm-prov").length === 2);
       assert.equal(await view.locator(".sm-provider-undo").count(), 0, "nothing left to undo");
 
+        await allWords(page); // every language is a file of its own now (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "1 Codex session was made with another provider ({from}): Codex lists only {to}'s sessions in its history now, so it doesn't show there.",
         "{n} Codex sessions were made with another provider ({from}): Codex lists only {to}'s sessions in its history now, so they don't show there.",

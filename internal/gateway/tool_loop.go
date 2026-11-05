@@ -70,8 +70,14 @@ func (s *Server) stoppedToolLoop(w http.ResponseWriter, r *http.Request, from pr
 	return true
 }
 
-// mayLoop: body has results enough to hold a loop.
+// mayLoop: body has results enough to hold a loop. The count is kept while
+// the body is held (scanOf): stoppedToolLoop asks once per request, and
+// the route's own retries ask again about the same bytes.
 func mayLoop(from provider.Protocol, body []byte) bool {
+	return scanOf(from, body, scanLoop, func() bool { return loopMarks(from, body) })
+}
+
+func loopMarks(from provider.Protocol, body []byte) bool {
 	n := 0
 	for _, m := range toolResultMarks[from] {
 		n += bytes.Count(body, m)
@@ -98,12 +104,15 @@ const tailItems = 8 * toolLoopRepeats
 // took ~30ms and 20MB a turn of 1.5MB; gjson finds the items without
 // decoding them. A body whose conversation isn't such a list is as it came.
 func tailOf(from provider.Protocol, body []byte) []byte {
-	list := getIn(body, conversationKey[from])
-	if !list.IsArray() || list.Index <= 0 {
+	// the list's top-level member from the body's split top level
+	// (topMemberAt), where gjson walked to it past the system prompt and
+	// tools; gjson then reads only the list itself
+	list, at, found, ok := topMemberAt(body, conversationKey[from])
+	if !ok || !found || len(list) == 0 || list[0] != '[' || at <= 0 {
 		return body
 	}
 	var items []gjson.Result
-	list.ForEach(func(_, v gjson.Result) bool {
+	parseInPlace(list).ForEach(func(_, v gjson.Result) bool {
 		items = append(items, v)
 		return true
 	})
@@ -112,8 +121,9 @@ func tailOf(from provider.Protocol, body []byte) []byte {
 	}
 	// a slice made to its size, not a bytes.Buffer: under -race the
 	// Buffer's Grow allocates its slice twice
-	b := make([]byte, 0, len(body)-list.Index-len(list.Raw)+items[len(items)-1].Index+len(items[len(items)-1].Raw)-items[len(items)-tailItems].Index+list.Index+2)
-	b = append(b, body[:list.Index]...)
+	last := items[len(items)-1]
+	b := make([]byte, 0, len(body)-len(list)+last.Index+len(last.Raw)-items[len(items)-tailItems].Index+2)
+	b = append(b, body[:at]...)
 	b = append(b, '[')
 	for i, v := range items[len(items)-tailItems:] {
 		if i > 0 {
@@ -122,7 +132,7 @@ func tailOf(from provider.Protocol, body []byte) []byte {
 		b = append(b, v.Raw...)
 	}
 	b = append(b, ']')
-	return append(b, body[list.Index+len(list.Raw):]...)
+	return append(b, body[at+len(list):]...)
 }
 
 // toolLoop is a conversation's newest exchange and how many turns in a row

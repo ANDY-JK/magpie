@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,6 +24,7 @@ import (
 	"github.com/yetone/magpie/internal/filelock"
 	"github.com/yetone/magpie/internal/filememo"
 	"github.com/yetone/magpie/internal/settings"
+	"github.com/yetone/magpie/internal/sqlitedb"
 	"github.com/yetone/magpie/internal/steady"
 )
 
@@ -399,11 +399,7 @@ func holdCodexThread(home, id string) (letGo func(), err error) {
 func CodexThreadProviders(home string) []string {
 	var out []string
 	for _, p := range codexStateDBs(home) {
-		u := url.URL{Scheme: "file", Path: filepath.ToSlash(p), RawQuery: "mode=ro&_pragma=busy_timeout(2000)"}
-		if len(u.Path) >= 2 && u.Path[1] == ':' {
-			u.Path = "/" + u.Path
-		}
-		db, err := sql.Open("sqlite", u.String())
+		db, err := sql.Open("sqlite", sqlitedb.FileURL(p, "mode=ro&_pragma=busy_timeout(2000)"))
 		if err != nil {
 			continue
 		}
@@ -428,11 +424,7 @@ func CodexThreadProviders(home string) []string {
 func codexThreadsOn(home, p string) []string {
 	var out []string
 	for _, path := range codexStateDBs(home) {
-		u := url.URL{Scheme: "file", Path: filepath.ToSlash(path), RawQuery: "mode=ro&_pragma=busy_timeout(2000)"}
-		if len(u.Path) >= 2 && u.Path[1] == ':' {
-			u.Path = "/" + u.Path
-		}
-		db, err := sql.Open("sqlite", u.String())
+		db, err := sql.Open("sqlite", sqlitedb.FileURL(path, "mode=ro&_pragma=busy_timeout(2000)"))
 		if err != nil {
 			continue
 		}
@@ -656,11 +648,7 @@ func rewriteCodexProvider(path, to string) (bool, error) {
 // database, and says whether it had a row there. A database without the
 // threads table (another version of Codex) is left alone.
 func moveCodexThread(path, id, to string) (bool, error) {
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(path), RawQuery: "_pragma=busy_timeout(5000)"}
-	if len(u.Path) >= 2 && u.Path[1] == ':' {
-		u.Path = "/" + u.Path
-	}
-	db, err := sql.Open("sqlite", u.String())
+	db, err := sql.Open("sqlite", sqlitedb.FileURL(path, "_pragma=busy_timeout(5000)"))
 	if err != nil {
 		return false, err
 	}
@@ -698,11 +686,7 @@ func RelabelCodexThreads(home, from, to string) ([]string, error) {
 	type row struct{ db, id, path string }
 	var rows []row
 	for _, p := range codexStateDBs(home) {
-		u := url.URL{Scheme: "file", Path: filepath.ToSlash(p), RawQuery: "mode=ro&_pragma=busy_timeout(2000)"}
-		if len(u.Path) >= 2 && u.Path[1] == ':' {
-			u.Path = "/" + u.Path
-		}
-		db, err := sql.Open("sqlite", u.String())
+		db, err := sql.Open("sqlite", sqlitedb.FileURL(p, "mode=ro&_pragma=busy_timeout(2000)"))
 		if err != nil {
 			continue
 		}

@@ -80,6 +80,10 @@ func TestUpdateNotesRoute(t *testing.T) {
 // v0.1.1024 out): the newest release is the one it names, with the notes
 // of every release up to it.
 func TestUpdateNotesAskTheFeedAgain(t *testing.T) {
+
+	if update.Independent() {
+		t.Skip("this build follows no release feed (update.independent)")
+	}
 	feedAsked := 0
 	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		feedAsked++
@@ -140,6 +144,10 @@ func TestUpdateNotesAskTheFeedAgain(t *testing.T) {
 // dialog said it had none) takes them from the next check that has them,
 // though the version is the one already downloaded; notes held are kept.
 func TestUpdateRecheckTakesNotesLate(t *testing.T) {
+
+	if update.Independent() {
+		t.Skip("this build follows no release feed (update.independent)")
+	}
 	notes := "## Features\n- twenty-four"
 	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(update.Release{Version: "0.1.1224", Notes: notes})

@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yetone/magpie/internal/sqlitedb"
 )
 
 // The Codex app (ChatGPT.app's Codex, 26.x) lists conversations from a
@@ -106,13 +107,7 @@ func codexCatalogDBs(home string) []string {
 }
 
 // sqliteURL is a database's file: URL with query q.
-func sqliteURL(path, q string) string {
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(path), RawQuery: q}
-	if len(u.Path) >= 2 && u.Path[1] == ':' {
-		u.Path = "/" + u.Path
-	}
-	return u.String()
-}
+func sqliteURL(path, q string) string { return sqlitedb.FileURL(path, q) }
 
 // codexGoneThreads are the threads a Codex folder's state databases name
 // whose rollout is gone from its sessions or archived_sessions.

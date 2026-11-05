@@ -213,9 +213,12 @@ async function routingPage(t, engine, lang, feed, view = "routing") {
   await page.route("**/*", serve(lang, feed));
   await page.goto(`http://magpie.test/?view=${view}`);
   // out of sight the list isn't drawn (routing-hidden-stage.test.cjs): the
-  // trace is in once the live dot says a request is under way
+  // trace is in once the live dot says a request is under way. On another
+  // page there is no dot to wait for: Routing is declared ahead of its
+  // script (pages.js) and nothing of it is in the window until it is
+  // opened, so the first open is the page coming, request and all
   if (view === "routing") await page.waitForFunction(() => document.querySelectorAll(".rt-req").length > 0);
-  else await page.waitForFunction(() => document.querySelector(".rt-livedot.on"));
+  else await page.waitForFunction(() => document.querySelectorAll("#agents .row").length > 0);
   return { page, errors };
 }
 

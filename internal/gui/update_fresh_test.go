@@ -146,6 +146,15 @@ func TestRestartClickTakesTheNewest(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := freshUpdater(t, true)
+	if update.Independent() {
+		// this build follows no release feed: the check finds nothing,
+		// nothing is downloaded, and a click has nothing to restart into
+		u.check()
+		if j := u.json(); j.State != "source" || j.Latest != "" {
+			t.Fatalf("an independent build offered an update: %+v", j)
+		}
+		return
+	}
 	u.check()
 	if j := u.json(); j.State != "found" || j.Latest != "0.1.11" {
 		t.Fatalf("the check: %+v", j)
@@ -175,6 +184,15 @@ func TestRestartClickTakesTheNewest(t *testing.T) {
 func TestRestartWaitsForTheFeed(t *testing.T) {
 	f := newFreshFeed(t)
 	u := freshUpdater(t, true)
+	if update.Independent() {
+		// this build follows no release feed: the restart has nothing to
+		// wait for, nothing is downloaded, and nothing is restarted into
+		u.check()
+		if j := u.json(); j.State != "source" || j.Latest != "" {
+			t.Fatalf("an independent build offered an update: %+v", j)
+		}
+		return
+	}
 	oldTicks, oldTick := recheckTicks, recheckTick
 	recheckTicks, recheckTick = 3, time.Millisecond
 	t.Cleanup(func() { recheckTicks, recheckTick = oldTicks, oldTick })
@@ -207,6 +225,15 @@ func TestTrayRestartTakesTheNewest(t *testing.T) {
 	u := freshUpdater(t, true)
 	quick(t, busy, u)
 	waitRecheck = (*updater).recheck
+	if update.Independent() {
+		// this build follows no release feed: the tray's restart has
+		// nothing to ask for and nothing to restart into
+		u.check()
+		if j := u.json(); j.State != "source" || j.Latest != "" {
+			t.Fatalf("an independent build offered an update: %+v", j)
+		}
+		return
+	}
 	f := newFreshFeed(t)
 	u.check()
 	if j := u.json(); j.State != "ready" || j.Latest != "0.1.11" {
@@ -244,6 +271,22 @@ func TestTrayRestartTakesTheNewest(t *testing.T) {
 func TestAvailableOpensTheNewestPage(t *testing.T) {
 	f := newFreshFeed(t)
 	u := freshUpdater(t, false)
+	if update.Independent() {
+		// this build follows no release feed: nothing is available, and no
+		// release page is opened for it
+		u.check()
+		if j := u.json(); j.State != "source" || j.Latest != "" {
+			t.Fatalf("an independent build offered an update: %+v", j)
+		}
+		w := &openedURLs{}
+		postInstall(t, w)
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		if len(w.urls) != 0 {
+			t.Fatalf("an independent build opened a release page: %q", w.urls)
+		}
+		return
+	}
 	u.check()
 	if j := u.json(); j.State != "available" || j.Latest != "0.1.11" {
 		t.Fatalf("the check: %+v", j)

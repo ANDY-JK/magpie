@@ -68,6 +68,21 @@ func TestWellFormed(t *testing.T) {
 	}
 }
 
+// A drive letter without its slash ahead is read as a URL's host, and the
+// open fails; a path's spaces and # are escaped so SQLite reads the name
+// it was given.
+func TestFileURL(t *testing.T) {
+	for _, c := range []struct{ path, query, want string }{
+		{"C:/Users/me/.cc-switch/cc-switch.db", "mode=ro", "file:///C:/Users/me/.cc-switch/cc-switch.db?mode=ro"},
+		{"/Users/me/.cc-switch/cc-switch.db", "", "file:///Users/me/.cc-switch/cc-switch.db"},
+		{"/home/me/my db#1.sqlite", "_pragma=busy_timeout(2000)", "file:///home/me/my%20db%231.sqlite?_pragma=busy_timeout(2000)"},
+	} {
+		if got := FileURL(c.path, c.query); got != c.want {
+			t.Errorf("FileURL(%q, %q) = %q, want %q", c.path, c.query, got, c.want)
+		}
+	}
+}
+
 // Every SQLite open goes through this package, so libc's environment is
 // cleaned before any of them: no other package's own code imports
 // modernc's driver or its libc. A test file may, to build its fixtures.

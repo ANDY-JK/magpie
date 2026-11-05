@@ -190,6 +190,14 @@ func updateCmd(args []string) error {
 	if len(args) > 2 || len(args) == 2 && args[1] != "check" {
 		return fmt.Errorf("usage: magpie update [check] [--proxy <url>] [--mirror <prefix>]")
 	}
+	// this build follows no release feed (update.independent): asking it
+	// would be a request to a feed that isn't this checkout's, and the
+	// answer could only be another release's version. The app's own check
+	// answers the same way (gui/update.go, updater.run).
+	if update.Independent() {
+		fmt.Println("magpie", version, muted.Render("is maintained on its own, apart from yetone/magpie's releases; update it the way you built it"))
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	ctx = update.WithMirror(update.WithProxy(ctx, proxy), mirror)

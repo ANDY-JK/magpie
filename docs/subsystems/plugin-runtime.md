@@ -57,6 +57,37 @@ plugins' scripts and `app.js`, all classic scripts sharing one scope. It is
   `title` is the page's header (English; `show` translates it).
   `magpie.pages()` adds the plugins' pages to the views `show` and
   `?view=` know.
+- **A page that comes with its script.** A page whose code is heavy is
+  declared before it: `magpie.lazy(key, {plugin, title, loads, scripts})`
+  in `assets/pages.js`, whose scripts it reads from index.html's lazyPages
+  template (that naming is what gives each its `?v=`, `api.go`). Its
+  `<main class="view">` is in the window at once, so the sidebar, `show`
+  and `?view=` have it and its title is known, and its script, markup and
+  hooks come the first time a hook asks for the page — `open` when `show`
+  opens it, or `magpie.ready(key)`. One fetch per page however many ask,
+  the view saying it is loading until then, and a script that never
+  registers its page goes through the error boundary. Such a page must be
+  self-contained, or the window's calls of it before then a small eager
+  file of its own (app.js asks a page's `dirty` with `=== true`, since a
+  page whose script hasn't come answers with a promise; a caller that
+  can't wait for it asks `magpie.came(key)` first, as the window closing
+  does before asking Routing's editor, rather than bring a page in as the
+  window goes). The window's own controls that sit in the page's markup
+  come with it too: Hide accounts is one switch over three buttons, asked
+  for where a click lands, and the page paints it as it mounts
+  (`window.maskSync`). Sessions and
+  Library are declared this way, and Routing too, its eager half
+  `assets/plugins/routing/shared.js`: what its rows say of a request
+  (`kindName`, `purposeOf`, `purposeOptions`, `swapWhy`, `routedWhy`), which
+  Usage's Requests and the context card say too, and `openRoute`,
+  `newGroupWith` and `panelRoutingShown` as calls that bring the page in
+  (`magpie.call("routing", "mount")`) and then call what it set in their
+  place — a page that didn't come leaves the shim, and the call fails with
+  "The Routing page didn't open." rather than calling itself. The tray
+  panel's Routing tab is the one that brings it in there, on `ptab`. Insights ›
+  Masking is one too, its eager half `assets/plugins/redact/shared.js`:
+  `maskMatches`, which Settings › Privacy's *Try it* asks of the page's own
+  records.
 - **Words.** A plugin's `i18n.js` calls `magpie.strings({zh, "zh-TW", ja,
   de})`, added to i18n.js's `I18N` before app.js translates anything. A key
   already there is logged and not taken. `tests/strings.cjs` reads them as
@@ -90,9 +121,10 @@ stream's events or its reply), which Usage's ledger and Routing's trace
 call too; every plugin's scripts load whether it is on or off. Still in
 app.js and app.css: its styles, its sidebar and header buttons
 (`data-feature="gateway"` in index.html), and `decideEntry`, which the model
-info card shares. `TestBuiltinClientsLoaded` holds index.html to load every
-plugin's `Client` script between kernel.js and app.js, and its stylesheet in
-the head, each with its `?v=`.
+info card shares. `TestBuiltinClientsLoaded` holds index.html to name
+every plugin's `Client` script — loaded between kernel.js and app.js, or in
+the lazyPages template when its page is one pages.js declares — and its
+stylesheet in the head, each with its `?v=`.
 
 ## Pages moved out (P2)
 
@@ -126,7 +158,9 @@ as" (#3897).
   before the reader leaves it. `window.loadLibrary`, `redrawLibrary`,
   `closeLibraryModal`, `libraryDirty` and `discardLibrary` are gone.
 - **Routing** (`plugins/routing`, `Client: i18n.js, routing.css,
-  client.js`): the page that was `routing.js`, Essential. Its part's `html`
+  shared.js, client.js`): the page that was `routing.js`, Essential, and a
+  lazy page: `shared.js` comes with the window and `client.js` the first
+  time the page is opened (the kernel's magpie.lazy, above). Its part's `html`
   is the page's head and boxes that were index.html's; the rest of the page
   is drawn by `routingPage`, run at `mount` because it builds on app.js. It
   keeps itself after that, as it did (its own `hidden`, the language, the

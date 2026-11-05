@@ -35,6 +35,15 @@ func TestWhatsNewTellsFailureFromNone(t *testing.T) {
 	defer func() { Version = old }()
 	Version = "0.1.737"
 	n := &whatsNew{}
+	if update.Independent() {
+		// this build follows no feed, so it never asks: a site that is
+		// down is not an error to report, and there is no release page to
+		// send the page to
+		if j := n.get(context.Background(), true, "en"); j.Error != "" || j.URL != "" || len(j.Releases) != 0 || j.Show {
+			t.Fatalf("an independent build: %+v", j)
+		}
+		return
+	}
 
 	j := n.get(context.Background(), true, "en")
 	if j.Error == "" || len(j.Releases) != 0 || j.URL != "https://github.com/yetone/magpie-releases/releases/tag/v0.1.737" {

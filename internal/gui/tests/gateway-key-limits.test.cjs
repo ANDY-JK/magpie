@@ -4,14 +4,11 @@
 // from a tab, with Add a limit and Remove this limit. In every language,
 // both engines, wide and narrow.
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 const { fixture } = require("./fixtures/caller-keys.cjs");
 
-const src = fs.readFileSync(path.resolve(__dirname, "../assets/i18n.js"), "utf8");
-const I18N = new Function(src.slice(0, src.indexOf("\n};") + 3) + "; return I18N;")();
+const { I18N } = require("./strings.cjs").strings(); // the language files’ words
 
 const hour = 36e5, day = 864e5;
 const limits = () => ({

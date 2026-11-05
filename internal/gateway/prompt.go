@@ -1234,6 +1234,13 @@ func windowFor(id, model string) int {
 // end to scale to what was counted. masked is the body as the vendor would
 // get it with masking on, kept a while for the card's text (PromptText);
 // plain when it went unmasked, so is masked only when the card asks.
+//
+// It reads on a goroutine of its own, beside the vendor's round trip, and
+// every route joins it at its end (gateway.go, codex_backend.go): the
+// calibration needs the estimate, and Routing draws it as the route goes.
+// Reading it only when a card asks instead would leave Routing's prompt
+// blank until one is opened and change what calibrate scales, so it is
+// eager on purpose.
 func (s *Server) inspectPrompt(tr *Route, from provider.Protocol, body, masked []byte, plain bool) (wait func() *Prompt) {
 	ch := make(chan *Prompt, 1)
 	go func() {

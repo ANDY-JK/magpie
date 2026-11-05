@@ -420,17 +420,6 @@ func TestImportSourcesNeverNull(t *testing.T) {
 	}
 }
 
-func TestSqlitePath(t *testing.T) {
-	for in, want := range map[string]string{
-		`C:/Users/me/.cc-switch/cc-switch.db`: "/C:/Users/me/.cc-switch/cc-switch.db",
-		"/Users/me/.cc-switch/cc-switch.db":   "/Users/me/.cc-switch/cc-switch.db",
-	} {
-		if got := sqlitePath(in); got != want {
-			t.Errorf("sqlitePath(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
 // The same relay is often both a CC Switch entry and what Claude Code's
 // settings.json points at. Picked together, it is added once; removed, it
 // can be imported again rather than being "Already added" as the copy left

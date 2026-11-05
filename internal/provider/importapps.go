@@ -26,7 +26,7 @@ import (
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/plugin"
 	"github.com/yetone/magpie/internal/settings"
-	_ "github.com/yetone/magpie/internal/sqlitedb"
+	"github.com/yetone/magpie/internal/sqlitedb"
 )
 
 // AppSource is one app magpie can import from, with what it holds.
@@ -958,22 +958,10 @@ func readAlma(path string) ([]AppImport, error) {
 	return out, nil
 }
 
-// sqlitePath is a file's path as a SQLite URI wants it: slashed, and on
-// Windows with a slash before the drive (file:///C:/…) — without it the
-// drive letter is read as a host, and the open fails.
-func sqlitePath(path string) string {
-	p := filepath.ToSlash(path)
-	if len(p) >= 2 && p[1] == ':' {
-		p = "/" + p
-	}
-	return p
-}
-
 // openReadOnly opens another app's SQLite database without writing to it,
 // waiting out the app's own writes.
 func openReadOnly(path string) (*sql.DB, error) {
-	u := url.URL{Scheme: "file", Path: sqlitePath(path), RawQuery: "mode=ro&_pragma=busy_timeout(3000)"}
-	db, err := sql.Open("sqlite", u.String())
+	db, err := sql.Open("sqlite", sqlitedb.FileURL(path, "mode=ro&_pragma=busy_timeout(3000)"))
 	if err != nil {
 		return nil, err
 	}

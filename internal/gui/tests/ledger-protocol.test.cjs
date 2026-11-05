@@ -126,6 +126,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(await dd(5, [want[lang].proto, want[lang].stop]), ["", ""]);
       if (process.env.ARTIFACT_DIR) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, `${engine}-${lang}-protocol-list.png`) });
       for (const l of ["zh", "ja", "de"]) {
+        // the other languages' words are files of their own now (i18n.<lang>.js,
+        // plugins/<id>/i18n.<lang>.js): asked for before they are read
+        await page.evaluate(async (l) => { await loadLocaleWords(l); await pluginLocaleWords(l); }, l);
         const missing = await page.evaluate((l) => ["Protocol", "Upstream stop reason",
           "The agent spoke {from}; sent upstream as {to}", "Sent upstream as {to}, as the agent spoke it"].filter((k) => !I18N[l][k]), l);
         assert.deepEqual(missing, [], `every string has its ${l}`);

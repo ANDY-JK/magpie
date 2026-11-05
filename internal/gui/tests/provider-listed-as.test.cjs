@@ -8,6 +8,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -95,6 +96,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // an account's models take none
       await open("acct");
       assert.equal(await row("m1").getByRole("textbox", { name: L["Listed as"], exact: true }).count(), 0);
+      await allWords(page); // the other languages' words are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => ["Listed as",
         "The id magpie lists {id} by at this provider: agents, routing groups, the groups magpie finds, gateway keys and Usage all use it, and the provider is still asked for {own}. Empty: its own id",
         "Its own name, every reasoning level it has, whether it sees images, the API it is asked on, the model it is the same as, its own id, and its list price",

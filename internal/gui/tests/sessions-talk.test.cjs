@@ -13,6 +13,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -191,6 +192,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await view.locator(".sess-talk-btn").count(), 0);
 
       if (lang === "zh") {
+        await allWords(page); // every language is a file of its own now (i18n.js, plugins/<id>/i18n.js)
         const missing = await page.evaluate(() => ["Continue in {agent}", "Continue in", "Continue this session in another agent", "Continue in another agent",
           "Copy the command", "Conversation", "Show conversation", "Hide conversation", "Reading…"].filter((k) => !I18N.zh[k] || !I18N.ja[k] || !I18N.de[k]));
         assert.deepEqual(missing, [], "every string has its Chinese, Japanese and German");

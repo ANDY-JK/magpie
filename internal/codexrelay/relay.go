@@ -37,6 +37,7 @@ import (
 
 	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/settings"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // Command is the magpie command a relay runs as.
@@ -256,7 +257,7 @@ func writeState(st state) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), p)
+	return steady.Rename(tmp.Name(), p)
 }
 
 func readState() (state, bool) {

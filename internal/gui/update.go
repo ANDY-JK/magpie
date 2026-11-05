@@ -382,6 +382,15 @@ func (u *updater) begin() bool {
 }
 
 func (u *updater) run() {
+	if update.Independent() {
+		// this build follows no release feed: the feed is not even asked,
+		// and there is no newer version to offer. "source" is the state
+		// the page shows — the one that says this build is on its own.
+		u.mu.Lock()
+		u.state = "source"
+		u.mu.Unlock()
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	s := settings.Load()

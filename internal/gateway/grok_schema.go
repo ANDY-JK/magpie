@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/tidwall/gjson"
 	"github.com/yetone/magpie/internal/provider"
 )
 
@@ -24,7 +23,7 @@ import (
 // as it goes upstream, or xAI's own API; every other model's tools go as
 // they came.
 func grokToolPatterns(p provider.Provider, to provider.Protocol, body []byte) []byte {
-	if p.Host() != "api.x.ai" && !grokModel(gjson.GetBytes(body, "model").String()) {
+	if p.Host() != "api.x.ai" && !grokModel(topString(body, "model")) {
 		return body
 	}
 	if !bytes.Contains(body, []byte(`"pattern"`)) {

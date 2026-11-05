@@ -22,6 +22,7 @@ import (
 	"github.com/yetone/magpie/internal/filememo"
 	"github.com/yetone/magpie/internal/ghtoken"
 	"github.com/yetone/magpie/internal/source"
+	"github.com/yetone/magpie/internal/steady"
 	"github.com/yetone/magpie/internal/update"
 )
 
@@ -146,10 +147,7 @@ func saveNPM() {
 		return
 	}
 	_ = os.MkdirAll(filepath.Dir(npmCacheFile()), 0o755)
-	tmp := npmCacheFile() + ".tmp"
-	if os.WriteFile(tmp, b, 0o644) == nil {
-		_ = os.Rename(tmp, npmCacheFile())
-	}
+	_ = steady.WriteFile(npmCacheFile(), b, 0o644)
 }
 
 // InfoCached is what npm said last of each package it was asked of, however

@@ -43,6 +43,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     await page.route("**/*", serve());
     t.after(() => browser.close());
     await page.goto("http://magpie.test/?view=routing");
+    // Routing is declared ahead of its script (pages.js, the lazy pages): the
+    // view is up at once, its head — the mask button — comes with the script
+    await page.evaluate(() => magpie.ready("routing"));
     await page.evaluate(() => { try { localStorage.removeItem("magpie.maskEmails"); } catch {} });
     await page.evaluate((text) => {
       const d = document.createElement("div");

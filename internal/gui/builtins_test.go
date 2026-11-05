@@ -233,7 +233,10 @@ func TestBuiltinConfig(t *testing.T) {
 // Every file a built-in plugin says it has is on disk, loaded by the page
 // and named with its hash so a new one isn't read from the cache: a script
 // after the kernel and before app.js, which looks for its pages, a
-// stylesheet in the head with the others.
+// stylesheet in the head with the others. A heavy page's script is named
+// there too, in the lazyPages template (pages.js, kernel.js's
+// magpie.lazy): its tag carries data-page, and it runs when the page is
+// first opened.
 func TestBuiltinClientsLoaded(t *testing.T) {
 	page, err := os.ReadFile("assets/index.html")
 	if err != nil {
@@ -241,9 +244,9 @@ func TestBuiltinClientsLoaded(t *testing.T) {
 	}
 	src := string(page)
 	at := func(name string) int {
-		tag := `<script src="` + name + `"></script>`
+		tag := `<script src="` + name + `"`
 		if strings.HasSuffix(name, ".css") {
-			tag = `<link rel="stylesheet" href="` + name + `">`
+			tag = `<link rel="stylesheet" href="` + name + `"`
 		}
 		i := strings.Index(src, tag)
 		if i < 0 {
@@ -270,8 +273,16 @@ func TestBuiltinClientsLoaded(t *testing.T) {
 				}
 			} else if c == "page.js" {
 				// a page's code that runs on app.js's helpers: after app.js,
-				// before start.js shows the first page
-				if i := at(name); i < app || i > start {
+				// before start.js shows the first page — or, a heavy page's,
+				// named in the lazyPages template with data-page, which runs
+				// the first time the page is opened, after app.js's helpers
+				i := at(name)
+				tagEnd := strings.Index(src[i:], ">")
+				if tagEnd >= 0 && strings.Contains(src[i:i+tagEnd], "data-page=") {
+					if i < kernel || i > app {
+						t.Errorf("%s isn't in the lazyPages template, before app.js", name)
+					}
+				} else if i < app || i > start {
 					t.Errorf("%s isn't between app.js and start.js", name)
 				}
 			} else if i := at(name); i < kernel || i > app {
@@ -290,16 +301,12 @@ func TestBuiltinClientsLoaded(t *testing.T) {
 
 // Every string of every built-in plugin is said in every language.
 func TestBuiltinsTranslated(t *testing.T) {
-	src, err := os.ReadFile("assets/i18n.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, lang := range []string{"zh: {", `"zh-TW": {`, "ja: {", "de: {"} {
-		_, block, ok := strings.Cut(string(src), "\n  "+lang+"\n")
-		if !ok {
-			t.Fatalf("no %s block", lang)
+	for _, lang := range pageLanguages {
+		b, err := os.ReadFile("assets/i18n." + lang + ".js")
+		if err != nil {
+			t.Fatalf("%s: %v", lang, err)
 		}
-		block, _, _ = strings.Cut(block, "\n  },")
+		block := string(b)
 		for _, m := range pluginrt.Registered() {
 			says := []string{m.Name, m.Sub, m.One, m.Many}
 			if sc := m.Schema(); sc != nil {

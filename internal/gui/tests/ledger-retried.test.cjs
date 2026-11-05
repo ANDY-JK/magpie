@@ -96,6 +96,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
 
         // every string, in every language
         for (const l of ["zh", "zh-TW", "ja", "de"]) {
+          // the other languages' words are files of their own now (i18n.<lang>.js,
+          // plugins/<id>/i18n.<lang>.js): asked for before they are read
+          await page.evaluate(async (l) => { await loadLocaleWords(l); await pluginLocaleWords(l); }, l);
           const missing = await page.evaluate(([l, ks]) => ks.filter((k) => !I18N[l][k]), [l, STRINGS]);
           assert.deepEqual(missing, [], `every string has its ${l}`);
         }

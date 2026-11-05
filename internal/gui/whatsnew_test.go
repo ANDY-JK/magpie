@@ -44,6 +44,17 @@ func TestWhatsNewAfterUpgrade(t *testing.T) {
 		n.start()
 		return n, n.get(context.Background(), false, "en")
 	}
+	if update.Independent() {
+		// this build follows no release feed (update.Independent): nothing
+		// is shown, and no version is kept for a next start to go by
+		if _, j := run("0.1.604"); j.Show || len(j.Releases) != 0 || j.Error != "" {
+			t.Fatalf("an independent build showed notes: %+v", j)
+		}
+		if _, err := os.Stat(filepath.Join(dir, lastRunFile)); !os.IsNotExist(err) {
+			t.Fatalf("an independent build kept a version: %v", err)
+		}
+		return
+	}
 
 	// a fresh install: nothing shown, the version kept
 	if _, j := run("0.1.600"); j.Show || len(j.Releases) != 0 {
@@ -116,6 +127,14 @@ func TestWhatsNewFromBefore(t *testing.T) {
 	Version = "0.1.604"
 	n := &whatsNew{}
 	n.start()
+	if update.Independent() {
+		// this build follows no feed, so a magpie from before shows none of
+		// what came since either
+		if j := n.get(context.Background(), false, "en"); j.Show || len(j.Releases) != 0 || j.Error != "" {
+			t.Fatalf("an independent build showed notes: %+v", j)
+		}
+		return
+	}
 	if j := n.get(context.Background(), false, "en"); !j.Show || len(j.Releases) != 1 || j.Releases[0].Notes != "## Bug Fixes\n\n- four" {
 		t.Fatalf("%+v", j)
 	}
@@ -147,6 +166,18 @@ func TestWhatsNewQuietAfterRestartToUpdate(t *testing.T) {
 		n := &whatsNew{}
 		n.start()
 		return n, n.get(context.Background(), false, "en")
+	}
+	if update.Independent() {
+		// no feed is followed, so a restart into a version shows nothing
+		// either, and Settings has nothing to open
+		n, j := run("0.1.605")
+		if j.Show || len(j.Releases) != 0 {
+			t.Fatalf("an independent build showed notes: %+v", j)
+		}
+		if j := n.get(context.Background(), true, "en"); len(j.Releases) != 0 {
+			t.Fatalf("an independent build showed notes for Settings: %+v", j)
+		}
+		return
 	}
 	run("0.1.604")
 
@@ -296,6 +327,16 @@ func TestWhatsNewListsEveryReleaseUpToTheWaitingUpdate(t *testing.T) {
 			if r.Pending {
 				pending = append(pending, r.Version)
 			}
+		}
+		return
+	}
+	if update.Independent() {
+		// this build follows no release feed (update.Independent): no
+		// version of it counts as released, so nothing is listed, nothing
+		// is marked pending, and the site's notes are never asked for
+		updates = &updater{state: "ready", notesIn: "en", latest: &update.Release{Version: "0.1.1409", Notes: "## Bug Fixes\n\n- fix 1409"}}
+		if vs, pending := got(ask()); len(vs) != 0 || len(pending) != 0 {
+			t.Fatalf("an independent build: %v pending %v", vs, pending)
 		}
 		return
 	}

@@ -30,6 +30,7 @@ import (
 	"github.com/yetone/magpie/internal/lastgood"
 	"github.com/yetone/magpie/internal/netproxy"
 	"github.com/yetone/magpie/internal/settings"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 //go:embed host.js
@@ -862,11 +863,7 @@ func hostScript(name string, js []byte) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	tmp := p + ".tmp"
-	if err := os.WriteFile(tmp, js, 0o644); err != nil {
-		return "", err
-	}
-	return p, os.Rename(tmp, p)
+	return p, steady.WriteFile(p, js, 0o644)
 }
 
 // get is the running host, started (Bun downloaded, the plugins loaded)

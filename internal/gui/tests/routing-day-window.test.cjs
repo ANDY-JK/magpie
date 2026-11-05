@@ -115,6 +115,12 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         t.after(() => browser.close());
         await page.goto("http://magpie.test/?view=routing");
         await page.locator(".rt-req").first().waitFor();
+        // the day bar is drawn with the history, a moment after the trace's
+        // first rows: a pill is picked once it is laid out — or the menu the
+        // pills past the bar's width go under is (a pill not laid out yet
+        // reads as not visible, and the menu is not there yet either)
+        await page.waitForFunction(() => document.querySelector(".rt-days .rt-day-more") ||
+          [...document.querySelectorAll(".rt-days .rt-day:not(.rt-day-more)")].some((p) => p.getClientRects().length > 0));
         // a day picked from its pill, or at a narrow width, from the menu
         // the pills past the bar's width go under (#961); picked, the day's
         // requests are in the list (each day's models are its own)

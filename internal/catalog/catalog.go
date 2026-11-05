@@ -24,6 +24,7 @@ import (
 
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/filememo"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // Model is one entry the picker can offer.
@@ -842,7 +843,7 @@ func syncLock(ctx context.Context, onlyIfMissing bool) error {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(p, b, 0o644); err != nil {
+	if err := steady.WriteFile(p, b, 0o644); err != nil {
 		return err
 	}
 	// the lab catalog beside it is best effort: without it the provider

@@ -15,6 +15,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -86,6 +87,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         const unsaved = (label) => fieldOf(label).getByText(L.unsaved, { exact: true });
         const said = (s) => page.evaluate(([k, zh]) => zh ? I18N.zh[k] : k, [s, zh]);
         await open();
+        await allWords(page); // every language is a file of its own now (i18n.js, plugins/<id>/i18n.js)
         const missing = await page.evaluate(() => [
           "Stays", "Auto", "Session", "Within a turn", "Off", "unsaved", "Made when the provider is saved; Cancel drops it",
           "A conversation stays with the account or key that answered it while what the vendor cached of it is worth keeping — within a turn always, across turns while it's fresh.",

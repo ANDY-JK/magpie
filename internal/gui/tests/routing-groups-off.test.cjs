@@ -9,6 +9,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { allWords } = require("./strings.cjs");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
@@ -123,6 +124,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     await page.route("**/*", serve("en", false, []));
     await page.goto("http://magpie.test/?view=routing");
     await page.locator(".rt-goff").waitFor();
+    await allWords(page); // every language is a file of its own now (i18n.js, plugins/<id>/i18n.js)
     const missing = await page.evaluate((ks) => ["zh", "zh-TW", "ja", "de"].flatMap((l) => ks.filter((k) => !I18N[l]?.[k]).map((k) => `${l}: ${k}`)), keys);
     assert.deepEqual(missing, []);
   });

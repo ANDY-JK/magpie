@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/settings"
+	"github.com/yetone/magpie/internal/steady"
 )
 
 // Managing sessions: every session of one agent, to look through and pick
@@ -616,11 +617,7 @@ func writeManifest(dir string, t Trashed) error {
 	if err != nil {
 		return err
 	}
-	tmp := filepath.Join(dir, manifest+".tmp")
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, filepath.Join(dir, manifest))
+	return steady.WriteFile(filepath.Join(dir, manifest), b, 0o600)
 }
 
 // move renames a file or folder, or copies it and then removes it when the
