@@ -85,7 +85,8 @@ func postDead(t *testing.T, srv *Server) *httptest.ResponseRecorder {
 // and answered 429 with no Retry-After, so a client that waits as told
 // asked again at once. A key is held once it was refused so twice in a
 // row (a single refusal may be a moment's, zoecats on Discord), and, its
-// vendor naming no time, asked again a minute on, which Retry-After says.
+// vendor naming no time, skipped for the day: not asked till the next
+// day, which Retry-After says.
 func TestAllRestingAnswersFromRest(t *testing.T) {
 	d, srv := deadChain(t, "dead-a", "dead-b")
 	rec := postDead(t, srv)
@@ -119,8 +120,8 @@ func TestAllRestingAnswersFromRest(t *testing.T) {
 			t.Errorf("again: asked %v while every key rests", got)
 		}
 		ra, err := strconv.Atoi(rec.Header().Get("Retry-After"))
-		if err != nil || ra < 50 || ra > int(fallbackCooldown/time.Second) {
-			t.Errorf("again: Retry-After %q, want about %v", rec.Header().Get("Retry-After"), fallbackCooldown)
+		if err != nil || ra < int((23*time.Hour).Seconds()) || ra > int(dayRest/time.Second) {
+			t.Errorf("again: Retry-After %q, want about %v", rec.Header().Get("Retry-After"), dayRest)
 		}
 		if !strings.Contains(rec.Body.String(), "weekly usage limit") {
 			t.Errorf("again: the vendor's reason is gone: %s", rec.Body)
@@ -129,7 +130,7 @@ func TestAllRestingAnswersFromRest(t *testing.T) {
 }
 
 // A provider whose keys are out for the week, its vendor saying nothing of
-// when, rests them as long as the user set (quotaRest), not 15 minutes.
+// when, rests them as long as the user set (quotaRest), not the day.
 func TestOwnQuotaRest(t *testing.T) {
 	d, srv := deadChain(t, "dead-a", "dead-b")
 	if err := provider.SetQuotaRest("mockdead", 7*24*60); err != nil {

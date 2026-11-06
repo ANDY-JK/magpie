@@ -40,7 +40,11 @@ function serve(lang) {
   };
 }
 
-const rest = { en: "Show the other 1", zh: "显示其余 1 个" };
+const rest = { en: "Show the other 74", zh: "显示其余 74 个" };
+const last1 = { en: "Show the other 1", zh: "显示其余 1 个" };
+// 79 joins the picks on the way back: the picks are 11, and the list's
+// first 80 plus every pick leave 73 out
+const last73 = { en: "Show the other 73", zh: "显示其余 73 个" };
 
 for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
   for (const lang of ["en", "zh"]) {
@@ -66,29 +70,50 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const chips = editor.locator(".mchips").first();
       const names = (sel) => chips.locator(sel).evaluateAll((cs) => cs.map((c) => c.firstChild.textContent));
 
-      // all ten picked are drawn, the three past 80 too; one unpicked is left out
+      // Picked only (the serves control, 9b538a3f3) opens on the picks
+      // alone: all ten are there, the three past 80 too
       assert.deepEqual(await names(".mchip.on"), chosen);
-      assert.equal(await chips.locator(".mchip").count(), 83);
+      assert.equal(await chips.locator(".mchip").count(), 10);
       const more = chips.getByRole("button", { name: rest[lang], exact: true });
       await more.waitFor();
-      assert.equal(await chips.getByText(/filter to find them|用筛选查找/).count(), 0);
 
-      // the rest come in where the button was; the editor stays put
-      await more.scrollIntoViewIfNeeded();
-      const last = chips.locator(".mchip", { hasText: /^zen\/model-79$/ });
-      const before = await last.evaluate((e) => e.getBoundingClientRect().top);
+      // the click shows the rest, up to the first 80 plus every pick; a
+      // pick past the 80 is drawn, one just past it is left out
       await more.click();
+      assert.equal(await chips.locator(".mchip").count(), 83);
+      assert.deepEqual(await names(".mchip.on"), chosen);
+      const first80 = ids.filter((_, i) => i < 80 || chosen.includes(ids[i]));
+      assert.deepEqual(await names(".mchip:not(.on)"), first80.filter((id) => !chosen.includes(id)));
+
+      // a chip clicked while the rest are in sight keeps every model: the
+      // click sets unpickedShown, so the picks-only view draws them all
+      // (model-81, left out by the first click, comes back behind a button)
+      const past = chips.locator(".mchip", { hasText: /^zen\/model-79$/ });
+      await past.scrollIntoViewIfNeeded();
+      await past.click();
+      assert.equal(await chips.locator(".mchip").count(), 83);
+      assert.ok((await names(".mchip.on")).includes("zen/model-79"));
+      const more1 = chips.getByRole("button", { name: last1[lang], exact: true });
+      await more1.waitFor();
+      await more1.click();
+      assert.equal(await chips.locator(".mchip").count(), 84);
+      // the new pick joins the order it was drawn in: the list's own, then
+      // the click's, and the ones past 80 after their unpicked neighbours
+      assert.deepEqual(await names(".mchip.on"), [...chosen.slice(0, 7), "zen/model-79", ...chosen.slice(7)]);
+
+      // back on the picks: the button folds the rest away again, and the
+      // click draws the same first 80 plus every pick
+      const seg = (v) => editor.locator(`.mserves .opt[data-serves=${v}]`);
+      await seg("list").click();
+      await seg("picked").click();
+      const folded = chips.getByRole("button", { name: last73[lang], exact: true });
+      await folded.waitFor();
+      assert.equal(await chips.locator(".mchip").count(), 11);
+      assert.deepEqual(await names(".mchip.on"), [...chosen.slice(0, 7), "zen/model-79", ...chosen.slice(7)], "the picks-only view holds every pick");
+      await folded.click();
       await page.waitForTimeout(300);
       assert.equal(await chips.locator(".mchip").count(), 84);
-      assert.deepEqual(await names(".mchip:not(.on)"), ids.filter((id) => !chosen.includes(id)));
-      assert.equal(await chips.getByRole("button", { name: rest[lang], exact: true }).count(), 0);
-      assert.deepEqual(await names(".mchip.on"), chosen, "opening the rest picks nothing");
-      assert.equal(await last.evaluate((e) => e.getBoundingClientRect().top), before, "the click moved the list");
-
-      // a chip clicked keeps the rest open
-      await chips.locator(".mchip", { hasText: /^zen\/model-81$/ }).click();
-      assert.equal(await chips.locator(".mchip").count(), 84);
-      assert.ok((await names(".mchip.on")).includes("zen/model-81"));
+      assert.deepEqual(await names(".mchip.on"), [...chosen.slice(0, 7), "zen/model-79", ...chosen.slice(7)], "opening the rest picks nothing");
       assert.deepEqual(errors, []);
     });
   }

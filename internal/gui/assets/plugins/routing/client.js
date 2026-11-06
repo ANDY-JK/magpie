@@ -641,10 +641,10 @@ function routingPage(part) {
     const d = dur(at(rest.until) - from), time = clock(rest.until);
     switch (rest.by) {
       case "retry-after": return t("It rests {d}, as the vendor's Retry-After says", { d });
-      case "credit": return t("It sits out half an hour, until someone tops it up");
+      case "credit": return t("It rests {d}, out of credit, and is asked again when that is over. Top it up, then try it again here", { d });
       case "window": return t("Its allowance is used up: it rests until that renews, at {time}", { time });
       case "resets": return t("It rests until {time}, when the vendor says the limit resets", { time });
-      case "quota": return t("It rests 15 minutes: out of quota, with no word of when it resets");
+      case "quota": return t("It rests {d}, out of quota, and is asked again when that is over. Top it up, then try it again here", { d });
       // a Codex account that holds credits, refused again once asked
       // again onto them: not benched until its window renews
       case "credits": return t("It holds credits, so it rests only {d} and its usage is read again, not until its allowance renews", { d });
@@ -652,6 +652,8 @@ function routingPage(part) {
       // its provider set never to rest after an unknown failure
       // (`magpie provider rest-cap <id> off`): asked again next time
       case "off": return t("It doesn't rest: its provider is set to ask it again after an error like this");
+      // a key its vendor refuses outright, skipped for the day too
+      case "key": return t("Its key was refused: it rests {d}, and is asked again when that is over. Replace the key in magpie, or try it again here", { d });
       // the vendor restricted the account itself (#1849): only its lifting,
       // which the vendor's appeal asks for, brings it back
       case "restricted": return t("The vendor restricted the account: it rests {d}, as only the vendor lifting the restriction brings it back. Appeal with the vendor; once it's lifted, try it again here", { d });
@@ -1397,7 +1399,7 @@ function routingPage(part) {
       return t("{agent} canceled the request while {who} was answering: nobody failed, so nobody rests and nobody else is asked.", { who: name, agent });
     if (tr.rest?.by === "key")
       // a key its vendor won't take (keyRefusedRest): not a sign-in to
-      // renew, and asked again once its rest is over
+      // renew, and asked again the next day
       return t("{who} answered {status}: the vendor doesn't accept its key. {how}. Replace the key in magpie, or rest it now.",
         { who: name, status: tr.status, how: restHow(tr.rest, at(tr.start) + (tr.ms || 0)) });
     if (tr.fail === "auth")

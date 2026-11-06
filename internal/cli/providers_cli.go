@@ -104,7 +104,7 @@ const providerUsage = `usage:
                                           default: what its plugin says)
   magpie provider quota-rest <id> [30m|6h|7d|until 08:00|until 00:00+08:00|default]
                                           how long a key sits out once the vendor says it is out of its allowance
-                                          without saying when it is back (default: 15 minutes; at most 8 days),
+                                          without saying when it is back (default: the day; at most 8 days),
                                           or until the time of day a daily allowance comes back, on this
                                           computer's clock or at the vendor's offset from UTC
   magpie provider rest-cap <id> [1m|30m|6h|1d|off|default]
@@ -1902,7 +1902,7 @@ func atOnceCmd(rest []string) error {
 
 // quotaRestCmd shows, or sets, how long a provider's keys sit out once the
 // vendor says one is out of its allowance without saying when it is back
-// (#1772: Ollama Cloud's weekly limit, asked again every 15 minutes).
+// (#1772: Ollama Cloud's weekly limit, asked again every day).
 func quotaRestCmd(rest []string) error {
 	usage := fmt.Errorf("magpie provider quota-rest <id> [30m|6h|7d|until 08:00|until 00:00+08:00|default]")
 	if len(rest) == 3 && (rest[1] == "until" || rest[1] == "at") {
@@ -1939,7 +1939,7 @@ func quotaRestCmd(rest []string) error {
 	} else if d := p.QuotaRestFor(); d > 0 {
 		fmt.Printf("%s · a key out of its allowance, with no word of when it is back, sits out %s\n", p.Name, restWords(d))
 	} else {
-		fmt.Printf("%s · a key out of its allowance, with no word of when it is back, sits out 15 minutes (magpie's own)\n", p.Name)
+		fmt.Printf("%s · a key out of its allowance, with no word of when it is back, sits out the day (magpie's own)\n", p.Name)
 	}
 	return nil
 }

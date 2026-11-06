@@ -237,8 +237,10 @@ func TestAntigravityQuotaStillRests(t *testing.T) {
 	if len(r.Tries) != 2 || r.Tries[0].Status != 429 || r.Tries[0].Fail != failQuota || r.Tries[0].Rest == nil {
 		t.Fatalf("the used-up try: %+v", r.Tries)
 	}
-	if d := time.Until(r.Tries[0].Rest.Until); d < 14*time.Minute || d > 15*time.Minute {
-		t.Fatalf("rests %v, not the 15 minutes a used-up plan takes", d)
+	// a used-up plan with no word of when it resets sits out the day, and
+	// is asked once more the next (not every 15 minutes)
+	if d := time.Until(r.Tries[0].Rest.Until); d < dayRest-time.Minute || d > dayRest {
+		t.Fatalf("rests %v, not the day a used-up plan with no reset takes", d)
 	}
 	if *askedUsage != 1 {
 		t.Fatalf("the account's usage was asked again %d times, once as it was", *askedUsage)

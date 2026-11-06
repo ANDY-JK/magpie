@@ -9,8 +9,8 @@ import (
 )
 
 // Concurrent requests on one provider can fail differently: a 402 out of
-// credit rests the account for half an hour, and a 429 answering at the
-// same moment — the first request still holding the vendor's only slot —
+// credit rests the account for the day, and a 429 answering at the same
+// moment — the first request still holding the vendor's only slot —
 // rests it for the minute a rate limit starts at. Written last, the
 // shorter rest used to replace the longer one (#3289, wjq990112), and the
 // account was asked again as soon as it ended, refused, and rested again,
@@ -70,11 +70,11 @@ func TestShorterRestDoesNotReplaceLongerOne(t *testing.T) {
 	}
 }
 
-// A quota rest magpie only guessed (a refusal that named no time: the
-// 15 minutes of quotaRest, asked again a minute on) gives way to the same
-// refusal's time when the vendor names one later, though it is sooner:
-// the guess stood in for the vendor's word. Another kind's shorter rest
-// still doesn't shorten it.
+// A quota rest magpie only guessed (a refusal that named no time: the day
+// of dayRest, asked again when it ends) gives way to the same refusal's
+// time when the vendor names one later, though it is sooner: the guess
+// stood in for the vendor's word. Another kind's shorter rest still
+// doesn't shorten it.
 func TestNamedQuotaTimeReplacesAGuess(t *testing.T) {
 	forgetRouting()
 	old := allowances
@@ -93,8 +93,8 @@ func TestNamedQuotaTimeReplacesAGuess(t *testing.T) {
 	t.Cleanup(func() { s.Unrest(acct.restKey()) })
 
 	guess := s.restAfter(acct, http.StatusTooManyRequests, http.Header{}, []byte(`{"error":{"type":"usage_limit_reached","message":"You have hit your usage limit"}}`))
-	if guess.Why != failQuota || guess.By != "quota" || guess.askAt.IsZero() {
-		t.Fatalf("the refusal naming no time rests by %q (%s), askAt %v: not a guess", guess.By, guess.Why, guess.askAt)
+	if guess.Why != failQuota || guess.By != "quota" || !guess.guess {
+		t.Fatalf("the refusal naming no time rests by %q (%s), guess %v: not a guess", guess.By, guess.Why, guess.guess)
 	}
 
 	// a rate limit's minute doesn't shorten the guess

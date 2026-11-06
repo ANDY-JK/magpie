@@ -48,10 +48,8 @@ const GATEWAY_HIDES = ["agents", "library"];
 // search pass over its rows. boot.js says which before the first paint,
 // each read of the settings after (applyFeatures). The gateway is the
 // same either way. Whatever is marked data-feature-off="<id>" is the
-// other way round, there only while its feature is off: where a page
-// says what went and turns it back on (bigbenniu on X: with routing
-// groups off, the Routing page offered no new group and said nothing of
-// why).
+// other way round, there only while its feature is off, where a page says
+// what went and turns it back on (bigbenniu on X).
 let featuresOff = new Set(window.bootPrefs?.featuresOff || []);
 const featureSel = () => [...featuresOff].map((id) => `[data-feature~="${id}"]`).join(",");
 const featureHides = (n) => { const sel = featureSel(); return !!sel && !!n?.closest(sel); };
@@ -308,11 +306,11 @@ function keepIcons(...roots) {
 // A mono logo is a CSS mask, not an <img>: a row drawn again makes its
 // span afresh, and only the spans on the page keep the picture, so the
 // engine may let it go between rows and paint the new one empty until it
-// is loaded again: the logo blinks, an <img> beside it doesn't (#1847). Every
-// mask picture that has loaded is kept by a span of its own on a hidden
-// shelf for as long as the page is open, so a logo drawn again paints at
-// once on any page. Each picture is tried once, not once per logo: a
-// probe made for every logo asked for the file again on a redraw.
+// is loaded again: the logo blinks, an <img> beside it doesn't (#1847).
+// Every mask picture that has loaded is kept by a span of its own on a
+// hidden shelf for as long as the page is open, so a logo drawn again
+// paints at once on any page. Each picture is tried once, not once per
+// logo: a probe made for every logo asked for the file again on a redraw.
 const maskLoads = new Map();
 let maskShelf = null;
 function maskSpan(src, failed) {
@@ -727,8 +725,8 @@ function renderAgents() {
     // the ones nothing is set on, then, last and least, the ones hidden by
     // hand (0xZaTe on Discord: listed first, right under the agents in use,
     // hidden read as pinned, 反而更显眼了). Under the others the hidden ones
-    // are a disclosure of their own, shut until it is opened, as a Finder
-    // sidebar section is; with nothing else folded, the fold is theirs.
+    // are a disclosure of their own, shut until it is opened; with nothing
+    // else folded, the fold is theirs.
     const byHand = folded.filter(isHidden), unset = folded.filter((a) => !isHidden(a));
     if (!byHand.length) showHiddenAgents = false;
     let i = 0;
@@ -2054,7 +2052,8 @@ function appRestart(a) {
   return go;
 }
 
-// Air's own Codex and Claude Agent: the IDE plugin's run this computer's codex and claude, the app's never go through magpie (jumy_18634)
+// Air's own Codex and Claude Agent (jumy_18634): the IDE plugin's run this
+// computer's codex and claude, the app's never go through magpie
 const AIR_KINDS = new Set(["air", "air-ide"]);
 function airSaid(a, line) {
   const warn = (s) => { const w = line(el("span", "ag-dot"), el("span", "", s)); w.classList.add("ag-warn", "ag-air-own"); return w; };
@@ -3979,9 +3978,10 @@ const LEAD_PICKS = "The model a subagent starts on when Codex's lead names none;
 const CLAUDE_PICKS = "Claude Code's lead, or a subagent's own definition, may name a model or tier for it; a model set here is for the subagents that name none";
 const claudePicks = (a, f) => leadPicks(a, f) && kindOf(a) === "claude";
 // Codex's two subagent squares read alike (the owner, HoGee_xxl on X): the
-// card shows the subagent model alone, saying what each does. A pick there takes away [agents] default_subagent_model too (the
-// backend), and one left in the config is said on it until then. With no
-// model of magpie's to pick there, Codex's own square stays.
+// card shows the subagent model alone, saying what each does. A pick there
+// takes away [agents] default_subagent_model too (the backend), and one left
+// in the config is said on it until then. With no model of magpie's to pick
+// there, Codex's own square stays.
 const codexSub = (a) => kindOf(a) === "codex" && a.fields.some((f) => f.label === SUB_MODEL && (f.options.length || f.value));
 const codexOwnSub = (a, f) => f.label === "subagents" && codexSub(a);
 // named rows in Codex's settings: no square too (the owner, 10-25)
@@ -4720,11 +4720,11 @@ function oneRowPerModel(options, cur) {
 // foldSame: magpie's rows for the very account the agent is signed in to
 // itself (Claude Code's Claude subscription, added in magpie too) are the
 // agent's own models a second time; they fold into one row that a click
-// opens, for the few who want them (failover to more accounts, a fix that
-// only magpie's way has). The value set stays a row of its own (#496). The
-// row comes after the agent's own rows of its group: the account is listed
-// after the providers the user added, and in its place the group was
-// headed twice. A query shows every row it finds, for Enter to pick.
+// opens, for the few who want them. The value set stays a row of its own
+// (#496). The row comes after the agent's own rows of its group: the
+// account is listed after the providers the user added, and in its place
+// the group was headed twice. A query shows every row it finds, for Enter
+// to pick.
 function foldSame(items) {
   if (!pick.modelPicker || pick.groupFilter === "favorites" || $("#q").value.trim()) return items;
   const same = items.filter((o) => o.same && o.value !== pick.field.value);
@@ -5247,11 +5247,10 @@ function loadTag(n) {
 // same key shares; one whose label is its own gets none.
 //
 // A tell is the part of its id the others' don't share: the path segments
-// every id of the label begins with and ends with are dropped, so buddy/x
-// and cline/x say "buddy" and "cline", p/buddy/x and p/cline/x the same,
-// and buddy/x-fast and buddy/x-slow "x-fast" and "x-slow". An id left with
-// nothing (x beside buddy/x) says itself whole; and where tells would
-// still read alike, each says its whole id.
+// every id of the label begins and ends with are dropped, so buddy/x and
+// cline/x say "buddy" and "cline", and buddy/x-fast and buddy/x-slow
+// "x-fast" and "x-slow". An id left with nothing (x beside buddy/x) says
+// itself whole; where tells would still read alike, each says its id.
 function modelTells(items, label = (x) => x.name || x.id, id = (x) => x.id, key = () => "") {
   const by = new Map();
   for (const x of items || []) {
@@ -6266,14 +6265,13 @@ function openProviderMenu(anchor, p) {
   ]);
 }
 
-// Providers' search (#1614, ququdu: "供应商很多，然后经常需要翻找"): the
-// words typed keep the rows that say them all, on and off alike, matched on
-// the row's own text and on what it doesn't show: its id, preset, addresses,
-// each account's user and plan, and the keys' names. The words it doesn't
-// say are one model's it serves, separators aside ("opus 5.5" finds
-// claude-opus-5-5), named under the row (frankdeng, Neo). The ones turned
-// off show unfolded while searching. Escape or clearing the box brings back
-// every row, the fold as it was.
+// Providers' search (#1614, ququdu): the words typed keep the rows that say
+// them all, on and off alike, matched on the row's own text and on what it
+// doesn't show: its id, preset, addresses, each account's user and plan, and
+// the keys' names. The words it doesn't say are one model's it serves,
+// separators aside ("opus 5.5" finds claude-opus-5-5), named under the row
+// (frankdeng, Neo). The ones turned off show unfolded while searching.
+// Escape or clearing the box brings back every row, the fold as it was.
 let pvQuery = "";
 function providerText(p, row) {
   const a = p.account;
@@ -6695,12 +6693,12 @@ function accountPlan(a) {
 
 // copy asks magpie to put text on the clipboard, as the page's own
 // clipboard API is refused inside the app's window; a browser tab on the
-// dev UI falls back to it. A tab on `magpie web` reached over plain http
-// from another computer (a NAS's) has no clipboard API at all, so the
-// older copy command is the last try there. magpie refuses a copy it
-// couldn't read back (#1881: GTK 3 on KDE Plasma without middle-click
-// paste served it empty), and the page's ways are tried then too. When
-// none copies, the page says so and shows the text to copy by hand.
+// dev UI falls back to it. A tab on `magpie web` over plain http from
+// another computer has no clipboard API at all, so the older copy command
+// is the last try there. magpie refuses a copy it couldn't read back
+// (#1881: GTK 3 on KDE Plasma without middle-click paste served it empty),
+// and the page's ways are tried then too. When none copies, the page says
+// so and shows the text to copy by hand.
 async function copy(text, what, btn, message) {
   const done = () => { status(message || t("{what} copied", { what }), "ok"); flashCopied(btn); };
   const res = await fetch("/api/copy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) }).catch(() => null);
@@ -7110,8 +7108,8 @@ function renderAdd() {
     // a deprecated one whose plugin is installed is that plugin's row alone
     // (ARNO on Discord: Qoder CN twice), and one with no account isn't
     // offered at all: it is the Plugins page's, installed from there
-    // (yetone: 对于新用户来说，这里应该只显示内置的 provider), unless it is
-    // signing in now. A search naming one finds it there.
+    // (yetone), unless it is signing in now. A search naming one finds it
+    // there.
     const named = (x) => !f || x.name.toLowerCase().includes(f) || x.agent.includes(f) || "subscription".includes(f);
     const subs = SUBS.filter((x) => !(replacedSub(x.agent) || unusedSub(x.agent)) || signing?.agent === x.agent).map((x) => subOf(x.agent)).filter(named);
     const inPlugins = f && SUBS.some((x) => unusedSub(x.agent) && signing?.agent !== x.agent && named(subOf(x.agent)));
@@ -8163,8 +8161,8 @@ function setNewAPIUser(rows, id) {
 // into the top of every request's body to the vendor, filling in what the
 // body lacks, or replacing it for a name written "!name"; ${sessionId} is
 // the conversation's id. The fields magpie sets itself — the model, stream,
-// the conversation — are refused, as provider.ExtraBodyReserved refuses
-// them on a save. The draft keeps the text as typed; extraBodyOf reads it.
+// the conversation — are refused, as ExtraBodyReserved refuses them on a
+// save. The draft keeps the text as typed; extraBodyOf reads it.
 const EXTRA_BODY_RESERVED = ["model", "stream", "messages", "input", "contents", "system", "systemInstruction", "system_instruction", "instructions", "tools"];
 function extraBodyText(obj) {
   return obj && Object.keys(obj).length ? JSON.stringify(obj, null, 2) : "";
@@ -11881,7 +11879,7 @@ function renderDrawers(p) {
 // Cancel drops it (01huadalang on Discord: each click saved and redrew,
 // so looking through what each says lagged).
 const ROUTINGS = [
-  ["", "Smart", "The first takes requests while it has quota to spare; when it runs low, the one with the most left takes over. One out of credit sits out half an hour, one out of quota until it resets, one rate limited as long as the vendor asks, and one that fails a minute, longer each time it fails again."],
+  ["", "Smart", "The first takes requests while it has quota to spare; when it runs low, the one with the most left takes over. One out of credit, or out of quota with no word of when it resets, is skipped for the day and asked again the next, one rate limited as long as the vendor asks, and one that fails a minute, longer each time it fails again."],
   ["order", "In order", "Requests go to the first; the next takes over when the one before runs out of quota, hits a rate limit or fails."],
   // dzxx0496 on Discord: free accounts one after another, the first not
   // taking the requests back once it renews (routes.Drain)
@@ -13233,6 +13231,16 @@ function renderAccounts(a, p) {
     // its plan's end, under its line (danzi002)
     if (l.until) aq.append(Object.assign(planSpan({ until: l.until }), { className: "aq-until" }));
     row.append(aq);
+    // one the gateway passes over after a failure: why, until when, and a
+    // Try now, as a key's row has (#1772, an account out of credit)
+    if (l.rest && new Date(l.rest.until) > Date.now()) {
+      row.append(keyRestRow(l.rest, "account", false, () => {
+        l.rest = null;
+        renderProviders();
+        status(t("{key} is asked again from the next request", { key: l.user }), "ok");
+      }));
+      row.classList.add("resting");
+    }
     row.classList.add("with-aq"); // not :has(.aq), which Safari 15.0 lacks (#220)
     // Remove goes under ⋯ too, but beside Sign in again while signed out
     if (!row.classList.contains("signed-out")) tools.append(...line.querySelectorAll(":scope > .text.quiet"));
@@ -13395,8 +13403,7 @@ function codexNote(cls, n, s) {
 // each. What is read stays here only until it is sent; the box masks it.
 // A sign-in waiting for its browser's address is kept behind the import
 // rather than canceled: that address pasted into the import box finishes
-// it there (LuvLetter, magpie in Docker, pasted it into this box instead of
-// the sign-in's Callback URL field), and closing the box ends it.
+// it there (LuvLetter, magpie in Docker), and closing the box ends it.
 function startImport(agent) {
   const behind = signingOpen() && signing.pasteCallback ? signing.id : signing?.behind;
   if (signingOpen() && signing.id !== behind) api("signin/" + signing.id + "/cancel", {}).catch(() => {});
@@ -14248,9 +14255,9 @@ function poolWindows(ws) {
     // a pool read without its 5 hours (#745) keeps its models' own 5-hour
     // windows as families: they go in the pool's place, before its week,
     // so the card reads in the same order whether or not the summary sent
-    // the 5 hours this time (#860: 5h and 7d swapped after a refresh)
-    // (a model's own pool stands for no family: Gemini 4 Argon's week
-    // takes no Gemini model's 5 hours)
+    // the 5 hours this time (#860: 5h and 7d swapped after a refresh). A
+    // model's own pool stands for no family: Gemini 4 Argon's week takes no
+    // Gemini model's 5 hours
     if (!own.some((w) => hours(w) === 5) && !poolOfModel(pool)) {
       const mine = (w) => { const f = w.tiers ? w.name : w.family; return !!f && pool.toLowerCase().includes(f.toLowerCase()); };
       out.push(...fam.filter(mine));
@@ -14367,8 +14374,8 @@ async function accountAction(path, body, okMsg, confirmed = false, say = (m) => 
 // provider's, as before. The pill on its row says which it serves; a click
 // opens the provider's models under it as chips, picked and saved apart
 // from the editor's Save. acctModels is the row being picked: { id, ref,
-// chosen }. Picks left unsaved there go with the editor's Save, which says
-// it saved them (#2862).
+// chosen }. Picks left unsaved go with the editor's Save, which says it
+// saved them (#2862).
 let acctModels = null;
 function accountModelsOf(p, ref) { return p.accountModels?.[String(ref).toLowerCase()] || []; }
 // accountModelsDraft: what the open picker of p's has picked and not saved,
@@ -14535,24 +14542,14 @@ function renderKeyAccounts(p) {
     // a line of its own under the key's, so the row's controls stay in reach
     let restLine = null;
     if (k.rest && new Date(k.rest.until) > Date.now()) {
-      const r = el("span", "key-rest", t("Resting · {why} · back at {time}", { why: (k.rest.status ? k.rest.status + " " : "") + keyRestWords(k.rest), time: restBack(k.rest.until) }) + (k.rest.probed ? " · " + t("checked in the background, back as soon as it answers") : ""));
-      r.title = t("The gateway passes this key over until then, and tries the next one");
       // lifted by hand (#1869): the next request asks it again, and a
       // refusal then rests it again as before
-      const go = el("button", "text key-unrest", t("Try now"));
-      go.title = t("Ends the rest: the next request asks it again. Refused again, it rests again.");
-      go.onclick = async (e) => {
-        e.stopPropagation();
-        go.classList.add("busy");
-        try {
-          await api("gateway/unrest", { key: k.rest.key });
-          k.rest = null;
-          renderProviders();
-          status(t("{key} is asked again from the next request", { key: k.name || k.masked }), "ok");
-        } catch (err) { go.classList.remove("busy"); statusErr(err); }
-      };
-      restLine = el("div", "key-rest-line");
-      restLine.append(r, go);
+      restLine = keyRestRow(k.rest, "key", !!k.rest.probed, () => {
+        k.rest = null;
+        renderProviders();
+        status(t("{key} is asked again from the next request", { key: k.name || k.masked }), "ok");
+      });
+      row.append(restLine);
       row.classList.add("resting");
     }
     if (k.on && several) row.append(keyWeight(p, k, weightOf(k), weights));
@@ -15097,15 +15094,14 @@ function respellURL(u, api) {
 }
 
 // curlOf reads a curl command pasted whole, as a vendor's docs show it
-// (@mark_li21 on X: 能支持通过curl例子直接导入provider不？), into what a
-// provider's editor takes: the API its URL's endpoint names (…/chat/
-// completions OpenAI's chat, …/messages Anthropic's, …/responses OpenAI's
-// Responses) and the base URL that API is asked at (respellURL), the key
-// from Authorization: Bearer, x-api-key or api-key, and the model of its
-// JSON body. Lines may be joined by \ (sh), ^ (cmd) or ` (PowerShell). A
-// key that stands for one ($OPENAI_API_KEY, %KEY%, <API_KEY>, YOUR_API_KEY)
-// is no key: it is given back as placeholder. null for text that isn't a
-// curl command.
+// (@mark_li21 on X), into what a provider's editor takes: the API its URL's
+// endpoint names (…/chat/completions OpenAI's chat, …/messages Anthropic's,
+// …/responses OpenAI's Responses) and the base URL that API is asked at
+// (respellURL), the key from Authorization: Bearer, x-api-key or api-key,
+// and the model of its JSON body. Lines may be joined by \ (sh), ^ (cmd) or
+// ` (PowerShell). A key that stands for one ($OPENAI_API_KEY, %KEY%,
+// <API_KEY>, YOUR_API_KEY) is no key: it is given back as placeholder.
+// null for text that isn't a curl command.
 function curlOf(text) {
   let s = String(text || "").trim();
   const head = /^curl(?:\.exe)?(?=\s)/i.exec(s);
@@ -15483,8 +15479,8 @@ $("#addSheet").addEventListener("click", (e) => {
 // with it until the sheet's top is 12px under the view's. The scroll is led
 // by the height, frame by frame, from when the sheet reaches the view's foot
 // to when it is whole: it scrolls only into room the sheet has made, so it
-// never runs ahead to be held back and jump, nor stops short; and it is
-// the view's own scrollTop, which WebKit animates where it won't a smooth
+// never runs ahead to be held back and jump, nor stops short; and it is the
+// view's own scrollTop, which WebKit animates where it won't a smooth
 // scrollIntoView. The reader scrolling meanwhile has the view from then on.
 function unrollSheet(view, sheet, e) {
   const from = view.scrollTop, room = view.scrollHeight - view.clientHeight;
@@ -15582,9 +15578,8 @@ let quotaHist = []; // each account's windows over time, for the curves (#651)
 // qq666666qq), as Refresh now is: an asked read, the one that goes out
 // with allowances read only when asked (#1518). Each one asked makes the
 // backend read every account again, so opening within QUOTAS_OPEN_GAP of
-// the last asked read (switching tabs and back, the window's focus and
-// visibility both firing, focus-follows-mouse) asks nothing: it takes what
-// is kept, or the read on its way. Refresh now asks every time.
+// the last asked read asks nothing: it takes what is kept, or the read on
+// its way. Refresh now asks every time.
 const QUOTAS_OPEN_GAP = 30e3;
 let quotasAskedAt = -Infinity;
 function quotasOpened() {
@@ -16286,8 +16281,8 @@ function creditDays(daily, named) {
 // current cycle of the account's longest window, its start to its reset;
 // each account can pick an earlier recorded cycle beside its plot.
 // "Off" draws none, on the Usage page or on the tray's cards (ARNO on
-// Discord: 额度面板变得非常混乱和难以观看了). One pick in the allowances'
-// head turns every card, remembered, and the tray panel follows it.
+// Discord). One pick in the allowances' head turns every card, remembered,
+// and the tray panel follows it.
 let quotaRange = "cycle";
 try { const v = localStorage.getItem("magpie.quotaRange"); if (v === "2d" || v === "off") quotaRange = v; } catch {}
 const QUOTA_RANGES = [["off", "Off", "No curves on the cards"], ["2d", "2 days", "The last two days"], ["cycle", "Cycle", "The current cycle, from the window's start to its reset"]];
@@ -18585,7 +18580,7 @@ const ledFloor = (x) => x?.floor_ms > 0 ? (1000 * x.floor_out) / x.floor_ms : 0;
 // requests" alone; with replies read from a session file that tell the least
 // they wrote at, that floor and how many, "≥100 tok/s · 30 replies"; with
 // both, both, the one of more replies first, "≥71 tok/s · 54 replies; 62
-// tok/s · 2 timed replies", as two replies are too few to stand for 56; else
+// tok/s · 2 timed replies", as two are too few to stand for 56; else
 // nothing. Counts are words, not a bare "(2)" only its tooltip explains. The
 // Requests tab says each row's alone: "125 tok/s" or "≥100 tok/s". v is the
 // figure a speed ranking orders by and bars, the first one's; main is the
@@ -19373,8 +19368,8 @@ const DISCORD_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="curre
 // showing the picked one's rows. The tab is remembered; WorkBuddy's, there
 // only while an account is signed in or the check-in is on, falls back to
 // Codex's when it is not. A click on a tab leaves the page where it is, as
-// every click does (see "where the reader is"): a shorter card under it at
-// the page's end gets room kept at the view's foot.
+// every click does: a shorter card under it at the page's end gets room kept
+// at the view's foot.
 const WARM_TABS = { codex: "codexWarmList", claude: "claudeWarmList", wb: "wbList", trae: "traeList", minimax: "minimaxList", qoder: "qoderList", plugins: "pluginCheckinList" };
 let warmTab = "codex";
 try { const k = localStorage.getItem("magpie.warmTab"); if (k in WARM_TABS) warmTab = k; } catch {}
@@ -19422,9 +19417,9 @@ function tabKeys(tabs, sel) {
 // under it. The part is kept in the address (?view=settings&tab=privacy) so
 // a reload comes back to it, and remembered for the window opened again.
 // A part with no row to show here (every one hidden on this system) has no
-// tab. A click on a tab, like every click, leaves the page where it is: the
-// tabs at the top stay where they were and the part comes in under them.
-// Picked in the sidebar, a part opens at its top (navSubs).
+// tab. A click on a tab leaves the page where it is: the tabs at the top
+// stay where they were and the part comes in under them. Picked in the
+// sidebar, a part opens at its top (navSubs).
 const SET_TABS = ["general", "usage", "network", "models", "privacy", "otel", "sync", "plugins", "about"];
 let setTab = "general";
 try { const k = localStorage.getItem("magpie.settingsTab"); if (SET_TABS.includes(k)) setTab = k; } catch {}
@@ -20195,6 +20190,27 @@ function refreshAfterSync() {
 // hhmm: a time's hours and minutes, in the user's language
 const hhmm = (d) => new Date(d).toLocaleTimeString(intlLang(), { hour: "2-digit", minute: "2-digit" });
 const restBack = (d) => ((d = new Date(d)).toDateString() === new Date().toDateString() ? "" : d.toLocaleDateString(intlLang(), { month: "short", day: "numeric" }) + " ") + hhmm(d);
+// keyRestRow is the line under a key's or an account's own: that the
+// gateway passes it over, why and until when, and a Try now to lift the
+// rest (#1772, #1869). A key's row keeps its own title and press name; an
+// account's says the account
+function keyRestRow(r, what, probed, onTry) {
+  const line = el("div", "key-rest-line");
+  const note = el("span", "key-rest", t("Resting · {why} · back at {time}", { why: (r.status ? r.status + " " : "") + keyRestWords(r), time: restBack(r.until) }) + (probed ? " · " + t("checked in the background, back as soon as it answers") : ""));
+  note.title = t("The gateway passes this {what} over until then, and tries the next one", { what });
+  const go = el("button", "text key-unrest", t("Try now"));
+  go.title = t("Ends the rest: the next request asks it again. Refused again, it rests again.");
+  go.onclick = async (e) => {
+    e.stopPropagation();
+    go.classList.add("busy");
+    try { await api("gateway/unrest", { key: r.key }); onTry(); }
+    catch (err) { go.classList.remove("busy"); statusErr(err); }
+  };
+  line.append(note, go);
+  return line;
+}
+
+
 
 function syncWhen(iso) {
   const d = new Date(iso);
@@ -20459,9 +20475,8 @@ const IN_USE = "|*";
 // (or "routing group") after it, all but the user's own names (#92), or
 // none (#335). Set on its own, so the agents are told. Offered on Settings,
 // the provider's Names & levels and over Routing's groups (#868);
-// drawn(mode) redraws the place it was picked in. The mode is read from
-// the state's settings, read before any page is drawn, not Settings' own
-// read (#1433).
+// drawn(mode) redraws the place it was picked in. The mode comes from the
+// state's settings, read before any page is drawn (#1433).
 function suffixMode(s = state.settings || {}) { return s.plainNames ? "off" : s.plainOwnNames ? "own" : "on"; }
 function suffixSegs(drawn) {
   const mode = suffixMode();
@@ -20580,9 +20595,9 @@ function renderTrayUsage(s, keep) {
     if (!pill.isConnected) return;
     // the Usage page's cards (keyCards): a key's plan and its balance are
     // one, not two rows of one name ticked together (#1658, MizuIro-H). A
-    // balance left a card of its own (a stale stand-in) whose id another
-    // row has already is left out: the menu bar shows the first card of an
-    // id, so its row could only tick the other.
+    // balance left a card of its own whose id another row has already is
+    // left out: the menu bar shows the first card of an id, so its row could
+    // only tick the other.
     const cards = keyCards((quotas || []).filter((q) => !q.error && (q.windows?.length || q.balance)))
       .filter((q, i, all) => all.findIndex((c) => trayCardID(c) === trayCardID(q)) === i);
     const opts = [{ v: "", name: "Off", note: "" }];
@@ -22697,15 +22712,13 @@ function savePrefs(body) {
 //
 // - A view moves only for the reader: the wheel or trackpad, a touch, the
 //   keys that scroll, Tab, a drag. Anything else that scrolls it is put
-//   back before it's painted: a part redrawn and measured while briefly
-//   shorter pulls the page up to what was left of it (WebKit has no scroll
-//   anchoring), WebKit scrolls a field it focuses to the middle of the view,
-//   and code sets scrollTop.
-// - What the reader clicks stays where it is on the screen while what the
-//   click does redraws around it, till they scroll or click again or it has
-//   settled: a click is never a scroll. A page left shorter under it keeps
-//   room at its foot; a data-unrolls control goes down with what it opens;
-//   a view at its top stays there (gui-shell.md, "A click never moves").
+//   back before it's painted: a part redrawn while briefly shorter pulls
+//   the page up (WebKit has no scroll anchoring), and code sets scrollTop.
+// - What the reader clicks stays where it is while what the click does
+//   redraws around it, till they scroll or click again: a click is never a
+//   scroll. A page left shorter under it keeps room at its foot; a
+//   data-unrolls control goes down with what it opens; a view at its top
+//   stays there (gui-shell.md, "A click never moves").
 //
 // Code moves a view only in answer to a click that asks to go somewhere, and
 // shows that with the reader's event: scrollOnPurpose(e). Called without one
@@ -22754,8 +22767,7 @@ function keyboardFocus(e) {
 // tells the page of: every scroll was put back, the page shook and only the
 // bar's drag moved it (issenn). Three put back the same way in a second, no
 // redraw under a click's hold (h) moving them, are the reader's: given back,
-// and so is each one after that goes on the same way within a second. Code
-// scrolls once; not a run.
+// and so is each after that within a second. Code scrolls once; not a run.
 let putBack = [], run = null; // { v, by: px put back, at, h: held }, the last second's
 function puttingBack(v, from, h) {
   const by = from - v.scrollTop, at = performance.now(), d = Math.sign(by);
@@ -22824,11 +22836,11 @@ let downAt = null;
 // the pointer past its content, in the scrollbar band, the scrolls then come
 // with no event of the reader's between them, and the lift ends it. Held for
 // the drag's length they count as the reader's, so the view follows the bar
-// instead of putting every one of them back (emo172, #1089).
+// instead of putting every one back (emo172, #1089).
 // Whatever the last click was holding in place is let go of here, as the
 // wheel and a drag of the content let go of it through readerScrolls: a hold
 // keeps what was clicked on the screen frame by frame, and would fight the
-// drag — the same bug as the one this fixes, with a click before it.
+// drag, the same bug with a click before it.
 let barDrag = null;
 // WebKit sends the drag's last scrolls after the lift, once the gesture is
 // over, so the reader's window is held open past it for them, as a flick's is
@@ -23033,8 +23045,7 @@ function hold(h) {
     // Only while what was clicked moved by less than its height, a line come
     // in above it: a day picked on Routing brings its stage in above the bar
     // (~138px), and the bar is held where it was clicked (#961). Half its
-    // height was too little once a settings row kept 12px above and below its
-    // words: the Version row's line grew it 12px past a 22px switch (10-22)
+    // height was too little once a row kept 12px above its words (10-22)
     if (h.top && want > 0 && Math.abs(d) < a[0].getBoundingClientRect().height) want = 0;
     // a view at its top when clicked stays there rather than be given room
     // to scroll down: a chip saved in the panel's Profiles came in above the
@@ -23111,10 +23122,9 @@ addEventListener("click", (e) => {
   // back, so this one is taken where the reader left it, not at the top.
   // So is a scroll the page hasn't heard of yet: the browser tells of a
   // scroll at the next frame, and a scroll made just before the click and
-  // not the reader's (a field focused on the press, scrolled to; a scroll by
-  // code; a test's click scrolling what it clicks into view while the view
-  // slides in) would be heard of only after it, and kept as where the reader
-  // was (#1554).
+  // not the reader's (a field focused on the press; a scroll by code; a
+  // test's click scrolling what it clicks into view) would be heard of only
+  // after it, and kept as where the reader was (#1554).
   if (held?.v === v) hold(held);
   else if (!readers && barDrag !== v) backToReader(v);
   const chain = [];
@@ -23429,8 +23439,8 @@ $("#sync").onclick = async () => {
     // The turn itself is told to be the last, so it ends on the compositor's
     // clock: waiting for animationiteration and then dropping the class
     // jumped the icon back by however far it had turned while the page was
-    // busy drawing the reply — the twitch at the end of every refresh.
-    // The svg's drawing turns, not the svg (app.css), one animation a part.
+    // busy drawing the reply, the twitch at the end of every refresh. The
+    // svg's drawing turns, not the svg (app.css), one animation a part.
     const spins = b.querySelector("svg").getAnimations({ subtree: true });
     const stop = () => b.classList.remove("spin");
     if (spins.length && spins.every((a) => a.effect?.updateTiming)) {
@@ -23722,11 +23732,11 @@ function toggleSideNav() {
 // drawn and the new laid out, the sidebar sliding and each tab flying to
 // its place in the other; a webview without view transitions, or a reader
 // who asked for less motion, has the new at once. So does the Linux app:
-// WebKitGTK with compositing off (webkit_linux.go turns it off under
-// Wayland) crashes in a view transition, the click on the sidebar's button
-// taking the window down (depravity_wings on X). Anywhere else, a transition
-// still going well past its half second is cut short, so a webview that
-// never ends one can't leave the window on the old layout's picture
+// WebKitGTK with compositing off (webkit_linux.go) crashes in a view
+// transition, the click on the sidebar's button taking the window down
+// (depravity_wings on X). A transition still going well past its half
+// second is cut short, so a webview that never ends one can't leave the
+// window on the old layout's picture
 var MORPH_MAX = 1500;
 function navMorph(change) {
   if (navCalm() || !document.startViewTransition || document.body.classList.contains("linux")) { change(); return; }

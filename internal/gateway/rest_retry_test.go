@@ -132,13 +132,13 @@ func TestRetryAfterALimitIsAsked(t *testing.T) {
 	}
 }
 
-// Refused twice in a row, every key is held as #1772 wants, not asked
-// on every request; but a rest whose length magpie guessed (the half
-// hour out of credit, the quarter out of quota with no word of when) is
-// asked again once a minute, and its Retry-After says so, so an agent
-// that waits as told is answered within the minute the upstream is back.
-// A time the vendor named still holds it to then.
-func TestHeldLimitAskedAgainInAMinute(t *testing.T) {
+// Refused twice in a row, every key is held as #1772 wants, not asked on
+// every request, and skipped for the day: a rest whose length magpie
+// guessed (the day out of quota or credit with no word of when) is asked
+// again when its rest ends, the next day, and its Retry-After says so.
+// A refusal that said it can pass soon (creditSoon) is asked again a
+// minute on instead; a time the vendor named holds it to then.
+func TestHeldLimitAskedAgainTheNextDay(t *testing.T) {
 	d, srv := deadChain(t, "dead-a")
 	for i := 0; i < 2; i++ {
 		if rec := postDead(t, srv); rec.Code != 429 {
@@ -153,23 +153,44 @@ func TestHeldLimitAskedAgainInAMinute(t *testing.T) {
 		t.Fatalf("held: %d, asked %v", rec.Code, got)
 	}
 	ra, err := strconv.Atoi(rec.Header().Get("Retry-After"))
-	if err != nil || ra < 50 || ra > 61 {
-		t.Errorf("held: Retry-After %q, want about a minute", rec.Header().Get("Retry-After"))
+	if err != nil || ra < int((23*time.Hour).Seconds()) || ra > int(dayRest/time.Second) {
+		t.Errorf("held: Retry-After %q, want about a day", rec.Header().Get("Retry-After"))
 	}
-	// a minute on: one more ask
+	// the next day: one more ask
 	restingUntil.Lock()
-	for k, r := range restingUntil.note {
-		r.askAt = time.Now().Add(-time.Second)
-		restingUntil.note[k] = r
+	for k := range restingUntil.note {
+		restingUntil.m[k] = time.Now().Add(-time.Second)
 	}
 	restingUntil.Unlock()
 	if rec := postDead(t, srv); rec.Code != 429 {
-		t.Fatalf("a minute on: %d %s", rec.Code, rec.Body)
+		t.Fatalf("a day on: %d %s", rec.Code, rec.Body)
 	}
 	if got := d.took(); len(got) != 1 {
-		t.Fatalf("a minute on asked %v, want once", got)
+		t.Fatalf("a day on asked %v, want once", got)
 	}
 	if rec := postDead(t, srv); rec.Code != 429 || len(d.took()) != 0 {
-		t.Fatalf("refused again a minute on: held no more")
+		t.Fatalf("refused again a day on: held no more")
+	}
+}
+
+// A rest whose length magpie guessed but the vendor said it can pass soon
+// (creditSoon) is asked again a minute on, once, and held again if
+// refused: a relay's moment, not the day.
+func TestHeldCreditSoonAskedAgainInAMinute(t *testing.T) {
+	fresh(t)
+	s := New()
+	key := candidate{p: provider.Provider{ID: "or", Key: "k"}, model: "m", rest: "or#k"}
+	id := key.restKey()
+	r := s.restAfter(key, http.StatusPaymentRequired, http.Header{}, []byte(openRouterInFlight))
+	if r.By != "credit" || !r.askAt.After(time.Now()) {
+		t.Fatalf("a refusal that can pass soon isn't asked again a minute on: by %s, askAt %v", r.By, r.askAt)
+	}
+	// asked again a minute on: the same short rest, not the day
+	restingUntil.Lock()
+	restingUntil.m[id] = time.Now().Add(-time.Second)
+	restingUntil.Unlock()
+	r = s.restAfter(key, http.StatusPaymentRequired, http.Header{}, []byte(openRouterInFlight))
+	if r.By != "credit" || time.Until(r.Until) > creditRest {
+		t.Fatalf("a minute on: %v by %s, want %v", time.Until(r.Until).Round(time.Second), r.By, creditRest)
 	}
 }

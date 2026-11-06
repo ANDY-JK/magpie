@@ -1063,7 +1063,8 @@ func (s *Server) drawOnAccounts(ctx context.Context, r *http.Request, p provider
 
 // restDrawer rests the image model on c's account when the account is out
 // of its quota for it, until the reset the refusal names (Antigravity's
-// "Your quota will reset after 3h19m30s.", resetsAt), else quotaRest. Only
+// "Your quota will reset after 3h19m30s.", resetsAt), else the day (as a
+// chat out of quota with no word of when rests, kept in rests.json). Only
 // the model rests (restID), never the account: its text models draw on
 // allowances of their own. The next drawing then asks the accounts that
 // still have it first (restLast in candidates), and a chat on that image
@@ -1078,7 +1079,7 @@ func restDrawer(c candidate, code int, msg string) {
 	now := time.Now()
 	r := Rest{Why: failQuota, Status: code, By: "quota", Key: c.restID(), Model: c.model,
 		agent: c.p.Account.UsageAgent(), user: c.p.Account.User, said: msg}
-	d := quotaRest
+	d := dayRest
 	if w := resetsAt([]byte(msg), now); w > 0 {
 		d, r.By = min(w, longestQuota), "resets"
 	}
@@ -1087,6 +1088,9 @@ func restDrawer(c candidate, code int, msg string) {
 	restingUntil.m[r.Key] = r.Until
 	restingUntil.note[r.Key] = r
 	restingUntil.Unlock()
+	if r.By == "quota" {
+		saveRests() // a drawing's model rest ends the day out, and is kept
+	}
 }
 
 // saidStatus is the status an error said inside a drawing's 200 stands

@@ -38,9 +38,10 @@ func expire(id string) {
 }
 
 // PaulT on Discord: an OpenAI key out of credit answered 402 and was
-// asked again, refused the same, every 30 minutes. A key its vendor says
-// is out of money now rests longer each time it is refused so again,
-// 30 minutes to a week; "Try now" and an answer start it over.
+// asked again, refused the same, every half hour. A key its vendor says
+// is out of money now sits out the day (dayRest), asked once more the
+// next; "Try now" and an answer start it over, and the refusals in a row
+// are kept with the rest.
 func TestKeyOutOfCreditRestsLongerEachTime(t *testing.T) {
 	near := func(d, want time.Duration) bool { return d > want-time.Minute && d <= want }
 	cases := []struct {
@@ -65,21 +66,16 @@ func TestKeyOutOfCreditRestsLongerEachTime(t *testing.T) {
 			key := candidate{p: provider.Provider{ID: "openai", Key: "sk-x"}, model: "gpt-x", rest: "openai#k"}
 			id := key.restKey()
 			refuse := func() Rest { return s.restAfter(key, tc.status, http.Header{}, []byte(tc.body)) }
-			for i, want := range creditLadder {
-				r := refuse()
-				if r.Why != failCredit || r.By != "credit" || r.Failures != i+1 || !near(time.Until(r.Until), want) {
-					t.Fatalf("refusal %d: rests %v (%s, by %s, failures %d), want %v", i+1, time.Until(r.Until).Round(time.Second), r.Why, r.By, r.Failures, want)
-				}
-				// refused again while it rests (the lone key, asked all the
-				// same): the same rung
-				if r := refuse(); r.Failures != i+1 || !near(time.Until(r.Until), want) {
-					t.Fatalf("refusal %d again while resting: %v, failures %d", i+1, time.Until(r.Until).Round(time.Second), r.Failures)
+			for i := range 4 {
+				// refused while it rests (the lone key, asked all the
+				// same): the same rest, its count kept
+				for range 2 {
+					r := refuse()
+					if r.Why != failCredit || r.By != "credit" || r.Failures != i+1 || !near(time.Until(r.Until), dayRest) {
+						t.Fatalf("refusal %d: rests %v (%s, by %s, failures %d), want %v", i+1, time.Until(r.Until).Round(time.Second), r.Why, r.By, r.Failures, dayRest)
+					}
 				}
 				expire(id)
-			}
-			// the top rung holds
-			if r := refuse(); !near(time.Until(r.Until), creditLadder[len(creditLadder)-1]) {
-				t.Fatalf("past the ladder: %v", time.Until(r.Until).Round(time.Second))
 			}
 			// "Try now": lifted, and refused again it starts over
 			if !s.Unrest(id) {
@@ -88,14 +84,14 @@ func TestKeyOutOfCreditRestsLongerEachTime(t *testing.T) {
 			if _, ok := restOf(id); ok {
 				t.Fatal("still resting after Try now")
 			}
-			if r := refuse(); r.Failures != 1 || !near(time.Until(r.Until), creditRest) {
+			if r := refuse(); r.Failures != 1 || !near(time.Until(r.Until), dayRest) {
 				t.Fatalf("after Try now: %v, failures %d", time.Until(r.Until).Round(time.Second), r.Failures)
 			}
 			expire(id)
-			refuse() // 2h
+			refuse()
 			// an answer clears the count
 			servedCandidate(key, 1)
-			if r := refuse(); r.Failures != 1 || !near(time.Until(r.Until), creditRest) {
+			if r := refuse(); r.Failures != 1 || !near(time.Until(r.Until), dayRest) {
 				t.Fatalf("after an answer: %v, failures %d", time.Until(r.Until).Round(time.Second), r.Failures)
 			}
 		})
@@ -103,7 +99,8 @@ func TestKeyOutOfCreditRestsLongerEachTime(t *testing.T) {
 }
 
 // A 402 that can pass soon, or for a smaller request, rests creditRest
-// each time, as before; one that names when it is back rests till then.
+// each time, as before, and is asked again a minute on; one that names
+// when it is back rests till then.
 func TestKeyCreditSoonDoesNotClimb(t *testing.T) {
 	near := func(d, want time.Duration) bool { return d > want-time.Minute && d <= want }
 	for _, tc := range []struct {
@@ -124,7 +121,7 @@ func TestKeyCreditSoonDoesNotClimb(t *testing.T) {
 			for i := range 4 {
 				r := s.restAfter(key, tc.status, tc.header, []byte(tc.body))
 				// creditRest, or the shorter time it names (resetsAt
-				// reads "try again in 30 seconds"): never a rung
+				// reads "try again in 30 seconds"): never the day
 				if r.Why != failCredit || r.Failures != 0 || time.Until(r.Until) > creditRest {
 					t.Fatalf("refusal %d: %v (%s, by %s, failures %d), want %v at most, flat", i+1, time.Until(r.Until).Round(time.Second), r.Why, r.By, r.Failures, creditRest)
 				}
@@ -144,15 +141,16 @@ func TestKeyCreditSoonDoesNotClimb(t *testing.T) {
 	}
 }
 
-// What doesn't climb: a subscription account other than ChatGPT's, and
-// another computer's magpie, whose model rests for its own provider there.
+// What doesn't keep a count, or a rest out of the day: a subscription
+// account other than ChatGPT's, and another computer's magpie, whose model
+// rests for its own provider there.
 func TestCreditLadderIsKeysOnly(t *testing.T) {
 	near := func(d, want time.Duration) bool { return d > want-time.Minute && d <= want }
 	fresh(t)
 	s := New()
 	other := candidate{p: provider.Provider{ID: "claude", Account: &provider.Account{Agent: "claude", User: "me@example.com"}}, model: "claude-x", rest: "claude@me@example.com"}
 	for range 3 {
-		if r := s.restAfter(other, http.StatusPaymentRequired, http.Header{}, nil); r.Failures != 0 || !near(time.Until(r.Until), creditRest) {
+		if r := s.restAfter(other, http.StatusPaymentRequired, http.Header{}, nil); r.Failures != 0 || !near(time.Until(r.Until), dayRest) {
 			t.Fatalf("account: %v failures %d", time.Until(r.Until).Round(time.Second), r.Failures)
 		}
 		expire(other.restKey())
@@ -161,7 +159,7 @@ func TestCreditLadderIsKeysOnly(t *testing.T) {
 	remote := candidate{p: provider.Provider{ID: "lan", Key: "k"}, model: "m", rest: "lan#k"}
 	for range 3 {
 		r := s.restAfter(remote, http.StatusPaymentRequired, h, []byte(deepSeekNoBalance))
-		if r.Failures != 0 || !near(time.Until(r.Until), creditRest) {
+		if r.Failures != 0 || !near(time.Until(r.Until), dayRest) {
 			t.Fatalf("remote magpie: %v failures %d", time.Until(r.Until).Round(time.Second), r.Failures)
 		}
 		if !strings.Contains(r.Key, "/") {

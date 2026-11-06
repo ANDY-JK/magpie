@@ -4438,7 +4438,8 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			// won't take, or one its vendor restricted: it rests as the
 			// ones before it did, for the next request to be answered
 			// from the rests until the first of them is back (#1772,
-			// keyRefusedRest). An account out of quota or credit too: not
+			// keyRefusedRest, now the day). An account out of quota or
+			// credit too: not
 			// resting, it stayed the one a relay's moment of failure went
 			// on to, and its 429 the agent's, request after request,
 			// while the relay before it would answer (dbydd on Discord),

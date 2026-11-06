@@ -1225,9 +1225,9 @@ func restingOf(c candidate) (Rest, bool) {
 // and a dead key asked on every request). Held so are a key out of its
 // allowance (refused with a 429 or a 402 for it, the vendor's words
 // kept), a key the vendor refuses outright (a 401 that says nothing of an
-// allowance: keyRefusedRest), an account or key out of credit — a balance
-// comes back when it is topped up by hand, so asking again only spends a
-// refused request — and an account or key its vendor restricted
+// allowance: keyRefusedRest, the day), an account or key out of credit —
+// a balance comes back when it is topped up by hand, so asking again only
+// spends a refused request — and an account or key its vendor restricted
 // (failRestricted): the vendor lifts that on an appeal, not on a clock,
 // and each request asking it again is one more refusal. A subscription
 // account out of quota isn't held so: its resets may be spent for it

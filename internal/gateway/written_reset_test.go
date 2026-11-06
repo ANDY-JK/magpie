@@ -180,7 +180,7 @@ func TestWrittenResetRestsUntilThen(t *testing.T) {
 		c = acct("workbuddy", lang+"-cut@x.com", "glm-5")
 		cut := wbAt(strings.TrimSuffix(lang, "-escaped"), time.Now().Add(back))
 		cut = cut[:strings.Index(cut, "UTC")+3]
-		if r := s.restAfter(c, 429, http.Header{}, []byte(cut)); time.Until(r.Until) > quotaRest {
+		if r := s.restAfter(c, 429, http.Header{}, []byte(cut)); time.Until(r.Until) > dayRest {
 			t.Fatalf("%s cut short: rests %v by %s", lang, time.Until(r.Until), r.By)
 		}
 	}
@@ -193,7 +193,7 @@ func TestWrittenResetRestsUntilThen(t *testing.T) {
 	}{
 		{`{"error":{"message":"Rate limit reached for requests","type":"rate_limit_error"}}`, failRate, fallbackCooldown},
 		{`{"error":{"message":"Too many requests, retry after 2026-10-11 12:37:53 UTC+8."}}`, failRate, fallbackCooldown},
-		{`{"error":{"message":"You exceeded your current quota. glm-4 is deprecated on ` + time.Now().Add(72*time.Hour).Format("2006-01-02 15:04:05") + ` UTC+8."}}`, failQuota, quotaRest},
+		{`{"error":{"message":"You exceeded your current quota. glm-4 is deprecated on ` + time.Now().Add(72*time.Hour).Format("2006-01-02 15:04:05") + ` UTC+8."}}`, failQuota, dayRest},
 	} {
 		k := acct("other", "o@x.com", "m")
 		clearRest(k.restKey())
@@ -208,9 +208,9 @@ func TestWrittenResetRestsUntilThen(t *testing.T) {
 // Ark's monthly 429 rests the key until the reset it names, 3 days off as
 // CNife's was (#3251) or 9 as wyx1818's (#3276), past the week a written
 // reset is otherwise believed and the 8 days a quota's rest is held to: it
-// is not asked again every quotaRest till the month turns. The same time
-// in words that don't say the allowance is a month's keeps the week's
-// guard, and rests quotaRest as before.
+// is not asked again every day till the month turns. The same time in
+// words that don't say the allowance is a month's keeps the week's guard,
+// and rests the day as before.
 func TestMonthlyWrittenResetRestsTheMonth(t *testing.T) {
 	old := allowances
 	defer func() { allowances = old }()
@@ -240,8 +240,8 @@ func TestMonthlyWrittenResetRestsTheMonth(t *testing.T) {
 	clearRest(c.restKey())
 	back := 9*24*time.Hour + 12*time.Hour
 	notMonthly := []byte(strings.Replace(arkAt(time.Now().Add(back)), "monthly ", "", 1))
-	if r := s.restAfter(c, 429, http.Header{}, notMonthly); r.By != "quota" || !near(time.Until(r.Until), quotaRest) {
-		t.Fatalf("not monthly, 9 days off: rests %v by %s (%s), want %v", time.Until(r.Until), r.By, r.Why, quotaRest)
+	if r := s.restAfter(c, 429, http.Header{}, notMonthly); r.By != "quota" || !near(time.Until(r.Until), dayRest) {
+		t.Fatalf("not monthly, 9 days off: rests %v by %s (%s), want %v", time.Until(r.Until), r.By, r.Why, dayRest)
 	}
 	clearRest(c.restKey())
 

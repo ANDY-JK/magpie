@@ -62,14 +62,14 @@ func TestChatGPTOutOfCreditsRestsLong(t *testing.T) {
 		t.Fatalf("still resting after its window renewed: %v by %s", time.Until(r.Until).Round(time.Second), r.By)
 	}
 
-	// a key out of credit, any other vendor's account: as before
+	// a key out of credit, any other vendor's account: the day
 	key := candidate{p: provider.Provider{ID: "relay", Key: "k"}, model: "m", rest: "relay"}
-	if r := s.restAfter(key, http.StatusPaymentRequired, http.Header{}, nil); r.By != "credit" || !near(time.Until(r.Until), creditRest) {
-		t.Fatalf("key: rests %v by %s, want %v", time.Until(r.Until).Round(time.Second), r.By, creditRest)
+	if r := s.restAfter(key, http.StatusPaymentRequired, http.Header{}, nil); r.By != "credit" || !near(time.Until(r.Until), dayRest) {
+		t.Fatalf("key: rests %v by %s, want %v", time.Until(r.Until).Round(time.Second), r.By, dayRest)
 	}
 	other := candidate{p: provider.Provider{ID: "claude", Account: &provider.Account{Agent: "claude", User: "me@example.com"}}, model: "claude-x", rest: "claude@me@example.com"}
-	if r := s.restAfter(other, http.StatusPaymentRequired, http.Header{}, nil); r.By != "credit" || !near(time.Until(r.Until), creditRest) {
-		t.Fatalf("claude account: rests %v by %s, want %v", time.Until(r.Until).Round(time.Second), r.By, creditRest)
+	if r := s.restAfter(other, http.StatusPaymentRequired, http.Header{}, nil); r.By != "credit" || !near(time.Until(r.Until), dayRest) {
+		t.Fatalf("claude account: rests %v by %s, want %v", time.Until(r.Until).Round(time.Second), r.By, dayRest)
 	}
 	renewed("claude", "me@example.com")
 	if _, ok := restOf(other.restKey()); !ok {

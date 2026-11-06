@@ -62,6 +62,10 @@ type Login struct {
 	// Returns is the account magpie signed the agent out of when it was
 	// spent, and signs it back in to once it has room again (#408).
 	Returns bool `json:"returns,omitempty"`
+	// Rest is the gateway's rest the account is passing under, set on the
+	// Providers page so the row says why it is passed over and lifts it
+	// ("Try now"), as a key's row does
+	Rest *KeyRest `json:"rest,omitempty"`
 	// Token is a Claude account added by a setup-token: magpie's
 	// requests use it, Claude Code itself can't be signed in to it.
 	Token bool `json:"token,omitempty"`

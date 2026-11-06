@@ -4,8 +4,9 @@ package gateway
 // on (see provider.Provider.Routing): smartly, in order, in turn, or the
 // least used first. Whichever goes first, a key that suits the request
 // still goes before one that doesn't, and one resting after a failure
-// waits at the back for as long as its failure says: out of credit for
-// half an hour, out of quota until it says it resets — or, for a
+// waits at the back for as long as its failure says: out of credit for the
+// day (half an hour when the refusal says it can pass soon), out of quota
+// until it says it resets — the day when it says nothing, or, for a
 // subscription, until the window it filled does — rate limited until it
 // says to try again, and otherwise a minute, longer each time it fails
 // again. A rest's length and what set it go into the trace as they are, so
@@ -157,7 +158,7 @@ func unforbid(f forbidden) {
 // a provider rest or after a model-specific rest.
 func clearRest(key string) {
 	restingUntil.Lock()
-	kept := ladderRest(restingUntil.note[key])
+	kept := keptRest(restingUntil.note[key])
 	delete(restingUntil.m, key)
 	delete(restingUntil.note, key)
 	restingUntil.Unlock()
@@ -168,9 +169,17 @@ func clearRest(key string) {
 
 // How long a candidate sits out, by why it failed.
 const (
-	creditRest  = 30 * time.Minute // out of credit: until someone tops it up
-	quotaRest   = 15 * time.Minute // out of quota, with no word of when it resets
-	longestWait = time.Hour        // the most a vendor's own "try again at" is trusted
+	// creditRest: a key out of credit whose refusal says it can pass soon
+	// (creditSoon) rests half an hour, and is asked again a minute on
+	creditRest = 30 * time.Minute
+	// dayRest: a candidate out of credit or quota, with no word of when
+	// it is back, is skipped for the day and asked once more the next
+	// day: a balance comes back when someone tops it up, and a limit
+	// that named no reset is not asked every half hour (the user's ask:
+	// skip it, ask again the next day). "Try now", replacing the key or
+	// an answer lifts it at once
+	dayRest     = 24 * time.Hour
+	longestWait = time.Hour // the most a vendor's own "try again at" is trusted
 	// chatgptCreditRest is how long a ChatGPT account out of its credits
 	// sits out when neither the refusal nor its reading says when it can
 	// answer again: its credits come with the plan, by the month, and its
@@ -215,14 +224,16 @@ const (
 	// nothing of an allowance or a verification) is no wait's to mend. The
 	// backoff of the last one left asks it again on every request — a dead
 	// key was sent 1743 requests in two days, each refused, and an agent
-	// left on it had nothing but the vendor's 401 — so it rests this long
-	// (by "key"), and every request is answered from the rest meanwhile
-	// (quotaHeld). A request it serves clears it, replacing the key lifts
-	// it at once (UnrestAll, gui/key_replace.go), and the app's Rest now
-	// does too, for a 401 a relay gave for a moment. Its why stays
-	// failOther: another vendor's key may carry a token its own app renews
-	// (#716), which a sign-in's mark would never ask again.
-	keyRefusedRest = 30 * time.Minute
+	// left on it had nothing but the vendor's 401 — so it is skipped for
+	// the day with the rest (dayRest), by "key", and every request is
+	// answered from the rest meanwhile (quotaHeld): asked once more the
+	// next day, and left alone otherwise. A request it serves clears it,
+	// replacing the key lifts it at once (UnrestAll, gui/key_replace.go),
+	// and the app's Rest now does too, for a 401 a relay gave for a
+	// moment. Its why stays failOther: another vendor's key may carry a
+	// token its own app renews (#716), which a sign-in's mark would never
+	// ask again.
+	keyRefusedRest = dayRest
 	// slowRests is how many slow starts in a row (restSlow) rest a model
 	// on an account or key, and slowForget how long after the last one
 	// the next starts a new run
@@ -230,32 +241,26 @@ const (
 	slowForget = 30 * time.Minute
 )
 
-// creditLadder is how long a key its vendor says is out of money sits
-// out, by how many times in a row it was refused so (creditBackoff): a
-// balance spent, or a spend limit reached, comes back when someone tops
-// it up or raises the limit, or when a month's limit turns, not in half
-// an hour (PaulT on Discord: an OpenAI key's 402 had it asked, and
-// refused, every 30 minutes). The first rest is creditRest still, as a
-// relay's 402 can be its own moment's; each refusal after a rest ended
-// rests it longer, up to a week. "Try now" lifts it whenever the user
-// has topped it up, and an answer clears the count.
-var creditLadder = []time.Duration{creditRest, 2 * time.Hour, 8 * time.Hour, 24 * time.Hour, 3 * 24 * time.Hour, 7 * 24 * time.Hour}
-
 // creditSoon: an out-of-credit refusal that says it can pass soon, or
 // that a smaller request would: OpenRouter's in-flight budget (a 402
 // with Retry-After, "a wait-and-retry case", openrouter.ai/docs/
 // api-reference/errors), its "requires more credits, or fewer
 // max_tokens … can only afford N" (the request's size, not the balance
 // spent), and a vendor's "try again in 30 seconds" or "1 分钟后重试".
-// These rest creditRest, as before; they don't climb creditLadder.
+// These rest creditRest, and are asked again a minute on; they are not
+// skipped for the day, as one that named no time is
 var creditSoon = regexp.MustCompile(`(?i)openrouter_in_flight_budget|can only afford|fewer max_tokens|(?:try again|retry)(?: after| in)?\s*\d|\d+\s*(?:秒|分钟|小时)[后後]`)
 
 // creditBackoff is the rest of a key (c, no subscription account) out of
 // credit, rested by id: the vendor's own time when it names one (a
 // Retry-After, a reset in its body or headers), creditRest when it says
-// it can pass soon (creditSoon), else the next rung of creditLadder —
-// the same rung while the last rest still runs (the lone key asked all
-// the same), one up once it has ended. n is the rung, 0 off the ladder.
+// it can pass soon (creditSoon), else the day (dayRest): a balance comes
+// back when someone tops it up or raises the limit, or when a month's
+// limit turns, not in half an hour (PaulT on Discord: an OpenAI key's 402
+// had it asked, and refused, every 30 minutes). n counts the refusals in
+// a row, which rests.json keeps the rest with; a rest still running keeps
+// the count, one that ended climbs it. "Try now" lifts the rest whenever
+// the user has topped it up, and an answer clears the count.
 func creditBackoff(id string, header http.Header, body []byte, now time.Time) (d time.Duration, by string, n int, guessed bool) {
 	if w := resetsAt(body, now); w > 0 {
 		return min(w, longestMonthly), "resets", 0, false
@@ -277,7 +282,7 @@ func creditBackoff(id string, header http.Header, body []byte, now time.Time) (d
 		}
 	}
 	restingUntil.Unlock()
-	return creditLadder[min(n, len(creditLadder))-1], "credit", n, true
+	return dayRest, "credit", n, true
 }
 
 var (
@@ -682,16 +687,17 @@ type Rest struct {
 	Why    string    `json:"why"`    // failCredit, failQuota, failRate, failOther
 	Status int       `json:"status"` // what it answered
 	Until  time.Time `json:"until"`
-	// By is what set how long: "credit" (half an hour, a key longer each
-	// time again: creditLadder), "retry-after" (the
-	// vendor's own headers), "resets" (the time Claude Code gave), "window"
-	// (the allowance window it filled renews), "quota" (no word of when),
-	// "cooldown" (a minute), "backoff" (longer each time it fails again,
-	// or is rate limited again as soon as it is back), "restricted" (the
-	// vendor restricted the account: a day, or until lifted by hand),
-	// "key" (a key its vendor refuses with a 401 that says nothing else:
-	// keyRefusedRest), "off" (no rest: its provider is set not to rest
-	// after an unknown failure, provider.RestCapOff).
+	// By is what set how long: "credit" (the day, or half an hour when
+	// the refusal says it can pass soon: creditBackoff), "retry-after"
+	// (the vendor's own headers), "resets" (the time Claude Code gave),
+	// "window" (the allowance window it filled renews), "quota" (no word
+	// of when: the day, dayRest), "cooldown" (a minute), "backoff" (longer
+	// each time it fails again, or is rate limited again as soon as it is
+	// back), "restricted" (the vendor restricted the account: a day, or
+	// until lifted by hand), "key" (a key its vendor refuses with a 401
+	// that says nothing else: the day, keyRefusedRest), "off" (no rest:
+	// its provider is set not to rest after an unknown failure,
+	// provider.RestCapOff).
 	By       string `json:"by"`
 	Failures int    `json:"failures,omitempty"` // in a row, for a backoff
 	// Key is what it rests by, for the app to lift the rest (Unrest)
@@ -720,12 +726,15 @@ type Rest struct {
 	hold        time.Time // until when a failVerify is answered without asking
 	// a key out of its allowance or credit for as long as magpie guessed,
 	// the vendor and the user naming no time, is held (quotaHeld) once it
-	// was refused so twice in a row, not on the first refusal (first),
-	// and asked again from askAt, a minute on: zoecats on Discord, a local
-	// aggregator's "quota exhausted" for the moment it switched upstreams
-	// held every request for 15 minutes or more
+	// was refused so twice in a row, not on the first refusal (first):
+	// zoecats on Discord, a local aggregator's "quota exhausted" for the
+	// moment it switched upstreams, held every request for 15 minutes or
+	// more. One that said it can pass soon is asked again from askAt, a
+	// minute on; one skipped for the day (guess) isn't asked till its rest
+	// ends, the next day
 	first bool
 	askAt time.Time
+	guess bool
 	// there: another computer's magpie refused one of its models
 	// (remoteModelRest). It routes that model there and holds its own
 	// rests, and what it serves under a name can change at any moment (a
@@ -737,8 +746,8 @@ type Rest struct {
 }
 
 // asksAt is when r, a key's rest out of its allowance or credit, has it
-// asked again: at once after its first refusal, a minute on when magpie
-// guessed how long it is out, else when it is back. Any other rest asks
+// asked again: at once after its first refusal, a minute on when the
+// vendor said it can pass soon, else when it is back. Any other rest asks
 // when it ends.
 func (r Rest) asksAt(now time.Time) time.Time {
 	switch {
@@ -865,7 +874,7 @@ func RestOf(key string) (Rest, bool) { return restOf(key) }
 func (s *Server) Unrest(key string) bool {
 	restingUntil.Lock()
 	_, ok := restingUntil.m[key]
-	kept := ladderRest(restingUntil.note[key])
+	kept := keptRest(restingUntil.note[key])
 	delete(restingUntil.m, key)
 	delete(restingUntil.note, key)
 	liftedLocked(key, time.Now())
@@ -887,7 +896,7 @@ func (s *Server) UnrestAll(key string) int {
 	n, now, kept := 0, time.Now(), false
 	for k := range restingUntil.m {
 		if k == key || strings.HasPrefix(k, key+"/") {
-			kept = kept || ladderRest(restingUntil.note[k])
+			kept = kept || keptRest(restingUntil.note[k])
 			delete(restingUntil.m, k)
 			delete(restingUntil.note, k)
 			liftedLocked(k, now)
@@ -1153,7 +1162,7 @@ const longestWritten = 7 * 24 * time.Hour
 // allowance is believed, and the longest an account or key out of one
 // sits out: a month, and days over. Ark's monthly quota used up on the
 // 22nd resets on the 31st, 9 days off; held to the week, it was read as
-// no reset and asked again every quotaRest till the month turned (#3276).
+// no reset and asked again daily till the month turned (#3276).
 const longestMonthly = 35 * 24 * time.Hour
 
 // longestSaid is the furthest off a reset time a refusal writes is
@@ -1313,10 +1322,10 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 	case failCredit:
 		// a balance comes back when someone tops it up, not while a clock
 		// runs: an account is held from the first refusal to the rest's
-		// end (quotaHeld answers meanwhile), a key climbs the ladder, and
-		// a vendor that says when it is back says better, as out of quota
-		// believes it
-		d, r.By = creditRest, "credit"
+		// end (quotaHeld answers meanwhile), a key is skipped for the day
+		// (creditBackoff), and a vendor that says when it is back says
+		// better, as out of quota believes it
+		d, r.By = dayRest, "credit"
 		if a := c.p.Account; a != nil && a.UsageAgent() == "codex" {
 			// a ChatGPT account out of the credits its plan gives: they
 			// come again with the plan, and the account answers again
@@ -1339,10 +1348,10 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 			}
 			d, guessed = min(d, longestMonthly), false
 		} else if c.p.Account == nil && !remoteModelRest(c, why, header) {
-			// a key out of money: longer each time it is refused so
-			// again (creditLadder). Rested by the id the rest is kept
-			// under below; another computer's magpie rests its model
-			// for it, as before
+			// a key out of money: skipped for the day, asked once more
+			// (creditBackoff). Rested by the id the rest is kept under
+			// below; another computer's magpie rests its model for it, as
+			// before
 			id := c.restKey()
 			if c.p.PaidBesideFree(c.model) || modelCooledDown(why, body) {
 				id = c.restID()
@@ -1369,8 +1378,10 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 		// only a header is held to the longest wait, as a rate limit's
 		// would be (#147: a ChatGPT account out until 21:34 read as back
 		// "in 59 minutes", the resets_at turned Retry-After and cut to an
-		// hour, then was tried, refused and benched again)
-		d, r.By = quotaRest, "quota"
+		// hour, then was tried, refused and benched again). With no word
+		// of when at all, it is skipped for the day and asked once more
+		// the next day
+		d, r.By = dayRest, "quota"
 		// as long as the user set for this provider (#1772: Ollama
 		// Cloud's weekly limit says nothing of when it renews), or until
 		// the time of day they said its allowance comes back (#2008: a
@@ -1492,9 +1503,10 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 		d, r.By, r.Failures = min(fallbackCooldown<<min(n-1, 10), c.p.RestCapOr(longestRetry)), "backoff", n
 		if refused {
 			// a key the vendor doesn't take (refused, above) is no ladder's
-			// to mend: it rests keyRefusedRest, and requests meanwhile are
-			// answered from the rest (quotaHeld). A request it serves
-			// clears it, and replacing the key lifts it at once
+			// to mend: it is skipped for the day (keyRefusedRest), and
+			// requests meanwhile are answered from the rest (quotaHeld). A
+			// request it serves clears it, and replacing the key lifts it
+			// at once
 			d, r.By = keyRefusedRest, "key"
 		}
 		// a subscription that failed with a window full is out of it,
@@ -1584,28 +1596,34 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 	restingUntil.Lock()
 	if why == failQuota || why == failCredit {
 		// out for as long as magpie guessed: refused so the time before
-		// too, it is held from now on, and asked again a minute on; a
-		// refusal on its own is asked once more. A time the vendor named,
-		// or the user set, holds it from the first
+		// too, it is held from now on, and asked again when its rest ends
+		// — a minute on when the vendor said it can pass soon. One
+		// skipped for the day is not asked till it ends. A refusal on its
+		// own is asked once more. A time the vendor named, or the user
+		// set, holds it from the first
 		if guessed {
 			prev, had := restingUntil.note[id]
 			r.first = !had || prev.Why != failQuota && prev.Why != failCredit
-			r.askAt = now.Add(fallbackCooldown)
+			r.guess = true
+			if d <= creditRest {
+				// the vendor said it can pass soon: a minute on
+				r.askAt = now.Add(fallbackCooldown)
+			} // skipped for the day: not asked till it ends
 		}
 	}
-	kept := ladderRest(r) || ladderRest(restingUntil.note[id])
+	kept := keptRest(r) || keptRest(restingUntil.note[id])
 	// a failure answering while a longer rest still stands doesn't shorten
 	// it (#3289, wjq990112): a 429 resting for the minute it starts at used
 	// to replace the half-hour rest a 402 out of credit had taken a moment
 	// before, and the account was asked again as soon as it ended, refused,
 	// and rested again, round after round. Whichever rest ends later
 	// stands, as a slow start's does here, and a rest narrowed to a model
-	// keeps the longer of the two. A time magpie only guessed (askAt set:
-	// a quota or credit refusal that named none) gives way to the same
+	// keeps the longer of the two. A time magpie only guessed (guess: a
+	// quota or credit refusal that named none) gives way to the same
 	// refusal's time the vendor names later, though it is sooner: the
 	// vendor's word is what the guess stood in for
 	prev := restingUntil.note[id]
-	named := !prev.askAt.IsZero() && prev.Why == r.Why && (r.By == "resets" || r.By == "retry-after")
+	named := prev.guess && prev.Why == r.Why && (r.By == "resets" || r.By == "retry-after")
 	if until, ok := restingUntil.m[id]; !ok || !until.After(r.Until) || named {
 		restingUntil.m[id] = r.Until
 		restingUntil.note[id] = r
@@ -1723,7 +1741,7 @@ func restSlow(c candidate, now time.Time) (Rest, bool) {
 		restingUntil.Unlock()
 		return kept, true
 	}
-	ladder := ladderRest(restingUntil.note[id])
+	ladder := keptRest(restingUntil.note[id])
 	restingUntil.m[id] = r.Until
 	restingUntil.note[id] = r
 	restingUntil.Unlock()

@@ -138,7 +138,7 @@ func TestGroupWeighsKeyWindows(t *testing.T) {
 
 // A key refused for its own limit rests until the window it filled starts
 // again, as an account does, and its windows are read again; when they
-// were last read short of full, it rests a quarter of an hour.
+// were last read short of full, it rests the day.
 func TestKeyOutOfItsWindowRestsUntilReset(t *testing.T) {
 	now := time.Now()
 	of := map[string]provider.Allowance{
@@ -158,7 +158,7 @@ func TestKeyOutOfItsWindowRestsUntilReset(t *testing.T) {
 		t.Fatalf("full: rests %v by %s (%s)", time.Until(r.Until), r.By, r.Why)
 	}
 	r = s.restAfter(key("sk-stale"), 429, http.Header{}, body)
-	if r.Why != failQuota || r.By != "quota" || !near(time.Until(r.Until), quotaRest) {
+	if r.Why != failQuota || r.By != "quota" || !near(time.Until(r.Until), dayRest) {
 		t.Fatalf("stale: rests %v by %s (%s)", time.Until(r.Until), r.By, r.Why)
 	}
 	if len(*staled) != 2 || (*staled)[0] != "sk-full" || (*staled)[1] != "sk-stale" {

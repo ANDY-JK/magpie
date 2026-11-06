@@ -1,5 +1,5 @@
 // Run with Node's test runner and Playwright on the module path; see README.md.
-// A key out of credit rests days at a time (creditLadder), and its note in
+// A key out of credit rests for the day, and its note in
 // the provider's key list said only the time it is back: "Resting · 402
 // out of credit · back at 04:10 PM" read as this afternoon (PaulT on
 // Discord). A rest that ends on another day says its date too; one that

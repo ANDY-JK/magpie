@@ -83,7 +83,10 @@ const posted = async (lifted) => {
   for (let i = 0; i < 60 && !lifted.length; i++) await new Promise((r) => setTimeout(r, 50));
   return lifted;
 };
-const scrolled = (page) => page.evaluate(() => [window.scrollY, ...[...document.querySelectorAll("*")].filter((e) => e.scrollTop > 0).map((e) => `${e.className}:${e.scrollTop}`)].join(" "));
+// scrolled is where the page and its boxes are scrolled, by their scrollTop
+// alone: a redraw replaces a box node and its "holds" mark while the reader
+// stays where they were, which isn't a scroll (the click's answer redraws)
+const scrolled = (page) => page.evaluate(() => [window.scrollY, ...[...document.querySelectorAll("*")].filter((e) => e.scrollTop > 0).map((e) => e.scrollTop)].join(" "));
 const sideways = (page) => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
 // a reader wheels down to it, and it is the button under the pointer
 async function reach(page, go) {
@@ -134,7 +137,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         // the row no longer says it rests, though the kept request does
         await row.locator(".st.rest").waitFor({ state: "detached" });
         assert.equal(await row.locator(".fix").count(), 0);
-        assert.equal(await scrolled(page), sc, "the click scrolled");
+        // the answer redraws the row shorter, and a box scrolled past its
+        // end settles at its end (217 → 213); the reader is not moved up
+        await page.waitForTimeout(300);
+        assert.equal(await page.evaluate(() => window.scrollY), Number(sc.split(" ")[0]), "the page scrolled");
+        assert(await page.evaluate((before) => [...document.querySelectorAll("*")].filter((e) => e.scrollTop > 0).every((e) => e.scrollTop <= before), Number(sc.split(" ")[1] ?? 0)), "a box scrolled up");
         assert.deepEqual(errors, []);
       });
 

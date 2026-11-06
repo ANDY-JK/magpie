@@ -208,7 +208,7 @@ type Provider struct {
 	// QuotaRest is how many minutes one of its keys sits out once the
 	// vendor says it is out of its allowance without saying when it is
 	// back (#1772: Ollama Cloud's weekly limit); 0 is the gateway's own
-	// quarter of an hour. A time the vendor names stands over it.
+	// day. A time the vendor names stands over it.
 	QuotaRest int `json:"quotaRest,omitempty"`
 	// QuotaResetAt is the time of day a key of it out of its allowance is
 	// back, when its vendor refuses for a day's allowance without saying

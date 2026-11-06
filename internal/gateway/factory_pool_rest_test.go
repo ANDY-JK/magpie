@@ -18,7 +18,7 @@ const factoryStandardOut = `{"error":{"message":"Factory: You've reached your we
 // Factory's Standard pool used up is Standard's: the account's Droid Core
 // models still answer (#1979, Ziqi-Cui: a group of claude-opus-5-5 then
 // glm-5.3 on two Factory accounts fell back to GLM a few times, then every
-// request was Opus's 402, both accounts resting 30 minutes "for credit").
+// request was Opus's 402, both accounts resting for the day "for credit").
 // The allowance is as the built-in reads /api/billing/limits and as the
 // plugin hands its windows on (Standard's notModels, Core's models), so a
 // moved Factory is held to the same.

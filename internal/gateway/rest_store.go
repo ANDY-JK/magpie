@@ -13,31 +13,47 @@ import (
 	"github.com/yetone/magpie/internal/steady"
 )
 
-// A key out of credit climbs creditLadder (30 minutes up to a week) in
-// restingUntil, which is memory: a restart of magpie started it over at
-// 30 minutes, its rest gone too (PaulT on Discord). Each such rest — its
-// rung (Failures) and when it ends — is kept in rests.json beside
-// providers.json, and read back once at start (loadRests), so the key
-// rests out what is left and climbs on from its rung. Only the ladder's
-// rests are kept: the others are a minute to a few hours, or end when the
-// vendor said, and a reading finds them again.
+// A key out of credit, or out of quota, is skipped for the day
+// (dayRest), and a key its vendor refuses outright (keyRefusedRest) the
+// same: restingUntil, which is memory, a restart of magpie started each
+// over with the refusal itself, its rest gone too (PaulT on Discord).
+// Each such rest — its refusals in a row (Failures) and when it ends —
+// is kept in rests.json beside providers.json, and read back once at
+// start (loadRests), so the key rests out what is left and keeps its
+// count. Only those rests are kept: the others are a minute to a few
+// hours, or end when the vendor said, and a reading finds them again.
 
-// restsPath is the file the ladder's rests are kept in.
+// restsPath is the file the day rests are kept in.
 func restsPath() string { return filepath.Join(filepath.Dir(provider.Path()), "rests.json") }
 
 // restsKeep: a rest that ended this long ago is let go from the file. In
-// memory an ended rest keeps its rung until an answer or "Try now"; a key
-// left untried for over a month starts over.
+// memory an ended rest keeps its count until an answer or "Try now"; a
+// key left untried for over a month starts over.
 const restsKeep = longestMonthly
 
-// ladderRest says r is a key's rest on creditLadder.
-func ladderRest(r Rest) bool { return r.Why == failCredit && r.By == "credit" && r.Failures > 0 }
+// keptRest says r is a rest magpie keeps in rests.json: a key's day out
+// of credit, a key's or account's day out of quota with no word of when
+// (Failures counts its refusals in a row), or a key its vendor refuses
+// outright (keyRefusedRest). A credit refusal that said it can pass soon
+// (creditRest) is not kept: it ends within the hour.
+func keptRest(r Rest) bool {
+	switch {
+	case r.Why == failCredit && r.By == "credit" && r.Failures > 0:
+		return true
+	case r.Why == failQuota && r.By == "quota":
+		return true
+	case r.By == "key":
+		return true
+	}
+	return false
+}
 
-// savedRest is a ladder rest as rests.json has it.
+// savedRest is a day rest as rests.json has it.
 type savedRest struct {
 	Rest
 	First bool      `json:"first,omitempty"`
 	AskAt time.Time `json:"askAt,omitzero"`
+	Guess bool      `json:"guess,omitempty"`
 	Agent string    `json:"agent,omitempty"`
 	User  string    `json:"user,omitempty"`
 	Said  string    `json:"said,omitempty"`
@@ -58,9 +74,9 @@ var restsLoaded = struct {
 	from map[string]bool
 }{from: map[string]bool{}}
 
-// saveRests writes the ladder's rests to rests.json, through a file
-// renamed over it, when they changed. Called after any change that set or
-// dropped one, outside restingUntil.
+// saveRests writes the day rests to rests.json, through a file renamed
+// over it, when they changed. Called after any change that set or dropped
+// one, outside restingUntil.
 func saveRests() {
 	path := restsPath()
 	restsSaving.Lock()
@@ -70,11 +86,11 @@ func saveRests() {
 	restingUntil.Lock()
 	for k, until := range restingUntil.m {
 		r, ok := restingUntil.note[k]
-		if !ok || !ladderRest(r) || now.Sub(until) > restsKeep {
+		if !ok || !keptRest(r) || now.Sub(until) > restsKeep {
 			continue
 		}
 		r.Until = until
-		out[k] = savedRest{Rest: r, First: r.first, AskAt: r.askAt, Agent: r.agent, User: r.user, Said: r.said}
+		out[k] = savedRest{Rest: r, First: r.first, AskAt: r.askAt, Guess: r.guess, Agent: r.agent, User: r.user, Said: r.said}
 	}
 	restingUntil.Unlock()
 	b, err := json.Marshal(out)
@@ -108,8 +124,8 @@ func saveRests() {
 	restsSaving.path, restsSaving.last = path, string(b)
 }
 
-// loadRests reads the ladder's rests a magpie before this one kept, once
-// for each file. A rest ended since keeps its rung, as it would have here,
+// loadRests reads the day rests a magpie before this one kept, once for
+// each file. A rest ended since keeps its count, as it would have here,
 // unless it ended over restsKeep ago; a key no longer in providers.json
 // is let go. A file that can't be read or parsed adds nothing: no rest is
 // guessed from it, and the next change writes it anew. A rest this
@@ -138,18 +154,17 @@ func loadRests() {
 	restingUntil.Lock()
 	for k, v := range saved {
 		r := v.Rest
-		if !ladderRest(r) || r.Until.IsZero() || now.Sub(r.Until) > restsKeep || !known(k) {
+		if !keptRest(r) || r.Until.IsZero() || now.Sub(r.Until) > restsKeep || !known(k) {
 			continue
 		}
 		if _, ok := restingUntil.m[k]; ok {
 			continue
 		}
-		r.Failures = min(r.Failures, len(creditLadder))
-		if longest := now.Add(creditLadder[len(creditLadder)-1]); r.Until.After(longest) {
+		if longest := now.Add(dayRest); r.Until.After(longest) {
 			r.Until = longest // a clock set back since is no longer rest
 		}
 		r.Key = k
-		r.first, r.askAt, r.agent, r.user, r.said = v.First, v.AskAt, v.Agent, v.User, v.Said
+		r.first, r.askAt, r.guess, r.agent, r.user, r.said = v.First, v.AskAt, v.Guess, v.Agent, v.User, v.Said
 		restingUntil.m[k] = r.Until
 		restingUntil.note[k] = r
 	}

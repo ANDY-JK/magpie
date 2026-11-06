@@ -229,7 +229,7 @@ func TestSmartRouting(t *testing.T) {
 	restingUntil.m["t#fail"] = time.Now().Add(-time.Second)
 	restingUntil.Unlock()
 	s.restAfter(key("t#fail"), 500, http.Header{}, nil)
-	if until("t#credit") != creditRest || until("t#rate") != 5*time.Minute || until("t#fail") != 2*time.Minute {
+	if until("t#credit") != dayRest || until("t#rate") != 5*time.Minute || until("t#fail") != 2*time.Minute {
 		t.Fatalf("rests: %v %v %v", until("t#credit"), until("t#rate"), until("t#fail"))
 	}
 	served("t#fail", "t#fail", 1)
@@ -243,7 +243,7 @@ func TestSmartRouting(t *testing.T) {
 	s.restAfter(acct("q"), 429, http.Header{}, []byte("You've hit your limit · resets 5pm"))
 	s.restAfter(acct("r"), 429, http.Header{}, []byte("Claude AI usage limit reached|"+strconv.FormatInt(now.Add(2*time.Hour).Unix(), 10)))
 	s.restAfter(acct("o"), 429, http.Header{}, []byte("You've hit your limit"))
-	if until(acct("q").restKey()) != 3*time.Hour || until(acct("r").restKey()) != 2*time.Hour || until(acct("o").restKey()) != quotaRest {
+	if until(acct("q").restKey()) != 3*time.Hour || until(acct("r").restKey()) != 2*time.Hour || until(acct("o").restKey()) != dayRest {
 		t.Fatalf("subscription rests: %v %v %v", until(acct("q").restKey()), until(acct("r").restKey()), until(acct("o").restKey()))
 	}
 	// and so does one that failed some other way with a window full

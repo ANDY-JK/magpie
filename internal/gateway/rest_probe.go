@@ -243,7 +243,7 @@ func (s *Server) probed(key string, until time.Time, err error, now time.Time) {
 	delete(restProbes.m, key)
 	restingUntil.Lock()
 	lifted := restingUntil.m[key].Equal(until)
-	ladder := lifted && ladderRest(restingUntil.note[key])
+	ladder := lifted && keptRest(restingUntil.note[key])
 	if lifted {
 		delete(restingUntil.m, key)
 		delete(restingUntil.note, key)

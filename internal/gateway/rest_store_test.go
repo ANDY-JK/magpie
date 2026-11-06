@@ -36,8 +36,8 @@ func keyedOpenAI(t *testing.T) candidate {
 }
 
 // PaulT on Discord: a restart of magpie started an out-of-credit key's
-// ladder over at 30 minutes, and lifted its rest. It now rests out what
-// is left, and the next refusal climbs on from its rung.
+// rest over with the refusal itself, and lifted it. It now rests out what
+// is left of the day, and keeps its refusals in a row.
 func TestKeyCreditRestOutlivesRestart(t *testing.T) {
 	fresh(t)
 	s := New()
@@ -46,10 +46,10 @@ func TestKeyCreditRestOutlivesRestart(t *testing.T) {
 	refuse := func() Rest {
 		return s.restAfter(key, http.StatusPaymentRequired, http.Header{}, []byte(openAICreditsGone))
 	}
-	refuse() // 30m
+	refuse() // the day
 	expire(id)
 	saveRests()
-	r := refuse() // 2h
+	r := refuse() // the day, refusals 2
 	if r.Failures != 2 {
 		t.Fatalf("second refusal: failures %d", r.Failures)
 	}
@@ -60,21 +60,21 @@ func TestKeyCreditRestOutlivesRestart(t *testing.T) {
 		t.Fatal("after a restart the key rests no more")
 	}
 	if !got.Until.Equal(r.Until) || got.Failures != 2 || got.Why != failCredit || got.By != "credit" || got.Key != id {
-		t.Fatalf("after a restart: %+v, want until %v at rung 2", got, r.Until)
+		t.Fatalf("after a restart: %+v, want until %v, 2 refusals", got, r.Until)
 	}
-	// refused again while it still rests: the same rung, as before it
+	// refused again while it still rests: the same rest, its count kept
 	if r := refuse(); r.Failures != 2 {
 		t.Fatalf("refused while resting after a restart: failures %d", r.Failures)
 	}
-	// its rest ended, magpie started again, and refused: a rung up, 8h
+	// its rest ended, magpie started again, and refused: one refusal more
 	expire(id)
 	saveRests()
 	restartRests()
 	if _, ok := restOf(id); ok {
 		t.Fatal("an ended rest rests again after a restart")
 	}
-	if r := refuse(); r.Failures != 3 || time.Until(r.Until) < creditLadder[2]-time.Minute {
-		t.Fatalf("refused after a restart: failures %d, rests %v, want rung 3 (%v)", r.Failures, time.Until(r.Until).Round(time.Second), creditLadder[2])
+	if r := refuse(); r.Failures != 3 || time.Until(r.Until) < dayRest-time.Minute {
+		t.Fatalf("refused after a restart: failures %d, rests %v, want the day", r.Failures, time.Until(r.Until).Round(time.Second))
 	}
 
 	// an answer starts it over, after a restart too
@@ -86,7 +86,7 @@ func TestKeyCreditRestOutlivesRestart(t *testing.T) {
 	// "Try now" too
 	expire(id)
 	saveRests()
-	refuse() // rung 2
+	refuse() // refusals 2
 	s.Unrest(id)
 	restartRests()
 	if _, ok := restOf(id); ok {
@@ -98,13 +98,13 @@ func TestKeyCreditRestOutlivesRestart(t *testing.T) {
 }
 
 // A key removed while magpie was off is let go, and one ended over a
-// month ago starts over; a rest that isn't the ladder's isn't kept.
+// month ago starts over; a rest that isn't a day's isn't kept.
 func TestKeyCreditRestFileForgets(t *testing.T) {
 	fresh(t)
 	s := New()
 	key := keyedOpenAI(t)
 	s.restAfter(key, http.StatusPaymentRequired, http.Header{}, []byte(openAICreditsGone))
-	// a rate limit on another key is no ladder rest
+	// a rate limit on another key is no day rest
 	other := candidate{p: provider.Provider{ID: "openai"}, model: "gpt-y", rest: "openai#other"}
 	s.restAfter(other, http.StatusTooManyRequests, http.Header{"Retry-After": {"600"}}, []byte(`{"error":{"message":"rate limited"}}`))
 	saveRests()

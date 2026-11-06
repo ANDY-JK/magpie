@@ -1,7 +1,7 @@
 // Run with Node's test runner and Playwright on the module path; see README.md.
 // zoecats (Discord #feedback, 10-25): a local aggregator answers "quota
 // exhausted" for the moment it switches upstreams, and magpie set its key
-// aside for half an hour. A provider the user added has, under Advanced,
+// aside for the day. A provider the user added has, under Advanced,
 // "Set it aside when out of quota or rate limited", ticked by default and
 // with a note. Unticked and saved, it posts limitRestOff: true; one saved
 // so opens unticked, with Advanced open, and ticked again posts false. A

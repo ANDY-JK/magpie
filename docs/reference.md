@@ -1910,7 +1910,7 @@ rests comes from the first of these that is known: the reset time in the
 refusal (Claude Code's `usage limit reached|<time>`, ChatGPT's
 `resets_at`), the reset of a window magpie last read as used up (98%, 100%
 In order), the vendor's `Retry-After` or rate-limit reset header (an hour
-at most), else 15 minutes. A key's provider can rest longer of its own:
+at most), else the day. A key's provider can rest longer of its own:
 `magpie provider quota-rest <id> 6h`, or `until 08:00` for an allowance
 that comes back at a time of day (`until 00:00+08:00` on the vendor's
 clock). Its own rest stands over a `Retry-After` that asked for more than
@@ -1922,7 +1922,8 @@ named. A five hours started again while its week is still used up doesn't
 bring it back. A 429 that is a short rate limit rests
 the account for as long as the vendor asks (an hour at most), or a
 minute, doubled each time it comes back right after its rest, up to 30
-minutes. Out of credit rests half an hour. Any other failure rests a minute, longer each time it fails
+minutes. Out of credit rests for the day, unless the refusal says it can
+pass soon (half an hour then, asked again a minute on). Any other failure rests a minute, longer each time it fails
 again, up to 10 minutes; a subscription that fails with a window used up
 rests until that window renews. `magpie provider rest-cap <id> 4h` moves
 both of those caps, 30 and 10 minutes, for one provider's keys and
