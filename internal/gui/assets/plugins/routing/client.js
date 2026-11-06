@@ -3264,6 +3264,10 @@ function routingPage(part) {
   // o.context: opened to see its context window (the Usage page's
   // Context tab), which shows unfolded for it
   window.openRoute = async (id, time, o = {}) => {
+    // opening a request while the page is still coming: the lazy page's
+    // first trace may be one fetch away, and a route not in it yet is not
+    // a kept day's route. Wait for that read, not for a long poll.
+    await firstTrace;
     let r = routes.get(id);
     if (!r) {
       const res = await fetch("/api/gateway/route?id=" + encodeURIComponent(id) + "&day=" + encodeURIComponent(time.slice(0, 10)));
@@ -4991,6 +4995,13 @@ function routingPage(part) {
   // that changed meanwhile, and plays only the requests still under way
   const inSight = () => !document.hidden && (shown() || !!(pBox && pShown()));
   let heard = false, sightWait = null, caught = false;
+  // the trace's first pass: a route opened as this lazy page comes asks
+  // whether the gateway still holds it, so it waits for one read. A read
+  // that fails releases the wait too; the 5s wait for another magpie to
+  // take over is not part of it.
+  let firstTrace, firstTraceDone;
+  const traceCame = new Promise((done) => { firstTraceDone = done; });
+  firstTrace = traceCame;
   function inSightAgain() {
     if (sightWait && inSight()) { const go = sightWait; sightWait = null; go(); }
   }
@@ -5003,6 +5014,7 @@ function routingPage(part) {
       try {
         const res = await fetch(`/api/gateway/trace?after=${seq}${loaded ? "&wait=1" : ""}`);
         const d = await res.json();
+        if (firstTrace) { firstTrace = null; firstTraceDone(); }
         heard = true;
         noteAccounts(d);
         noteLifted(d.lifted);
@@ -5098,6 +5110,7 @@ function routingPage(part) {
           renderAll();
         }
       } catch {
+        if (firstTrace) { firstTrace = null; firstTraceDone(); }
         await new Promise((r) => setTimeout(r, 3000));
       }
     }

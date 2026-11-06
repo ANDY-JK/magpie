@@ -114,7 +114,7 @@ function server(lang, theme, asked, deleted = new Set()) {
         tries: [{ id: "relay", model: "gpt-6-sol", start: new Date(now - 86400e3).toISOString(), done: true, status: 200, ms: 50 }],
         done: true, status: 200, ms: 50 });
     }
-    if (url.pathname === "/api/providers") return json({ providers: [{ id: "relay", name: "Relay" }], presets: [], excluded: [], models: [], gateway: { running: false } });
+    if (url.pathname === "/api/providers") return json({ providers: [{ id: "relay", name: "Relay", icon: "generic", chat: "https://example.invalid/v1", models: [], agents: [], fallback: [], headers: {}, key: { set: true, masked: "fixture" }, routing: "" }], presets: [], excluded: [], models: [], gateway: { running: false } });
     if (url.pathname === "/api/state") return json({ agents: [], profiles: [], settings: { lang, theme }, fx: { rate: 7.2, at: new Date().toISOString() } });
     if (url.pathname === "/api/usage/requests") {
       asked.push(url.searchParams);
@@ -173,7 +173,7 @@ const L = {
     rankAdvice: "Relay 用了很久，现在仍经常失败。先检查账号，不需要了就移除。",
     rankRemoveBtn: "移除此供应商", rankAsk: "移除 Relay？", rankRemoved: "已移除 Relay",
     rankDropTag: "考虑移除", rankGoneTag: "已经移除",
-    rankWhy: "失败原因", rankRateLimit: "被限流时 · 25", rankCredit: "额度用尽 · 9",
+    rankWhy: "失败原因", rankRateLimit: "被限流时 · 25", rankCredit: "余额不足 · 9",
     rankLast: "最近 7 天：30 次请求，12 次失败",
     rankFoot: "用量太少：DeepSeek · 已经移除：Old Vendor",
     rankEmpty: "这个时间段还没有足够的网关请求可供排行。",

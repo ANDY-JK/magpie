@@ -83,7 +83,10 @@ plugins' scripts and `app.js`, all classic scripts sharing one scope. It is
   `newGroupWith` and `panelRoutingShown` as calls that bring the page in
   (`magpie.call("routing", "mount")`) and then call what it set in their
   place — a page that didn't come leaves the shim, and the call fails with
-  "The Routing page didn't open." rather than calling itself. The tray
+  "The Routing page didn't open." rather than calling itself. `openRoute`
+  then waits for the page's first trace pass before it decides whether a
+  request is live or from a kept day; a failed trace read releases that
+  wait so a history-only route still opens. The tray
   panel's Routing tab is the one that brings it in there, on `ptab`. Insights ›
   Masking is one too, its eager half `assets/plugins/redact/shared.js`:
   `maskMatches`, which Settings › Privacy's *Try it* asks of the page's own
