@@ -112,6 +112,15 @@ func (c checkiner) checkinNow(ctx context.Context, soon bool) []WorkBuddyCheckin
 			if prev.Checked() && !prev.ValidUntil.IsZero() {
 				settled = settled && now.Before(prev.ValidUntil)
 			}
+			// a campaign can open mid-day, so a recheck asks a done or
+			// inactive again — but not an answer the user acts on, whose
+			// answer changed nothing by being asked again (a captcha is
+			// pressed in the vendor's own app, magpie never solves one;
+			// ZCode's two accounts pressed a captcha 41 times a day, each
+			// only failing it). A press still asks it at once
+			if c.recheck && prev.userActsOn() {
+				settled = !soon
+			}
 		}
 		if seen && settled {
 			prev.User, prev.By = a.User, c.by

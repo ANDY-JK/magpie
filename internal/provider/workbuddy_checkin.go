@@ -217,6 +217,16 @@ func (r WorkBuddyCheckin) Checked() bool {
 	return r.Outcome == CheckinClaimed || r.Outcome == CheckinDone
 }
 
+// userActsOn says r is an answer only the user can settle — a captcha, or
+// a claim the vendor's own app alone takes (own-app): the user does it in
+// the vendor's app, and the vendor's own read is unchanged till they do. A
+// check-in that keeps asking one every wbCheckinEvery only asks again and
+// fails, so a rechecking vendor settles it for the day (checkinNow); a
+// press still asks it at once.
+func (r WorkBuddyCheckin) userActsOn() bool {
+	return r.Outcome == CheckinCaptcha || r.Outcome == CheckinOwnApp
+}
+
 // settled says whether r answers for day: it is that day's, not past
 // ValidUntil (a plugin's vendor whose day turns at another hour said when:
 // Qoder's daily credits open at 10:00 UTC+8, sdytman on Discord), and not

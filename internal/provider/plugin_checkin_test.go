@@ -545,6 +545,46 @@ func TestPluginCheckinQoderRechecksCampaigns(t *testing.T) {
 	}
 }
 
+// A rechecking vendor's answer the user acts on — a captcha, or a claim only
+// its own app takes — is settled for the day: the loop doesn't ask it again
+// every 30 minutes (each press only fails the captcha again; ZCode's two
+// accounts were pressed a captcha 41 times a day). A press (Try now, Check
+// in now) still asks at once; a done, inactive or ineligible is still asked
+// again every wbCheckinEvery, a claim too.
+func TestPluginCheckinCaptchaSettlesARecheck(t *testing.T) {
+	for _, id := range []string{"qoder", QoderCNID, "zcode"} {
+		for _, first := range []string{CheckinCaptcha, CheckinOwnApp} {
+			t.Run(id+"/"+first, func(t *testing.T) {
+				claudeHome(t)
+				now := time.Date(2026, 10, 18, 10, 0, 0, 0, beijing)
+				outcome, calls := first, 0
+				p := pluginCheckinCounter(id, &outcome, &calls)
+				run := func(at time.Time, press bool) WorkBuddyCheckin {
+					t.Helper()
+					got := p.checkiner(func() time.Time { return at }).checkinNow(context.Background(), press)
+					if len(got) != 1 {
+						t.Fatalf("at %s: %+v", at, got)
+					}
+					return got[0]
+				}
+				if r := run(now, false); r.Outcome != first || !r.Asked || calls != 1 {
+					t.Fatalf("first: %+v after %d asks", r, calls)
+				}
+				for _, step := range []time.Duration{31 * time.Minute, 5 * time.Hour} {
+					if r := run(now.Add(step), false); r.Outcome != first || calls != 1 {
+						t.Fatalf("loop +%s: %+v after %d asks; want %s kept after 1", step, r, calls, first)
+					}
+				}
+				// a press still asks it at once, whatever it answered
+				outcome = CheckinClaimed
+				if r := run(now, true); r.Outcome != CheckinClaimed || !r.Asked || calls != 2 {
+					t.Fatalf("press: %+v after %d asks", r, calls)
+				}
+			})
+		}
+	}
+}
+
 // Every other plugin's check-in is settled for the Beijing day by a claim,
 // or by a done, inactive or ineligible answered from noon Beijing on: the
 // loop doesn't ask again after 30 minutes (#2696 changes Qoder's, plugins#503 ZCode's).
