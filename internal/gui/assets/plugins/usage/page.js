@@ -1303,7 +1303,7 @@ function ledTime(when) {
 // quiet reads hold the list drawn until the JSON changes: a standing is
 // read every few seconds, not rebuilt every few seconds. As on Requests,
 // only the newest answer to the period and tab shown draws.
-let rank = null, rankAt = "", rankRead = 0;
+let rank = null, rankAt = "", rankReadSeq = 0;
 const RANK_WORDS = {
   served: "Answers reached", stood: "First try", fast: "Writing pace", soon: "First token",
   steady: "Reliable", failing: "Still failing", "slow-start": "Late start", unpriced: "No prices held",
@@ -1440,9 +1440,9 @@ function renderRankLoading() {
 }
 async function loadRank(quiet = false) {
   if (!rank || !quiet) renderRankLoading();
-  const at = rankKey(), read = ++rankRead;
+  const at = rankKey(), read = ++rankReadSeq;
   const next = await rankRead();
-  if (read !== rankRead || view !== "usage" || usageTab !== "rank" || at !== rankKey()) return;
+  if (read !== rankReadSeq || view !== "usage" || usageTab !== "rank" || at !== rankKey()) return;
   const changed = JSON.stringify(next) !== JSON.stringify(rank);
   rank = next;
   rankAt = at;
