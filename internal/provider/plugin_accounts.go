@@ -65,6 +65,24 @@ func (p Provider) publicAccount() bool {
 	return p.IsPlugin() && publicPlugin(*p.Account.plugin)
 }
 
+// KeySignedIn is whether the account p is served as was signed in with an
+// API key of a plugin's provider: a value the user pasted, which no
+// sign-in renews, as a keyed provider's own key. A 401 for one is the
+// vendor not taking that key (gateway's keyRefused): nothing magpie waits
+// out mends it, and the plugin can't sign in again on its own.
+func (p Provider) KeySignedIn() bool {
+	a := p.Account
+	if a == nil || a.plugin == nil || a.pluginKey == "" {
+		return false
+	}
+	for _, pa := range a.plugin.Accounts {
+		if pa.Key == a.pluginKey {
+			return pa.Type == "api"
+		}
+	}
+	return false
+}
+
 // pluginLabels names each account: by named (the agent's own, as the
 // agent is signed in now), else its id, else the end of its key, else what
 // it signed in with; a name two share gets the account's slot. The slot

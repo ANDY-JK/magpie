@@ -206,3 +206,60 @@ func TestQuotaHeldIncludesARefusedKey(t *testing.T) {
 		t.Fatal("held with a key that isn't resting")
 	}
 }
+
+// A plugin's provider signed in with an API key is a key as a keyed
+// provider's own is: the value is pasted once and no sign-in renews it. Its
+// vendor's 401 rests it for the day, and the requests in between are
+// answered from the rest without asking again. Before, it was taken for an
+// account and backed off 10 minutes at a time: Cloudflare Workers AI's dead
+// token was asked 75 times in 10 hours, each try refused.
+func TestPluginKeyRefusedRestsTheDay(t *testing.T) {
+	var mu sync.Mutex
+	asked := 0
+	pid := besideFake(t, "deadkey", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.Copy(io.Discard, r.Body)
+		mu.Lock()
+		asked++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		io.WriteString(w, `{"errors":[{"code":10000,"message":"Authentication error"}]}`)
+	}))
+	s := New()
+	post := func() (int, string) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"`+pid+`/fake-1","messages":[{"role":"user","content":"hi"}]}`))
+		req.Header.Set("Content-Type", "application/json")
+		s.Handler().ServeHTTP(rec, req)
+		return rec.Code, rec.Body.String()
+	}
+
+	if code, body := post(); code != http.StatusUnauthorized {
+		t.Fatalf("status %d: %s", code, body)
+	}
+	rt := lastRoute(s)
+	if len(rt.Tries) == 0 || rt.Tries[len(rt.Tries)-1].Rest == nil {
+		t.Fatalf("no rest recorded: %+v", rt.Tries)
+	}
+	rest := rt.Tries[len(rt.Tries)-1].Rest
+	if rest.By != "key" {
+		t.Fatalf("rests %v by %s, want a refused key (key)", rest.Why, rest.By)
+	}
+	if until := time.Until(rest.Until); until > keyRefusedRest || until < keyRefusedRest-time.Minute {
+		t.Fatalf("rests %v, want %v", until.Round(time.Second), keyRefusedRest)
+	}
+
+	// within the rest the vendor isn't asked: the rest answers
+	mu.Lock()
+	before := asked
+	mu.Unlock()
+	if code, body := post(); code != http.StatusUnauthorized {
+		t.Fatalf("second request: %d %s", code, body)
+	}
+	mu.Lock()
+	again := asked
+	mu.Unlock()
+	if again != before {
+		t.Fatalf("the vendor was asked again within the rest: %d asked, then %d", before, again)
+	}
+}

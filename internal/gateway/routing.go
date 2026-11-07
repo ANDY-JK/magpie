@@ -682,8 +682,20 @@ func failureOf(c candidate, status int, body []byte) string {
 // (signin_revoked.go, claude_auth.go, copilot_lapsed.go); a key has none,
 // and without this it rested for a backoff at most, or not at all as the
 // last one left (restAfterMarked, keyRefusedRest).
+//
+// A plugin's provider signed in with an API key is a key too (KeySignedIn):
+// its value is the user's, pasted once, and no sign-in magpie or the plugin
+// can make renews it. Before, it was taken for an account — a 10-minute
+// backoff asked again all day, once every few minutes, each try refused
+// (Cloudflare Workers AI's dead token: 75 tries in 10 hours).
 func keyRefused(c candidate, status int, why string) bool {
-	return status == http.StatusUnauthorized && why == failOther && c.p.Account == nil && c.p.Key != ""
+	if status != http.StatusUnauthorized || why != failOther {
+		return false
+	}
+	if c.p.Account != nil {
+		return c.p.KeySignedIn()
+	}
+	return c.p.Key != ""
 }
 
 // restrictedSaid says an error is one magpie already put in words as an

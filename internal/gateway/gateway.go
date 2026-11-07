@@ -4466,7 +4466,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				continue
 			}
 		}
-		refusedKey := c.p.Account == nil && c.p.Key != "" && hw.code() == http.StatusUnauthorized && keyRefused(c, hw.code(), failureOf(c, hw.code(), hw.errBody()))
+		refusedKey := keyRefused(c, hw.code(), failureOf(c, hw.code(), hw.errBody()))
 		if last && !held && !hw.passing && hw.failed() && (refusedKey ||
 			try.Fail == failRestricted || failure(hw.code(), hw.errBody()) == failRestricted ||
 			quotaStatus(hw.code()) && (c.p.Account == nil || !hw.turnedAway && try.Fail != failPrompt) && (try.Fail == failQuota || try.Fail == failCredit || failure(hw.code(), hw.errBody()) == failQuota || failure(hw.code(), hw.errBody()) == failCredit)) {
