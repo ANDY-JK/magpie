@@ -67,6 +67,13 @@ const (
 	// look's two minutes, so a machine that starts at the same time every
 	// day doesn't check in at the same minute either.
 	checkinStartMost = 10 * time.Minute
+	// checkinEveryMost is the most a loop's next look comes after
+	// wbCheckinEvery: a vendor asked every 30 minutes on the minute, all
+	// day, reads as automation, so each wait is 30 minutes and up to ten
+	// more. Never less than wbCheckinEvery: a rechecking vendor's answer
+	// stands wbCheckinEvery (checkinNow), and a look sooner than that would
+	// find it settled and ask nothing
+	checkinEveryMost = 10 * time.Minute
 )
 
 // checkinDayDelay is how far into the day the vendor's first look waits,
@@ -77,6 +84,16 @@ func checkinDayDelay(day, by string) time.Duration {
 	h := fnv.New64a()
 	h.Write([]byte("magpie checkin \x00" + by + "\x00" + day))
 	return time.Duration(h.Sum64()%uint64(checkinDayWindow/time.Second)) * time.Second
+}
+
+// checkinGap is how long after its n'th look of day a loop waits for the
+// next: wbCheckinEvery and up to checkinEveryMost more, from the vendor,
+// the day and where the look falls in it, so a vendor isn't asked at the
+// same minutes every day, nor at even intervals within one.
+func checkinGap(by, day string, n int) time.Duration {
+	h := fnv.New64a()
+	fmt.Fprintf(h, "magpie checkin gap\x00%s\x00%s\x00%d", by, day, n)
+	return wbCheckinEvery + time.Duration(h.Sum64()%uint64(checkinEveryMost/time.Minute))*time.Minute
 }
 
 // wbCheckinDayStart is the Beijing midnight the day t is in began at.
@@ -600,9 +617,9 @@ func wbPluginAccounts(pp plugin.Provider) []wbAccount {
 }
 
 // KeepWorkBuddyCheckedIn checks the WorkBuddy accounts in each day while
-// settings say to: a few minutes after it starts (checkinStartWait), every
-// wbCheckinEvery after that, and after the day's wait as the Beijing day
-// turns (checkinDayDelay), until ctx ends.
+// settings say to: a few minutes after it starts (checkinStartWait), one
+// gap after each look after that (checkinGap), and after the day's wait as
+// the Beijing day turns (checkinDayDelay), until ctx ends.
 func KeepWorkBuddyCheckedIn(ctx context.Context) {
 	keepCheckedIn(ctx, "workbuddy", newWBCheckiner(), func() bool { return settings.Load().WorkBuddyCheckin })
 }
@@ -643,21 +660,32 @@ func keepCheckedIn(ctx context.Context, label string, c checkinRunner, on func()
 
 // wbCheckinLoop is when keepCheckedIn last looked at the accounts, and
 // when a failure is due to be tried again, if before its next look. By is
-// the vendor, for the day's wait (checkinDayDelay).
+// the vendor, for the day's wait (checkinDayDelay) and the wait to the
+// next look (checkinGap).
 type wbCheckinLoop struct {
 	last, again time.Time
 	by          string
+	gap         time.Duration // the wait after last's look, checkinGap
+	n           int           // the looks of day so far
+	day         string
 }
 
-// tick looks at the accounts if it is time to: the first tick,
-// wbCheckinEvery after the last look, as the Beijing day turns — that
-// look after the day's wait (checkinDayDelay), so a check-in isn't at the
-// same minute every night — or as a failure comes due again. It says how
-// they stand, or nil.
+// tick looks at the accounts if it is time to: the first tick, one gap
+// after the last look (checkinGap), as the Beijing day turns — that look
+// after the day's wait (checkinDayDelay), so a check-in isn't at the same
+// minute every night — or as a failure comes due again. It says how they
+// stand, or nil.
 func (l *wbCheckinLoop) tick(ctx context.Context, c checkinRunner) []WorkBuddyCheckin {
 	// the wall clock, which goes on while the machine sleeps
 	now := c.clock().Round(0)
-	if !l.last.IsZero() && now.Sub(l.last) < wbCheckinEvery && wbCheckinDay(now) == wbCheckinDay(l.last) &&
+	if day := wbCheckinDay(now); day != l.day {
+		l.day, l.n = day, 0
+	}
+	gap := l.gap
+	if gap == 0 {
+		gap = wbCheckinEvery
+	}
+	if !l.last.IsZero() && now.Sub(l.last) < gap && wbCheckinDay(now) == wbCheckinDay(l.last) &&
 		(l.again.IsZero() || now.Before(l.again)) {
 		return nil
 	}
@@ -670,6 +698,8 @@ func (l *wbCheckinLoop) tick(ctx context.Context, c checkinRunner) []WorkBuddyCh
 		return nil
 	}
 	l.last, l.again = now, time.Time{}
+	l.n++
+	l.gap = checkinGap(l.by, l.day, l.n)
 	cx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	rs := c.checkinNow(cx, false)

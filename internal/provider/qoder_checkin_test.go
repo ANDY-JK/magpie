@@ -289,7 +289,8 @@ func TestQoderCheckinCampaignRollover(t *testing.T) {
 }
 
 // A successful campaign is reused for at most 30 minutes, and never past
-// Beijing midnight or its end. Refreshing does not claim it again.
+// Beijing midnight or its end; the loop's next look, one gap on
+// (checkinGap), refreshes it. Refreshing does not claim it again.
 func TestQoderCheckinCampaignCache(t *testing.T) {
 	for _, site := range []string{"qoder", QoderCNID} {
 		for _, status := range []string{"CLAIMABLE", "CLAIMED"} {
@@ -333,7 +334,7 @@ func TestQoderCheckinCampaignCache(t *testing.T) {
 				if len(rs) != 1 || rs[0].Outcome != want || rs[0].Asked || gets != 1 || posts != claims {
 					t.Fatalf("asked before the refresh interval: %+v, reads %d, claims %d", rs, gets, posts)
 				}
-				now = start.Add(wbCheckinEvery)
+				now = start.Add(checkinGap(l.by, wbCheckinDay(start), 1))
 				rs = l.tick(t.Context(), c)
 				if len(rs) != 1 || rs[0].Outcome != CheckinDone || !rs[0].Asked || gets != 2 || posts != claims {
 					t.Fatalf("campaign wasn't refreshed: %+v, reads %d, claims %d", rs, gets, posts)

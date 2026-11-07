@@ -600,3 +600,53 @@ func TestCheckinDayDelayVaries(t *testing.T) {
 		t.Fatalf("start wait %v", w)
 	}
 }
+
+// A loop's looks are no grid: each waits wbCheckinEvery and up to
+// checkinEveryMost more, from the vendor, the day and the look's place in
+// it — never less than wbCheckinEvery, which is how long a rechecking
+// vendor's answer stands (checkinNow), so a look sooner would ask nothing.
+func TestCheckinGapVaries(t *testing.T) {
+	saw := map[time.Duration]bool{}
+	for _, by := range []string{"plugin", "qoder", "zcode", ""} {
+		for n := 1; n <= 8; n++ {
+			d := checkinGap(by, "2026-11-07", n)
+			if d < wbCheckinEvery || d >= wbCheckinEvery+checkinEveryMost {
+				t.Fatalf("%s #%d: %v", by, n, d)
+			}
+			if checkinGap(by, "2026-11-07", n) != d {
+				t.Fatalf("%s #%d: not the same twice", by, n)
+			}
+			saw[d] = true
+		}
+	}
+	if len(saw) < 4 {
+		t.Fatalf("gaps %v: a grid all the same", saw)
+	}
+}
+
+// The loop waits its gap out: a look 30 minutes after the last, where the
+// gap is longer, doesn't happen, and the one at the gap does.
+func TestCheckinLoopWaitsItsGap(t *testing.T) {
+	f := &fakeWBCheckin{active: true}
+	srv := f.serve(t)
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, beijing)
+	c := wbCheckinFixture(t, srv, &now)
+	ctx := context.Background()
+	var l wbCheckinLoop
+	l.by = "workbuddy"
+	if rs := l.tick(ctx, c); len(rs) != 1 || !rs[0].Asked {
+		t.Fatalf("first look: %+v", rs)
+	}
+	gap := checkinGap(l.by, wbCheckinDay(now), 1)
+	if gap <= wbCheckinEvery {
+		t.Fatalf("the gap %v left nothing to wait out", gap)
+	}
+	now = now.Add(gap - time.Minute)
+	if rs := l.tick(ctx, c); rs != nil {
+		t.Fatalf("looked a minute early: %+v", rs)
+	}
+	now = now.Add(time.Minute)
+	if rs := l.tick(ctx, c); len(rs) != 1 {
+		t.Fatalf("not looked at its gap: %+v", rs)
+	}
+}
