@@ -3008,7 +3008,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			skipped = append(skipped, c.label()+": its provider rests")
 			continue
 		}
-		if rounds == 0 && restedHere(s.trace.restsOf(tr), c) && anyAwake(cands[i+1:]) {
+		if rounds == 0 && !c.p.IsRemoteMagpie() && restedHere(s.trace.restsOf(tr), c) && anyAwake(cands[i+1:]) {
 			// this request already rested this key or account, or this
 			// model of it, earlier in its plan: a second ask is the same
 			// question to the same seat, and the same answer — Cloudflare
@@ -3018,7 +3018,10 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			// and asked only as the last one left. The plan's first pass
 			// alone: a replan's round re-adds the members a busy answer
 			// rested, after the pause that rest was waiting for (#1418),
-			// and that round is the ask, not a repeat of it
+			// and that round is the ask, not a repeat of it. Nor another
+			// magpie's: its key resting whole still says nothing of each
+			// model there, and the next is asked as it always was
+			// (TestRemoteMagpieKeyLimitRestsTheRemote, #2077)
 			skipped = append(skipped, c.label()+": it rests")
 			continue
 		}
