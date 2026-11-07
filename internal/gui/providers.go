@@ -772,17 +772,6 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 			out.KeyList[i].Rest = &provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: key, Probed: r.Probed}
 		}
 	}
-	// an account the gateway passes over says so on its row, as a key's
-	// does: the reason, when it is back, and "Try now" to lift it. A
-	// subscription rests by provider@user, which the logins carry
-	if out.Account != nil {
-		for i, l := range out.Account.Logins {
-			key := p.ID + "@" + strings.ToLower(l.User)
-			if r, ok := keyRestOf(key); ok {
-				out.Account.Logins[i].Rest = &provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: key, Probed: r.Probed}
-			}
-		}
-	}
 	if !out.Key.Set && p.Ready() {
 		out.Key.Optional = true
 	}
@@ -802,6 +791,11 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 			out.KeptBy[m] = gs
 		}
 	}
+	// an account the gateway passes over says so on its row, as a key's
+	// does: the reason, when it is back, and "Try now" to lift it. A
+	// subscription rests by provider@user, which the logins carry. Written
+	// where the logins are known: before them out.Account is nil still, so
+	// a resting account said nothing on the page at all.
 	if a := p.Account; a != nil {
 		out.Account = &accountJSON{Account: *a, Agent: a.Agent}
 		out.Account.Name, out.Account.Icon = accountLabel(p)
@@ -815,6 +809,12 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 			out.Account.Logins = provider.Logins(p.ID)
 			if out.Icon == "" || out.Icon == "generic" {
 				out.Icon = out.Account.Icon
+			}
+		}
+		for i, l := range out.Account.Logins {
+			key := p.ID + "@" + strings.ToLower(l.User)
+			if r, ok := keyRestOf(key); ok {
+				out.Account.Logins[i].Rest = &provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: key, Probed: r.Probed}
 			}
 		}
 	}
