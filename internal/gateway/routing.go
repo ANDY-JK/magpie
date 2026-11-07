@@ -214,6 +214,13 @@ const (
 	// every time, never a step on the backoff ladder
 	overloadRest     = 30 * time.Second
 	overloadRestMost = time.Minute
+	// zcodeBusyRest is how long a ZCode provider sits out its plan's
+	// in-flight cap (zcodeConcurrency): the account asked was busy, and
+	// the rest is the provider's, since its other accounts go out from
+	// the same address and taking the next one is what the vendor reads
+	// as one address running many accounts — 11-07's blocks (Rest.By
+	// "blocked") came two and seven minutes after such a rotation.
+	zcodeBusyRest = time.Minute
 	// edgeRest is how long a provider sits out when its vendor's edge
 	// firewall blocked this computer's address (provider.EdgeBlocked): the
 	// block is the address's, which every key and account of the provider
@@ -1312,6 +1319,10 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 	status = carriedStatus(status, body)
 	now := time.Now()
 	d := fallbackCooldown
+	// busy says the rest is the provider's, not the account's: its plan's
+	// in-flight cap was hit, and every account of it shares the address
+	// the vendor counts (zcodeBusyRest)
+	busy := false
 	why := failureOf(c, status, body)
 	if why == failCut {
 		// a plugin ended the turn on purpose, its upstream's stream having
@@ -1494,8 +1505,15 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 		if zcodeConcurrency(c, status, body) {
 			// the plan's in-flight cap, not a rate limit (zcodeConcurrency):
 			// the account is busy for a moment, and resting it as a rate
-			// limit climbed a ladder that reached thirty minutes on it
-			d, r.By = overloadRest, "cooldown"
+			// limit climbed a ladder that reached thirty minutes on it. The
+			// provider sits out as a whole (busy), not just the account:
+			// its other accounts go out from the same address, and handing
+			// the request to the next one is exactly what the vendor reads
+			// as one address running many accounts — on 11-07 the second
+			// account in at 01:08 and again at 10:18 was followed seven and
+			// two minutes later by the address's block page (405), which
+			// cost this address an hour of the vendor's edge
+			d, r.By, busy = zcodeBusyRest, "cooldown", true
 			break
 		}
 		d, r.By, r.Failures = s.rateRest(c, header, body, sharedPool, now)
@@ -1712,8 +1730,10 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 	}
 	// a firewall's block is the address's, and an endpoint's page in place
 	// of its API is every key's: the provider rests as a whole, for every
-	// key and account of it (blockedKey)
-	if r.By == "blocked" || r.By == "vendor" {
+	// key and account of it (blockedKey). A plan's in-flight cap too: the
+	// request handed to the next account is one address running many
+	// accounts, which is what the vendor blocked the address for
+	if r.By == "blocked" || r.By == "vendor" || busy {
 		id = blockedKey(c.p)
 	}
 	r.Key = id

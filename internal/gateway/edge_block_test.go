@@ -109,27 +109,42 @@ func TestPlain405RestsTheAccount(t *testing.T) {
 var zcodeBusy = []byte(`{"type":"error","error":{"type":"rate_limit_error","message":"user concurrency limit exceeded (429, code 3008) — ZCode serves one account a few requests at a time, and every agent and session of this computer asks through magpie; this request came behind the others, and the same request a moment later is served"}}`)
 
 // The plan's in-flight cap is the account being busy, not a rate limit:
-// the account sits out half a minute, the same every time, and no rung of
-// the rate ladder is climbed. Before, it was a rate limit: on 11-07
-// zcode@龙_2608 sat out thirty minutes by 01:02 and zcode@唯心_9997 sixteen
-// by 01:04, each asked again at the end and refused for being busy again.
+// the same minute every time, and no rung of the rate ladder climbed.
+// Before, it was a rate limit: on 11-07 zcode@龙_2608 sat out thirty
+// minutes by 01:02 and zcode@唯心_9997 sixteen by 01:04, each asked again
+// at the end and refused for being busy again.
+//
+// The rest is the provider's, not the account's: every account of the
+// plugin goes out from this address, and handing the request to the next
+// account is what the vendor reads as one address running many accounts.
+// On 11-07 the second account in at 01:08 and again at 10:18 was followed
+// seven and two minutes later by the address's block page (405), which
+// cost this address an hour of the vendor's edge. So a 3008 rests them
+// all, and the request goes to the group's other providers.
 func TestZCodeConcurrencyCapRestsBriefly(t *testing.T) {
 	fresh(t)
 	s := New()
 	c := candidate{p: provider.PluginForTest("zcode", "zcode"), model: "GLM-5.3-Flash", rest: "zcode#k"}
 	r := s.restAfter(c, http.StatusTooManyRequests, http.Header{}, zcodeBusy)
-	if r.By != "cooldown" || r.Failures != 0 || r.Key != c.restKey() || r.Why != failRate {
-		t.Fatalf("the plan's cap: %+v, want a cooldown of the account, no failures", r)
+	if r.By != "cooldown" || r.Failures != 0 || r.Key != blockedKey(c.p) || r.Why != failRate {
+		t.Fatalf("the plan's cap: %+v, want a cooldown of the provider, no failures", r)
 	}
-	if left := time.Until(r.Until); left < overloadRest-time.Second || left > overloadRest+time.Second {
-		t.Fatalf("the cap rests %v, want about %v", left.Round(time.Second), overloadRest)
+	if left := time.Until(r.Until); left < zcodeBusyRest-time.Second || left > zcodeBusyRest+time.Second {
+		t.Fatalf("the cap rests %v, want about %v", left.Round(time.Second), zcodeBusyRest)
 	}
-	// refused again and again: the same half minute, never a ladder
+	// another account of the same plugin is rested with it: handing this
+	// request to that one is the pattern the vendor blocked
+	sib := c
+	sib.rest = "zcode#k2"
+	if _, ok := restOfAny(sib); !ok {
+		t.Fatal("the plan's cap rested one account alone, and the next would take the request")
+	}
+	// refused again and again: the same minute, never a ladder
 	for i := 0; i < 5; i++ {
-		expire(c.restKey())
+		expire(blockedKey(c.p))
 		r = s.restAfter(c, http.StatusTooManyRequests, http.Header{}, zcodeBusy)
-		if r.Failures != 0 || time.Until(r.Until) > overloadRest+time.Second {
-			t.Fatalf("refused %d times: %+v, want half a minute every time", i+1, r)
+		if r.Failures != 0 || time.Until(r.Until) > zcodeBusyRest+time.Second {
+			t.Fatalf("refused %d times: %+v, want a minute every time", i+1, r)
 		}
 	}
 	// another vendor's 429 that says the same words is its own rate limit
