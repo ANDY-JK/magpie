@@ -82,6 +82,7 @@ func fresh(t *testing.T) {
 func forgetRouting() {
 	routed.Lock()
 	routed.used, routed.failures, routed.slow = map[string]tokenUse{}, map[string]int{}, map[string]slowRun{}
+	routed.edge = map[string]edgeRun{}
 	routed.Unlock()
 	speeds.Lock()
 	speeds.m = map[string]speedRec{}

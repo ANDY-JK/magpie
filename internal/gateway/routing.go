@@ -42,7 +42,15 @@ var routed = struct {
 	used     map[string]tokenUse // candidate restKey → tokens it served
 	failures map[string]int      // candidate restKey → failures since it last answered
 	slow     map[string]slowRun  // candidate restID → its slow starts since it last answered (restSlow)
-}{used: map[string]tokenUse{}, failures: map[string]int{}, slow: map[string]slowRun{}}
+	edge     map[string]edgeRun  // provider → its edge blocks in a row as of the last (edgeBackoff)
+}{used: map[string]tokenUse{}, failures: map[string]int{}, slow: map[string]slowRun{}, edge: map[string]edgeRun{}}
+
+// edgeRun is how many times in a row a provider's edge firewall has blocked
+// this computer's address, and when the last of them was.
+type edgeRun struct {
+	n  int
+	at time.Time
+}
 
 // slowRun is a model's slow starts in a row on one account or key, and
 // when the last of them was.
@@ -85,6 +93,11 @@ func servedCandidate(c candidate, tokens int) {
 	// one a firewall is blocking: the provider's whole-block rest ends at
 	// once, not when its three minutes are up
 	clearRest(blockedKey(c.p))
+	// and the run of edge blocks it had ends: a firewall letting one
+	// through has freed the address (edgeBackoff)
+	routed.Lock()
+	delete(routed.edge, c.p.ID)
+	routed.Unlock()
 	provider.NoteServed(c.p, time.Now())
 	provider.Unretire(c.p.ID, c.model) // back in service, if it was said retired
 	if id := c.restID(); id != c.restKey() {
@@ -208,8 +221,18 @@ const (
 	// account's own ladder is climbed. Three minutes is the ZCode plugin's
 	// own hold on the same block (its EDGE_HOLD), so magpie asks again as
 	// that hold ends, and once more every three minutes while the address
-	// is blocked.
+	// is blocked — until the block outlasts its own rests: each block
+	// still there when the rest ends doubles it (edgeBackoff), as a
+	// firewall holding an address counts every ask.
 	edgeRest = 3 * time.Minute
+	// edgeCap is the longest a provider's edge block is rested: a firewall
+	// that outlasts the first probes is holding the address rather than
+	// refusing a moment's burst, and one ask an hour is as much as it
+	// gets until a success says the address is free again.
+	edgeCap = time.Hour
+	// edgeForget: a block this long after the last one starts the ladder
+	// over, a block a day apart being the firewall's own, not one run.
+	edgeForget = 6 * time.Hour
 	// vendorRest is how long a keyed provider sits out when its endpoint
 	// answers with a web page where its API should be (provider.WebPage):
 	// every key of it is a key of the one endpoint, so a page in place of
@@ -1543,7 +1566,7 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 			// rests alone (zcodeTrialBlocked, in unserved); the account
 			// ZCode's own risk control blocked says so (failRestricted,
 			// read before this)
-			d, r.By = edgeRest, "blocked"
+			d, r.By = edgeBackoff(c.p, now), "blocked"
 			break
 		}
 		if why == failOther && !unserved && c.p.Account == nil {
@@ -1794,6 +1817,36 @@ func remoteModelRest(c candidate, why string, header http.Header) bool {
 		return false
 	}
 	return why == failQuota || why == failCredit || why == failRate || why == failRestricted || why == failVerify
+}
+
+// edgeBackoff is how long a provider sits out for the edge block just
+// answered: three minutes the first time, twice as long for each block
+// still there when its rest ended, up to edgeCap. A block answering while
+// the provider already rests for one is that same block, and doesn't
+// climb — three requests of a group meet it at once, as zcode's four
+// accounts did on 11-07. A success from any of the provider's seats ends
+// the run at once (servedCandidate), so one that was blocked an hour and
+// answers is asked again in three minutes the next time it is, not in an
+// hour. A restart starts the ladder over, the plugin's own hold starting
+// it over with it.
+func edgeBackoff(p provider.Provider, now time.Time) time.Duration {
+	id := blockedKey(p)
+	restingUntil.Lock()
+	note, resting := restingUntil.note[id]
+	until := restingUntil.m[id]
+	restingUntil.Unlock()
+	if resting && note.By == "blocked" && now.Before(until) {
+		return edgeRest
+	}
+	routed.Lock()
+	run := routed.edge[p.ID]
+	if now.Sub(run.at) >= edgeForget {
+		run.n = 0
+	}
+	run.n, run.at = run.n+1, now
+	routed.edge[p.ID] = run
+	routed.Unlock()
+	return min(edgeRest<<min(run.n-1, 10), edgeCap)
 }
 
 // restSlow counts a slow start — let go for no first token in its group's
