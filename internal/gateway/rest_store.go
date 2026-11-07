@@ -172,21 +172,32 @@ func loadRests() {
 }
 
 // restKeysStored says whether a rest key — a provider's id, or id#key,
-// either followed by /model — names a key providers.json still has.
+// either followed by /model — names a key providers.json still has. An
+// account's rest is kept by id@user (restKey), and is read back while its
+// provider is there: the accounts are the sign-ins', which a start may not
+// have read yet, and an account signed out since matches no candidate. Not
+// read back, an account's day out started over at every restart — a swap
+// asked each account out of quota again at once (zcode's four at the
+// 11-06 22:34 swap), which is what the day rest is for.
 func restKeysStored() (func(string) bool, error) {
 	ps, err := provider.Stored()
 	if err != nil {
 		return nil, err
 	}
 	keys := map[string]bool{}
+	ids := map[string]bool{} // every provider there is, key or account
 	for _, p := range ps {
 		keys[p.ID] = len(p.KeyList()) > 0
+		ids[p.ID] = true
 		for _, k := range p.KeyList() {
 			keys[p.ID+"#"+k.ID] = true
 		}
 	}
 	return func(k string) bool {
 		k, _, _ = strings.Cut(k, "/")
+		if i := strings.IndexByte(k, '@'); i > 0 {
+			return ids[k[:i]]
+		}
 		return keys[k]
 	}, nil
 }

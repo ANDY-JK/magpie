@@ -97,6 +97,58 @@ func TestKeyCreditRestOutlivesRestart(t *testing.T) {
 	}
 }
 
+// An account's day out (restKey: provider@user) is kept over a restart as
+// a key's is. Before, only keys were read back, so every restart asked
+// each account out of quota again at once: on 11-06 the swap at 22:34 was
+// followed by the four ZCode accounts' refusals at 22:35, each a day's
+// again and each counted as that account's first of the day, so the newly
+// granted plan was asked again while it had not started.
+func TestAccountQuotaRestOutlivesRestart(t *testing.T) {
+	fresh(t)
+	forgetRouting()
+	old := allowances
+	allowances = func(string) map[string]provider.Allowance { return nil }
+	defer func() { allowances = old }()
+	s := New()
+	if err := provider.Save(provider.Provider{ID: "zplug", Name: "ZCode", Chat: "http://127.0.0.1:1/v1"}); err != nil {
+		t.Fatal(err)
+	}
+	acct := candidate{
+		p:     provider.Provider{ID: "zplug", Chat: "http://127.0.0.1:1/v1", Account: &provider.Account{Agent: "plugin", User: "me"}},
+		model: "GLM-5.3-Flash",
+		rest:  "zplug#3teif9",
+	}
+	id := acct.restKey()
+	if id != "zplug@me" {
+		t.Fatalf("an account's rest key is %q, want zplug@me", id)
+	}
+	// the plugin's own 429 for a gift out of this model, naming no time
+	spent := []byte(`{"type":"error","error":{"type":"rate_limit_error","message":"ZCode's limited quota for GLM-5.3-Flash is exhausted or temporarily unavailable"}}`)
+	r := s.restAfter(acct, http.StatusTooManyRequests, http.Header{}, spent)
+	if r.Why != failQuota || r.By != "quota" || !r.guess || !r.first {
+		t.Fatalf("the plugin's spent answer: %+v", r)
+	}
+	saveRests()
+
+	restartRests()
+	got, ok := restOf(id)
+	if !ok {
+		t.Fatal("after a restart the account rests no more")
+	}
+	if !got.Until.Equal(r.Until) || got.Why != failQuota || got.By != "quota" || !got.guess || !got.first || got.agent != "plugin" || got.user != "me" {
+		t.Fatalf("after a restart: %+v, want until %v", got, r.Until)
+	}
+
+	// a provider removed while magpie was off is let go, its accounts with it
+	if err := provider.Delete("zplug"); err != nil {
+		t.Fatal(err)
+	}
+	restartRests()
+	if _, ok := restOf(id); ok {
+		t.Fatal("an account of a removed provider rests after a restart")
+	}
+}
+
 // A key removed while magpie was off is let go, and one ended over a
 // month ago starts over; a rest that isn't a day's isn't kept.
 func TestKeyCreditRestFileForgets(t *testing.T) {
