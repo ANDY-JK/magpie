@@ -8,7 +8,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/yetone/magpie/internal/gwmw"
 	"github.com/yetone/magpie/internal/maskrec"
 	"github.com/yetone/magpie/internal/provider"
 	"github.com/yetone/magpie/internal/settings"
@@ -48,13 +50,33 @@ func TestMaskedRecordKeepsSentAndBack(t *testing.T) {
 	if len(rs) != 1 {
 		t.Fatal("nothing recorded")
 	}
+	// Took isn't asked for here: Windows's time.Now advances about every
+	// 2ms, so a masking that took 500µs is measured as 0µs and kept as
+	// such (TestMaskedRecordKeepsTook holds the field, without a clock)
 	r, ok := maskrec.Get(rs[0].Key)
-	if !ok || r.Back[p] != 2 || r.Took <= 0 {
+	if !ok || r.Back[p] != 2 {
 		t.Fatalf("record: %+v", r)
 	}
 	sent, ok := maskrec.SentOf(r.Key)
 	if !ok || !strings.Contains(sent, p) || strings.Contains(sent, key) {
 		t.Fatalf("sent %q %v", sent, ok)
+	}
+}
+
+// The record keeps how long masking took, as the masker measured it: 3ms
+// of masking is 3000µs in the record. The duration is handed to the
+// record, not measured here, since a request's own masking can be shorter
+// than the clock's step and read as 0µs.
+func TestMaskedRecordKeepsTook(t *testing.T) {
+	fresh(t)
+	h := maskHits{n: 1, hits: []gwmw.Hit{{Placeholder: "{{API_KEY_abcd1234}}", Kind: "API_KEY", By: "rule", Head: "sk-", Len: 36}}, took: 3 * time.Millisecond}
+	m, done := noteMaskedUntil(nil, "chat", h, `{"messages":[{"role":"user","content":"key {{API_KEY_abcd1234}}"}]}`, 0, "fake", "m1")
+	done("", "")
+	if m == nil {
+		t.Fatal("nothing recorded")
+	}
+	if r, ok := maskrec.Get(m.Key); !ok || r.Took != 3000 {
+		t.Fatalf("record: %+v", r)
 	}
 }
 
