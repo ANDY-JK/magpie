@@ -747,7 +747,10 @@ func TestPluginCheckinAsksAgainAtUntil(t *testing.T) {
 			defer cancel()
 			now := time.Date(2026, 10, 28, 9, 27, 0, 0, beijing).In(zone)
 			c := pluginCheckiner{now: func() time.Time { return now }, only: func(id string) bool { return PluginCheckinOn(settings.Load(), id) }}
-			var l wbCheckinLoop
+			// the loop a vendor runs for, as keepCheckedIn makes it: the
+			// day's wait is keyed on the vendor (checkinDayDelay), so a
+			// loop with no name waits a minute no vendor's has
+			l := wbCheckinLoop{by: "fakeco"}
 			var at []string
 			claimed := map[string]bool{}
 			end := time.Date(2026, 10, 29, 10, 30, 0, 0, beijing)
@@ -772,8 +775,16 @@ func TestPluginCheckinAsksAgainAtUntil(t *testing.T) {
 				}
 			}
 			// 09:27 claims the 10-27 campaign, 10:01 the 10-28 one, the
-			// Beijing day's turn asks once (done), 10:01 claims 10-29's
-			if want := []string{"10-28 09:27", "10-28 10:01", "10-29 00:00", "10-29 10:01"}; !slices.Equal(at, want) {
+			// Beijing day's turn asks once (done) after the day's wait, on
+			// the first minute the loop's ticks reach (checkinDayDelay),
+			// 10:01 claims 10-29's
+			turn := wbCheckinDayStart(time.Date(2026, 10, 29, 12, 0, 0, 0, beijing)).
+				Add(checkinDayDelay("2026-10-29", "fakeco"))
+			if m := turn.Truncate(time.Minute); m.Before(turn) {
+				turn = m.Add(time.Minute)
+			}
+			want := []string{"10-28 09:27", "10-28 10:01", turn.In(beijing).Format("01-02 15:04"), "10-29 10:01"}
+			if !slices.Equal(at, want) {
 				t.Fatalf("asked at %q, want %q", at, want)
 			}
 			if p := pressed(t, presses); len(p) != 4 {
@@ -786,7 +797,7 @@ func TestPluginCheckinAsksAgainAtUntil(t *testing.T) {
 			// in the gap (09:59:30, yesterday's closed, today's not open):
 			// a failure, asked again at 10:01, not half an hour on
 			_ = os.Remove(presses)
-			l = wbCheckinLoop{}
+			l = wbCheckinLoop{by: "fakeco"}
 			now = time.Date(2026, 10, 30, 9, 59, 30, 0, beijing).In(zone)
 			b, _ := json.Marshal(map[string]any{"outcome": CheckinFailed, "message": "today's credits aren't offered yet", "until": opens(now).UTC().Format(time.RFC3339)})
 			if err := os.WriteFile(presses+".until", b, 0o600); err != nil {
