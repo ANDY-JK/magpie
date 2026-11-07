@@ -292,13 +292,18 @@ func TestZCodeStartPlanBlockRestsRestricted(t *testing.T) {
 // account rests as restricted. Before, the gateway read ZCode's words as
 // Alibaba Cloud's block page, told the agent to change networks and
 // rested the account as any failure (windy_66454 on Discord, 10-31). The
-// plugin's words for the page itself are still the firewall's.
+// plugin's words for the page itself are still the firewall's, and that
+// block is the address's: the provider rests whole, every key and
+// account of it going out from there.
 func TestZCodeRiskControlNotToldAsFirewall(t *testing.T) {
 	for _, tc := range []struct {
 		name, body, says, notSays, why string
+		// whole: the block page is the address's, which rests the
+		// provider rather than the account asked (blockedKey)
+		whole bool
 	}{
-		{"risk control", `{"type":"error","error":{"type":"permission_error","message":"request has been blocked due to unusual activity. (405, code 3012) — ` + provider.ZCodeRestrictedHint + `"}}`, provider.ZCodeRestrictedHint, provider.BlockedHint, failRestricted},
-		{"block page", `{"type":"error","error":{"type":"permission_error","message":"405 Method Not Allowed — ` + provider.BlockedHint + `"}}`, provider.BlockedHint, provider.ZCodeRestrictedHint, failOther},
+		{"risk control", `{"type":"error","error":{"type":"permission_error","message":"request has been blocked due to unusual activity. (405, code 3012) — ` + provider.ZCodeRestrictedHint + `"}}`, provider.ZCodeRestrictedHint, provider.BlockedHint, failRestricted, false},
+		{"block page", `{"type":"error","error":{"type":"permission_error","message":"405 Method Not Allowed — ` + provider.BlockedHint + `"}}`, provider.BlockedHint, provider.ZCodeRestrictedHint, failOther, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("FAKE_ZCODE", "1")
@@ -329,8 +334,15 @@ func TestZCodeRiskControlNotToldAsFirewall(t *testing.T) {
 			if !strings.Contains(tr.Error, tc.says) || strings.Contains(tr.Error, tc.notSays) {
 				t.Fatalf("told %q", tr.Error)
 			}
-			if tr.Fail != tc.why || tr.Rest.Why != tc.why || tr.Rest.Key != c.restKey() {
+			if tr.Fail != tc.why || tr.Rest.Why != tc.why {
 				t.Fatalf("failed %q, rested %+v", tr.Fail, *tr.Rest)
+			}
+			want := c.restKey()
+			if tc.whole {
+				want = blockedKey(*p)
+			}
+			if tr.Rest.Key != want {
+				t.Fatalf("rested %q, want %q", tr.Rest.Key, want)
 			}
 		})
 	}
