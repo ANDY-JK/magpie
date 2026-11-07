@@ -58,9 +58,11 @@ func TestZCodeTrialRefusalRestsTheTrialAlone(t *testing.T) {
 		// rests alone and the plan's model is asked. Blocking the plain
 		// model, or the account's own risk control, rests the account
 		{"trial edge block", "zcode", "GLM-5.3-Flash-Trial", zcodeStartEdge, 405, true, false},
-		{"plain edge block", "zcode", "GLM-5.3", zcodeStartEdge, 405, false, true},
+		// the plain model blocked, or another vendor's: the provider rests
+		// whole (wholeRest below), the address being what was blocked
+		{"plain edge block", "zcode", "GLM-5.3", zcodeStartEdge, 405, false, false},
 		{"trial risk control", "zcode", "GLM-5.3-Flash-Trial", zcodeStartRisk, 405, true, true},
-		{"another vendor's block", "factory", "GLM-5.3-Trial", zcodeStartEdge, 405, false, true},
+		{"another vendor's block", "factory", "GLM-5.3-Trial", zcodeStartEdge, 405, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// a ZCode list with no free model, which would rest a paid
@@ -124,9 +126,20 @@ func TestZCodeTrialRefusalRestsTheTrialAlone(t *testing.T) {
 			if len(tries) != 2 || tries[0].Status != tc.status || tries[0].Rest == nil {
 				t.Fatalf("trial request tries: %+v", tries)
 			}
+			// the edge firewall's block is this computer's address's: the
+			// provider rests whole (blockedKey), every key and account of
+			// it going out from that address, rather than the one asked.
+			// A ZCode trial entry goes to zcode.z.ai's Start Plan, another
+			// host, so a block there says nothing of the account's plan
+			// host and rests the entry alone
+			wholeRest := strings.Contains(tc.body, "network firewall blocked") &&
+				!(tc.vendor == "zcode" && strings.Contains(tc.model, "-Trial"))
 			want := c.restID()
 			if tc.accountRest {
 				want = c.restKey()
+			}
+			if wholeRest {
+				want = blockedKey(*p)
 			}
 			if tries[0].Rest.Key != want {
 				t.Fatalf("the refusal rested %q, want %q", tries[0].Rest.Key, want)
@@ -134,7 +147,7 @@ func TestZCodeTrialRefusalRestsTheTrialAlone(t *testing.T) {
 			if _, ok := restOf(c.restKey()); ok != tc.accountRest {
 				t.Fatalf("account resting = %v, want %v", ok, tc.accountRest)
 			}
-			if _, ok := restOf(c.restID()); !tc.accountRest && !ok {
+			if _, ok := restOf(c.restID()); !tc.accountRest && !wholeRest && !ok {
 				t.Fatalf("%s isn't resting", tc.model)
 			}
 			// then the account's own GLM-5.3: served by the account unless
@@ -144,7 +157,7 @@ func TestZCodeTrialRefusalRestsTheTrialAlone(t *testing.T) {
 			}
 			mu.Lock()
 			defer mu.Unlock()
-			if tc.accountRest {
+			if tc.accountRest || wholeRest {
 				if b.n != 2 || len(asked) != 1 {
 					t.Fatalf("account fault: asked %v, the other provider %d times", asked, b.n)
 				}
