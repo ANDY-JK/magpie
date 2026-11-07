@@ -3008,14 +3008,17 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			skipped = append(skipped, c.label()+": its provider rests")
 			continue
 		}
-		if restedHere(s.trace.restsOf(tr), c) && anyAwake(cands[i+1:]) {
+		if rounds == 0 && restedHere(s.trace.restsOf(tr), c) && anyAwake(cands[i+1:]) {
 			// this request already rested this key or account, or this
 			// model of it, earlier in its plan: a second ask is the same
 			// question to the same seat, and the same answer — Cloudflare
 			// Workers AI's 401 was asked twice a request, once for each of
 			// two members' models, and Agnes' two keys alike (11-07). It
 			// is left to the rest while a member after it can be asked,
-			// and asked only as the last one left
+			// and asked only as the last one left. The plan's first pass
+			// alone: a replan's round re-adds the members a busy answer
+			// rested, after the pause that rest was waiting for (#1418),
+			// and that round is the ask, not a repeat of it
 			skipped = append(skipped, c.label()+": it rests")
 			continue
 		}
