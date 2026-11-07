@@ -149,6 +149,52 @@ func TestAccountQuotaRestOutlivesRestart(t *testing.T) {
 	}
 }
 
+// A key out for the window it filled is out for days, not the day the
+// file kept: OpenCode Go's week rested its key until 11-11 22:40, the
+// swap of 11-07 17:07 started magpie again, and the key was asked at
+// 17:08:39 and refused, as if it had never rested at all.
+func TestKeyWindowRestOutlivesRestart(t *testing.T) {
+	fresh(t)
+	s := New()
+	p := provider.Provider{ID: "opencode", Name: "OpenCode Go", Key: "sk-week", Chat: "https://opencode.ai/zen/go/v1", Models: []string{"deepseek-v4.1-flash"}}
+	if err := provider.Save(p); err != nil {
+		t.Fatal(err)
+	}
+	renews := time.Now().Add(4 * 24 * time.Hour)
+	keyWindows(t, map[string]provider.Allowance{"sk-week": week(100, renews)})
+	key := candidate{p: p, model: "deepseek-v4.1-flash", rest: "opencode"}
+	near := func(until time.Time) bool { return until.After(renews.Add(-time.Minute)) && !until.After(renews) }
+
+	r := s.restAfter(key, http.StatusTooManyRequests, http.Header{}, []byte(`{"error":{"message":"Go usage limit exceeded"}}`))
+	if r.Why != failQuota || r.By != "window" || !near(r.Until) {
+		t.Fatalf("the window it filled: rests %v by %s (%s), want until %v",
+			time.Until(r.Until).Round(time.Second), r.By, r.Why, renews)
+	}
+
+	restartRests()
+	got, ok := restOf(key.restKey())
+	if !ok {
+		t.Fatal("after a restart the key is asked again, its window still full")
+	}
+	if !near(got.Until) || got.By != "window" || got.Why != failQuota {
+		t.Fatalf("after a restart: %+v, want until %v by window", got, renews)
+	}
+	if got.user == "" {
+		t.Fatal("the window rest names no key: a reading of its windows can't lift it")
+	}
+
+	// a reading that finds the window renewed lifts it, and the lift is
+	// written: the next start doesn't rest on a window that renewed
+	renewed("", got.user)
+	if _, ok := restOf(key.restKey()); ok {
+		t.Fatal("a window a reading found renewed still rests the key")
+	}
+	restartRests()
+	if _, ok := restOf(key.restKey()); ok {
+		t.Fatal("a window a reading found renewed came back after a restart")
+	}
+}
+
 // A key removed while magpie was off is let go, and one ended over a
 // month ago starts over; a rest that isn't a day's isn't kept.
 func TestKeyCreditRestFileForgets(t *testing.T) {

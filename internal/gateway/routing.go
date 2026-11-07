@@ -854,8 +854,8 @@ func restarted(agent, user string) {
 // only by restarted's.
 func liftRests(agent, user string, vendorTill bool) {
 	restingUntil.Lock()
-	defer restingUntil.Unlock()
 	now := time.Now()
+	lifted := false
 	for k, r := range restingUntil.note {
 		if r.agent != agent || !strings.EqualFold(r.user, user) || !(r.Why == failQuota || r.By == "window" || r.Why == failCredit && agent == "codex") {
 			continue
@@ -866,6 +866,11 @@ func liftRests(agent, user string, vendorTill bool) {
 		delete(restingUntil.m, k)
 		delete(restingUntil.note, k)
 		liftedLocked(k, now)
+		lifted = true
+	}
+	restingUntil.Unlock()
+	if lifted {
+		saveRests() // a rest lifted by a reading isn't read back by the next start
 	}
 }
 
@@ -906,8 +911,8 @@ func narrowWhenRead(c candidate, r Rest) {
 	}
 	id, rid := c.restKey(), c.restID()
 	restingUntil.Lock()
-	defer restingUntil.Unlock()
 	if now, ok := restingUntil.note[id]; !ok || now.Why != failQuota || !restingUntil.m[id].Equal(r.Until) {
+		restingUntil.Unlock()
 		return
 	}
 	delete(restingUntil.m, id)
@@ -917,6 +922,8 @@ func narrowWhenRead(c candidate, r Rest) {
 		restingUntil.m[rid] = r.Until
 		restingUntil.note[rid] = r
 	}
+	restingUntil.Unlock()
+	saveRests() // the rest is the model's now: the file is read back that way
 }
 
 // keyAllowance and staleKeyAllowance are provider.KeyAllowance and

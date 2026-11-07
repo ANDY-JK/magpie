@@ -20,8 +20,9 @@ import (
 // Each such rest — its refusals in a row (Failures) and when it ends —
 // is kept in rests.json beside providers.json, and read back once at
 // start (loadRests), so the key rests out what is left and keeps its
-// count. Only those rests are kept: the others are a minute to a few
-// hours, or end when the vendor said, and a reading finds them again.
+// count. So is one out until the window it filled starts again, which is
+// days off. The rest of them are a minute to a few hours, and the next
+// request finds them again.
 
 // restsPath is the file the day rests are kept in.
 func restsPath() string { return filepath.Join(filepath.Dir(provider.Path()), "rests.json") }
@@ -33,9 +34,11 @@ const restsKeep = longestMonthly
 
 // keptRest says r is a rest magpie keeps in rests.json: a key's day out
 // of credit, a key's or account's day out of quota with no word of when
-// (Failures counts its refusals in a row), or a key its vendor refuses
-// outright (keyRefusedRest). A credit refusal that said it can pass soon
-// (creditRest) is not kept: it ends within the hour.
+// (Failures counts its refusals in a row), a key its vendor refuses
+// outright (keyRefusedRest), or one until the window it filled starts
+// again (OpenCode Go's week: days off, read from the key's own usage). A
+// credit refusal that said it can pass soon (creditRest) is not kept: it
+// ends within the hour.
 func keptRest(r Rest) bool {
 	switch {
 	case r.Why == failCredit && r.By == "credit" && r.Failures > 0:
@@ -43,6 +46,15 @@ func keptRest(r Rest) bool {
 	case r.Why == failQuota && r.By == "quota":
 		return true
 	case r.By == "key":
+		return true
+	case r.By == "window":
+		// the window it filled is days out, read from the account's or
+		// key's own usage, and nothing asks the vendor again without it:
+		// OpenCode Go's week rested its key until 11-11 22:40, the swap
+		// of 11-07 17:07 started magpie again, and the key was asked at
+		// 17:08:39 and refused, as if it had never rested. A reading that
+		// finds the window renewed lifts it (renewed), and that lift is
+		// written too.
 		return true
 	}
 	return false
@@ -86,10 +98,13 @@ func saveRests() {
 	restingUntil.Lock()
 	for k, until := range restingUntil.m {
 		r, ok := restingUntil.note[k]
-		if !ok || !keptRest(r) || now.Sub(until) > restsKeep {
+		if !ok {
 			continue
 		}
 		r.Until = until
+		if !keptRest(r) || now.Sub(until) > restsKeep {
+			continue
+		}
 		out[k] = savedRest{Rest: r, First: r.first, AskAt: r.askAt, Guess: r.guess, Agent: r.agent, User: r.user, Said: r.said}
 	}
 	restingUntil.Unlock()
@@ -160,8 +175,12 @@ func loadRests() {
 		if _, ok := restingUntil.m[k]; ok {
 			continue
 		}
-		if longest := now.Add(dayRest); r.Until.After(longest) {
-			r.Until = longest // a clock set back since is no longer rest
+		// a rest further off than a rest can be was written with the clock
+		// set back since: cut to the longest a rest is (longestMonthly),
+		// as one ended that long ago is let go. A day rest is a day out
+		// still; a window's, until the window renews
+		if longest := now.Add(restsKeep); r.Until.After(longest) {
+			r.Until = longest
 		}
 		r.Key = k
 		r.first, r.askAt, r.guess, r.agent, r.user, r.said = v.First, v.AskAt, v.Guess, v.Agent, v.User, v.Said
