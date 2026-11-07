@@ -4466,7 +4466,11 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				continue
 			}
 		}
-		refusedKey := keyRefused(c, hw.code(), failureOf(c, hw.code(), hw.errBody()))
+		// a 401 is the only answer whose body says whether the key itself
+		// was refused: read it then, once, not on every reply that went
+		// through — a 24MB JSON answer held whole for failureOf is a body
+		// scanned a minute and more per request (7ac20247a)
+		refusedKey := hw.code() == http.StatusUnauthorized && keyRefused(c, hw.code(), failureOf(c, hw.code(), hw.errBody()))
 		if last && !held && !hw.passing && hw.failed() && (refusedKey ||
 			try.Fail == failRestricted || failure(hw.code(), hw.errBody()) == failRestricted ||
 			quotaStatus(hw.code()) && (c.p.Account == nil || !hw.turnedAway && try.Fail != failPrompt) && (try.Fail == failQuota || try.Fail == failCredit || failure(hw.code(), hw.errBody()) == failQuota || failure(hw.code(), hw.errBody()) == failCredit)) {
