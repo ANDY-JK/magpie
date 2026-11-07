@@ -3008,6 +3008,17 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			skipped = append(skipped, c.label()+": its provider rests")
 			continue
 		}
+		if restedHere(s.trace.restsOf(tr), c) && anyAwake(cands[i+1:]) {
+			// this request already rested this key or account, or this
+			// model of it, earlier in its plan: a second ask is the same
+			// question to the same seat, and the same answer — Cloudflare
+			// Workers AI's 401 was asked twice a request, once for each of
+			// two members' models, and Agnes' two keys alike (11-07). It
+			// is left to the rest while a member after it can be asked,
+			// and asked only as the last one left
+			skipped = append(skipped, c.label()+": it rests")
+			continue
+		}
 		if i < len(cands)-1 {
 			if _, _, ok := quotaHeld(cands[i:]); ok {
 				// every key left is out of its allowance, resting until it
@@ -3672,6 +3683,13 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			if rest, ok := restSlow(c, time.Now()); ok {
 				try.Rest = &rest
 			}
+			// a start past the deadline is a speed sample, the deadline
+			// itself being the least it can have taken: Balance weighs the
+			// member as slow (routes.Seat.TTFT, slowSeats), so one that
+			// keeps missing it is asked after those that answer. 77625
+			// began 35 answers past 30s on 11-07, each a 30s timeout, and
+			// was weighed fast because only its answers were timed
+			noteSpeed(c, int64(firstToken)*1000, 0, 0, time.Now())
 			call.TTFT, call.FirstText, call.Flow, call.FirstReasoning = 0, 0, 0, 0
 			watched.attempt(call, try, c.p.ID, sent, hw, capture)
 			s.trace.update(tr, func(t *Route) { t.Tries[len(t.Tries)-1] = try })

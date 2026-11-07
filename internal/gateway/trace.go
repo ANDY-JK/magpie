@@ -809,6 +809,24 @@ func (t *trace) maskedOf(r *Route) *Masked {
 	return r.Masked
 }
 
+// restsOf is the rest each try of the route so far took, read under the
+// trace's lock: the serve loop leaves a member the request already rested
+// to the rest while another can be asked (restedHere).
+func (t *trace) restsOf(r *Route) []Rest {
+	if r == nil {
+		return nil
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var out []Rest
+	for _, try := range r.Tries {
+		if try.Rest != nil {
+			out = append(out, *try.Rest)
+		}
+	}
+	return out
+}
+
 func (t *trace) update(r *Route, f func(r *Route)) {
 	if r == nil {
 		return

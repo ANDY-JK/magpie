@@ -1467,6 +1467,23 @@ func anyAwake(cs []candidate) bool {
 	return false
 }
 
+// restedHere says a try of this request rested c, and c still rests: its
+// account or key, its model on that seat, or its provider as a whole
+// (blockedKey). The rest the try took is what the next candidate is
+// spared: a member the plan had twice, as a group's two models on one
+// key, would tell the same seat the same thing again, and hear the same
+// answer. One whose rest has run out is asked as the plan has it, as a
+// replan's round does once a moment's limit has passed.
+func restedHere(rests []Rest, c candidate) bool {
+	now := time.Now()
+	for _, r := range rests {
+		if r.Key != "" && now.Before(r.Until) && (r.Key == c.restKey() || r.Key == c.restID() || r.Key == blockedKey(c.p)) {
+			return true
+		}
+	}
+	return false
+}
+
 // quotaWords are how vendors say "out of quota" or "slow down" when their
 // status code doesn't: some answer 400 or 403 with it.
 var quotaWords = regexp.MustCompile(`(?i)quota|insufficient|balance|credit|billing|out of budget|budget (exceeded|exhausted)|exceeded|rate.?limit|usage.?limit|limit.?reached|hit your .*limit|limit.{0,24}resets|too many requests|overloaded|余额|额度|欠费|限流|频率|频繁|速率|套餐|用量|上限`)

@@ -83,6 +83,9 @@ func forgetRouting() {
 	routed.Lock()
 	routed.used, routed.failures, routed.slow = map[string]tokenUse{}, map[string]int{}, map[string]slowRun{}
 	routed.Unlock()
+	speeds.Lock()
+	speeds.m = map[string]speedRec{}
+	speeds.Unlock()
 	routes.Forget()
 }
 
