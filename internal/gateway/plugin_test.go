@@ -160,9 +160,18 @@ func TestPluginProvider(t *testing.T) {
 	if l := lapsed(); !strings.Contains(l, "sign-in has expired") {
 		t.Fatalf("the refused account's mark: %q", l)
 	}
+	// a key the vendor refuses with a 401 rests the day (keyRefusedRest),
+	// so every request until that rest is lifted is answered here and the
+	// mark stays: it clears on the first request that goes through, which
+	// is the one after "Try now" (s.Unrest)
+	rested := s.trace.routes[len(s.trace.routes)-1].Tries[0].Rest
+	if rested == nil || rested.By != "key" {
+		t.Fatalf("the refused key's rest: %+v", rested)
+	}
 	mu.Lock()
 	refused = ""
 	mu.Unlock()
+	s.Unrest(rested.Key)
 	for i := 0; i < 3 && lapsed() != ""; i++ {
 		postAs(t, s, "", `{"model":"fakeco/fake-1","messages":[{"role":"user","content":"hello"}]}`)
 	}
