@@ -862,10 +862,8 @@ func sinkOwn(sub provider.Group, cs []candidate, order []Weighed) ([]candidate, 
 // a group in a group, or a provider routed its own way, is weighed by.
 func firstAwake(cs []candidate) candidate {
 	for _, c := range cs {
-		if _, resting := restOf(c.restKey()); !resting {
-			if _, resting = restOf(c.restID()); !resting {
-				return c
-			}
+		if _, resting := restOfAny(c); !resting {
+			return c
 		}
 	}
 	return cs[0]
@@ -1179,10 +1177,7 @@ func probeOne(cs []candidate) []candidate {
 	rests := 0
 	rest := make([]bool, len(cs))
 	for i, c := range cs {
-		r, ok := restOf(c.restKey())
-		if !ok && c.restID() != c.restKey() {
-			r, ok = restOf(c.restID())
-		}
+		r, ok := restOfAny(c)
 		if !ok {
 			continue
 		}
@@ -1209,10 +1204,7 @@ func probeOne(cs []candidate) []candidate {
 // group weighs nothing by them, and a reading that finds them full no
 // more is what brings it back (renewed).
 func restingOf(c candidate) (Rest, bool) {
-	r, ok := restOf(c.restKey())
-	if !ok && c.restID() != c.restKey() {
-		r, ok = restOf(c.restID())
-	}
+	r, ok := restOfAny(c)
 	if ok && r.agent == "" && r.user != "" {
 		keyAllowance(c.p)
 	}
@@ -1428,6 +1420,39 @@ func restOf(id string) (Rest, bool) {
 	r := restingUntil.note[id]
 	r.Until = until
 	return r, true
+}
+
+// blockedKey is what a provider rests by when its vendor's edge firewall
+// blocked this computer's address: its id and "*", which no candidate's
+// own key reads as (id, id#key or id@user, or one of those with /model).
+// The block is the address's, which every key and account of the provider
+// goes out from, so it rests the provider as a whole (restOfAny) rather
+// than the one that happened to be asked.
+func blockedKey(p provider.Provider) string { return p.ID + "*" }
+
+// blockedKeyOf is blockedKey for the provider a rest key names: "id",
+// "id#key" and "id@user", each with or without /model, all name id.
+func blockedKeyOf(k string) string {
+	k, _, _ = strings.Cut(k, "/")
+	if i := strings.IndexAny(k, "#@"); i > 0 {
+		k = k[:i]
+	}
+	return k + "*"
+}
+
+// restOfAny is why c rests: by its own key or account, or by its model, or
+// by its provider as a whole — a firewall's block of this computer's
+// address (blockedKey).
+func restOfAny(c candidate) (Rest, bool) {
+	if r, ok := restOf(c.restKey()); ok {
+		return r, true
+	}
+	if id := c.restID(); id != c.restKey() {
+		if r, ok := restOf(id); ok {
+			return r, true
+		}
+	}
+	return restOf(blockedKey(c.p))
 }
 
 // quotaWords are how vendors say "out of quota" or "slow down" when their
@@ -4053,10 +4078,7 @@ func pinTo(raw string, cands []candidate, pl planned) ([]candidate, planned, int
 		if i >= len(pl.order) || !match(pl.order[i]) {
 			continue
 		}
-		r, ok := restOf(c.restKey())
-		if !ok && c.restID() != c.restKey() {
-			r, ok = restOf(c.restID())
-		}
+		r, ok := restOfAny(c)
 		if ok {
 			rests = append(rests, fmt.Sprintf("%s rests until %s (%s)", c.label(), r.Until.Format(time.RFC3339), r.Why))
 			continue

@@ -81,6 +81,10 @@ func served(rest, key string, tokens int) {
 // when it has one, the candidate's model-specific rest.
 func servedCandidate(c candidate, tokens int) {
 	served(c.restKey(), c.restKey(), tokens)
+	// an answer from any key or account of it says the address isn't the
+	// one a firewall is blocking: the provider's whole-block rest ends at
+	// once, not when its three minutes are up
+	clearRest(blockedKey(c.p))
 	provider.NoteServed(c.p, time.Now())
 	provider.Unretire(c.p.ID, c.model) // back in service, if it was said retired
 	if id := c.restID(); id != c.restKey() {
@@ -197,6 +201,15 @@ const (
 	// every time, never a step on the backoff ladder
 	overloadRest     = 30 * time.Second
 	overloadRestMost = time.Minute
+	// edgeRest is how long a provider sits out when its vendor's edge
+	// firewall blocked this computer's address (provider.EdgeBlocked): the
+	// block is the address's, which every key and account of the provider
+	// goes out from, so the provider rests as a whole and no key's or
+	// account's own ladder is climbed. Three minutes is the ZCode plugin's
+	// own hold on the same block (its EDGE_HOLD), so magpie asks again as
+	// that hold ends, and once more every three minutes while the address
+	// is blocked.
+	edgeRest = 3 * time.Minute
 	// longestRateRest is the most a rate limit that keeps coming back as
 	// soon as its rest is over is waited out, when the vendor says nothing
 	// of when (rateRest)
@@ -877,6 +890,17 @@ func (s *Server) Unrest(key string) bool {
 	kept := keptRest(restingUntil.note[key])
 	delete(restingUntil.m, key)
 	delete(restingUntil.note, key)
+	// "Try now" on any key or account of a provider the vendor's firewall
+	// blocked asks the whole provider again: the block is the address's,
+	// and the user's own retry is the way around it at once
+	if p := blockedKeyOf(key); p != key {
+		if _, held := restingUntil.m[p]; held {
+			ok = true
+			delete(restingUntil.m, p)
+			delete(restingUntil.note, p)
+			liftedLocked(p, time.Now())
+		}
+	}
 	liftedLocked(key, time.Now())
 	restingUntil.Unlock()
 	if kept {
@@ -900,6 +924,16 @@ func (s *Server) UnrestAll(key string) int {
 			delete(restingUntil.m, k)
 			delete(restingUntil.note, k)
 			liftedLocked(k, now)
+			n++
+		}
+	}
+	// the provider's whole rest too, when a firewall blocked its address:
+	// the user asked for it to be tried now
+	if p := blockedKeyOf(key); p != key {
+		if _, held := restingUntil.m[p]; held {
+			delete(restingUntil.m, p)
+			delete(restingUntil.note, p)
+			liftedLocked(p, now)
 			n++
 		}
 	}
@@ -1414,6 +1448,13 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 		}
 		d = min(d, longest)
 	case failRate:
+		if zcodeConcurrency(c, status, body) {
+			// the plan's in-flight cap, not a rate limit (zcodeConcurrency):
+			// the account is busy for a moment, and resting it as a rate
+			// limit climbed a ladder that reached thirty minutes on it
+			d, r.By = overloadRest, "cooldown"
+			break
+		}
 		d, r.By, r.Failures = s.rateRest(c, header, body, sharedPool, now)
 		// rate limited with quota left: to the back, where the order sinks
 		if c.full(now).IsZero() && !(c.isOpenRouterFree() && sharedPool) {
@@ -1463,6 +1504,26 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 			if w := retryAfter(header, now); w > 0 {
 				d, r.By = min(w, overloadRestMost), "retry-after"
 			}
+			break
+		}
+		if why == failOther && !unserved && provider.EdgeBlocked(wordsOf(body)) && !restrictedSaid(status, wordsOf(body)) {
+			// the vendor's edge firewall blocked this computer's address
+			// (Alibaba Cloud's in front of zcode.z.ai: a 405 block page, as
+			// the ZCode plugin words it in provider.BlockedHint). The
+			// account is as good as it was, and every key and account of
+			// the provider goes out from that address, so it is the
+			// provider's, not the account's: the provider rests as a whole
+			// (blockedKey), no ladder is climbed, and the group's other
+			// providers carry the request. Before, each account rested
+			// through the failOther ladder the block was the account's:
+			// zcode's four took 405s at 10:21 on 11-07 one after another,
+			// each resting longer than the block lasted (two of them six
+			// minutes), and every request asked them all again. A ZCode
+			// trial entry zcode.z.ai's firewall blocked is that entry's and
+			// rests alone (zcodeTrialBlocked, in unserved); the account
+			// ZCode's own risk control blocked says so (failRestricted,
+			// read before this)
+			d, r.By = edgeRest, "blocked"
 			break
 		}
 		counted := c.restKey()
@@ -1587,6 +1648,11 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 	}
 	if remoteModelRest(c, why, header) {
 		id, r.there = c.restID(), true
+	}
+	// a firewall's block is the address's: the provider rests as a whole,
+	// for every key and account of it (blockedKey)
+	if r.By == "blocked" {
+		id = blockedKey(c.p)
 	}
 	r.Key = id
 	if id == c.restID() {

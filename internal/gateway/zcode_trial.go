@@ -21,6 +21,27 @@ var (
 	zcodeSpentWords = regexp.MustCompile(`(?:^|: )ZCode's limited quota for (\S+) is exhausted or temporarily unavailable$`)
 )
 
+// zcodeConcurrencyWords is how the ZCode plugin answers a request past the
+// plan's in-flight cap: the vendor's own code, kept in the message, and
+// the plugin's words for what it means (its BUSY_HINT).
+var zcodeConcurrencyWords = regexp.MustCompile(`(?i)\((?:429), code 300[89]\)|ZCode serves one account a few requests at a time`)
+
+// zcodeConcurrency says a 429 from a ZCode plugin account is the plan's
+// in-flight cap (3008, "user concurrency limit exceeded", or 3009 for a
+// model) and not a rate limit: the request's turn had not come, and the
+// same request a moment later is served. The plugin waits about ten
+// seconds over it before it answers, so magpie rests the account a short
+// while and asks again — no rung of the rate ladder, which read it as the
+// account being rate limited over and over: on 11-07 zcode@龙_2608 sat out
+// thirty minutes by 01:02 and zcode@唯心_9997 sixteen by 01:04, from
+// refusals that only said the account was busy.
+func zcodeConcurrency(c candidate, status int, body []byte) bool {
+	if status != http.StatusTooManyRequests || c.p.PluginProvider() != "zcode" {
+		return false
+	}
+	return zcodeConcurrencyWords.Match(wordsOf(body))
+}
+
 // zcodeTrialRefused says c, a ZCode plugin account asked for one of its
 // Start Plan trial entries, was refused for that entry's own quota
 // (zcodeEndedWords, zcodeSpentWords), naming the model asked for. The
