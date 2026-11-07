@@ -1442,7 +1442,7 @@ func blockedKeyOf(k string) string {
 
 // restOfAny is why c rests: by its own key or account, or by its model, or
 // by its provider as a whole — a firewall's block of this computer's
-// address (blockedKey).
+// address, or its endpoint's page in place of its API (blockedKey).
 func restOfAny(c candidate) (Rest, bool) {
 	if r, ok := restOf(c.restKey()); ok {
 		return r, true
@@ -1453,6 +1453,18 @@ func restOfAny(c candidate) (Rest, bool) {
 		}
 	}
 	return restOf(blockedKey(c.p))
+}
+
+// anyAwake says one of cs doesn't rest now, as restOfAny reads it: a
+// provider resting as a whole leaves its other seats to the rest while
+// another that can be asked is left.
+func anyAwake(cs []candidate) bool {
+	for _, c := range cs {
+		if _, ok := restOfAny(c); !ok {
+			return true
+		}
+	}
+	return false
 }
 
 // quotaWords are how vendors say "out of quota" or "slow down" when their

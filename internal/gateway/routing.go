@@ -210,6 +210,15 @@ const (
 	// that hold ends, and once more every three minutes while the address
 	// is blocked.
 	edgeRest = 3 * time.Minute
+	// vendorRest is how long a keyed provider sits out when its endpoint
+	// answers with a web page where its API should be (provider.WebPage):
+	// every key of it is a key of the one endpoint, so a page in place of
+	// the API is the provider's, not the key's. fiimeopc's six keys each
+	// answered 404 with the same page on 11-07, every group request asking
+	// six of them for one model and six more for another: two and a half
+	// seconds and twelve tries for nothing, on every request that reached
+	// it. An answer from any key lifts it, and it climbs no key's ladder.
+	vendorRest = 2 * time.Minute
 	// longestRateRest is the most a rate limit that keeps coming back as
 	// soon as its rest is over is waited out, when the vendor says nothing
 	// of when (rateRest)
@@ -1256,6 +1265,17 @@ func restError(status int, body []byte) string {
 
 const restErrorRunes = 300
 
+// endpointPage says a failure's words are a vendor's endpoint answering
+// with a web page where its API should be: the page itself, or magpie's
+// words for it (provider.WebPage), which is what reaches restAfter for a
+// reply already read and worded by its adapter.
+func endpointPage(body []byte) bool {
+	if _, ok := provider.WebPage(body); ok {
+		return true
+	}
+	return bytes.Contains(body, []byte("a web page, not an API reply"))
+}
+
 // restAfter sets a failed candidate aside for as long as its failure says.
 func (s *Server) restAfter(c candidate, status int, header http.Header, body []byte) Rest {
 	return s.restAfterMarked(c, status, header, body, openRouterSharedPool(body))
@@ -1526,6 +1546,24 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 			d, r.By = edgeRest, "blocked"
 			break
 		}
+		if why == failOther && !unserved && c.p.Account == nil {
+			if endpointPage(body) {
+				// the vendor's endpoint answered with a web page where its
+				// API should be — a relay's own front end, a proxy's, a
+				// path that moved — and every key of it is a key of that
+				// one endpoint, so it is the provider's, not the key's
+				// (vendorRest). fiimeopc's six keys answered 404 with the
+				// same page to every request on 11-07: each key rested a
+				// minute on its own, and every group request asked six of
+				// them for one model and six more for another. A JSON
+				// refusal is the vendor's own answer and stays the key's,
+				// and an account's page may be its plan's (zcodeTrialBlocked
+				// reads those), so only a keyed provider's is the whole
+				// provider's
+				d, r.By = vendorRest, "vendor"
+				break
+			}
+		}
 		counted := c.restKey()
 		if unserved {
 			counted = c.restID()
@@ -1649,9 +1687,10 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 	if remoteModelRest(c, why, header) {
 		id, r.there = c.restID(), true
 	}
-	// a firewall's block is the address's: the provider rests as a whole,
-	// for every key and account of it (blockedKey)
-	if r.By == "blocked" {
+	// a firewall's block is the address's, and an endpoint's page in place
+	// of its API is every key's: the provider rests as a whole, for every
+	// key and account of it (blockedKey)
+	if r.By == "blocked" || r.By == "vendor" {
 		id = blockedKey(c.p)
 	}
 	r.Key = id

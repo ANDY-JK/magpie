@@ -2996,6 +2996,18 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			i--
 			continue
 		}
+		if _, whole := restOf(blockedKey(c.p)); whole && anyAwake(cands[i+1:]) {
+			// the provider rests as a whole: its vendor's edge firewall
+			// blocked this address, or its endpoint answered with a page
+			// where its API should be (blockedKey). Another of its keys or
+			// accounts asked now is the same address or the same endpoint,
+			// and the same answer: planned before that rest existed, it is
+			// left to the rest while a member after it can be asked — the
+			// group's next, as the plan has them — and asked only as the
+			// last one left, where the provider may have recovered
+			skipped = append(skipped, c.label()+": its provider rests")
+			continue
+		}
 		if i < len(cands)-1 {
 			if _, _, ok := quotaHeld(cands[i:]); ok {
 				// every key left is out of its allowance, resting until it
