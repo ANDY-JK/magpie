@@ -89,9 +89,6 @@ func seatMatch(a, b SubscriptionQuota) int {
 	return 0
 }
 
-// sameAccount is seatMatch's "the same seat", read afresh.
-func sameAccount(a, b SubscriptionQuota) bool { return seatMatch(a, b) == 1 }
-
 // seatName is how the account card standing in for plan p names the
 // seat: the key provider's name, and the key's when it has several.
 func seatName(p SubscriptionQuota) string {

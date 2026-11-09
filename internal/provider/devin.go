@@ -654,22 +654,6 @@ func DevinAuthAt(home string) (key, server string, err error) {
 	return c.Key, server, nil
 }
 
-// DevinVariant is the model to ask Devin's API for: a family's name
-// follows its newest model, which the API takes only as one of its
-// variants — the one at the effort asked for, or at the nearest effort
-// the family has; with none asked, the family's default. A family's fast
-// run (claude-opus-5-5-fast) is likewise its fast variant at that effort
-// (claude-opus-5-5-high-fast). A variant's own id (swe-2-medium, one an
-// agent was set to) goes as it is, whatever effort is asked: its id is the
-// effort it runs at.
-func DevinVariant(ctx context.Context, model, effort string) string {
-	families, err := DevinFamilies(ctx)
-	if err != nil {
-		return model
-	}
-	return devinVariantIn(families, model, effort)
-}
-
 func devinVariantIn(families []DevinFamily, model, effort string) string {
 	for _, f := range families {
 		if !f.named(model) || len(f.Models) == 0 {

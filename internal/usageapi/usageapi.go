@@ -71,14 +71,11 @@ func State(p usage.Period) Usage { return stateOf(usage.Summarize(p)) }
 // them, and SessionCount says how many there are.
 const PageSessions = 100
 
-// Page is State with the top PageSessions sessions only, which is what the
-// Usage page asks for: over a long history (Vantiboo1ean, ~750k requests)
-// State sent the page every one of ~84k sessions (22 MB) and worked the
-// summary out again for each refresh.
-func Page(p usage.Period) Usage { return PageIn(p, nil) }
-
-// PageIn is Page with the period's days and the chart's hours in zone, the
-// reader's (ZoneOf); nil is this computer's.
+// PageIn is what the Usage page asks for, with the period's days and the
+// chart's hours in zone, the reader's (ZoneOf); nil is this computer's:
+// the top PageSessions sessions only, over a long history (Vantiboo1ean,
+// ~750k requests) having had State send the page every one of ~84k
+// sessions (22 MB) and work the summary out again for each refresh.
 func PageIn(p usage.Period, zone *time.Location) Usage {
 	return stateOf(usage.SummarizeTopIn(p, PageSessions, zone))
 }
