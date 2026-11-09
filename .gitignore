@@ -13,3 +13,8 @@
 
 # 历史测试的遗留物（隔离配置、旧截图、旧打包），可整体删除
 /_scratch-*/
+
+# 本机缓存写进了仓库目录：mimosa 的钩子状态在嵌套目录也会再生，
+# PowerShell 的分析缓存则是在 internal/gui 下跑脚本时落下的
+**/.mimosa/
+/internal/gui/Microsoft/
