@@ -9,6 +9,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const cline = {
@@ -70,6 +71,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const posts = [];
       await page.route("**/*", serve(lang, posts));
       await page.goto("http://magpie.test/?view=providers");
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
       const zh = await page.evaluate(() => [
         "DeepSeek and GLM models only from their makers' own APIs", "Upstream",
         "Cline serves a model from any host its gateway picks; pinned, a request for a DeepSeek model goes only to DeepSeek and one for a GLM model only to Z.ai, which keeps its prompt cache, and fails when that API can't take it",

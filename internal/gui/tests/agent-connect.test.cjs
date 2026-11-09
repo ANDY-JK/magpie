@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const options = [{ value: "gpt-5.4", label: "GPT-5.4" }, { value: "relay/m1", label: "m1", ref: "relay/m1", note: "Relay · via magpie" }];
@@ -74,6 +75,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.route("**/*", server(lang, posts));
       await page.goto("http://magpie.test/?view=agents");
       await page.locator(`${row("codex")} .ag-conn`).waitFor();
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
       const missing = await page.evaluate(() => [
         "Not connected · {agent} uses its own settings",
         "Connected · pick magpie's models with {cmd} in {agent}",

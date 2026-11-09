@@ -13,6 +13,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const options = ["gpt-5.4", "magpie/relay/m1"].map((m) => ({ value: m, label: "Label " + m, ...(m.startsWith("magpie/") ? { ref: "relay/m1" } : {}) }));
@@ -77,6 +78,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // Claude Code, not connected, is under Not set up (#726): unrolled
       await page.locator(".agent-more").click();
       await page.waitForFunction(() => !document.querySelector(".agent-fold-inner")?.inert);
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
       const missing = await page.evaluate(() => [
         "Drag to reorder · click to move, hide or disconnect from magpie",
         "Disconnect from magpie",

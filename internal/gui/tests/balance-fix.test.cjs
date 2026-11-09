@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const relay = {
@@ -160,6 +161,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     }
     assert.equal(said[5], "Allowance unavailable — hover for why", "a Start Plan that couldn't be read is not a plan that ended");
     assert.equal(said[6], "Allowance unavailable — hover for why", "a sign-in error names the address itself and is not the card's")
+    await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
     const missing = await page.evaluate(() => [
       "…/api/usage/token takes the API key, not this token: for the account's balance, new-api uses /api/user/self; sub2api uses /api/v1/user/profile.",
       "The token needs a Balance URL: a new-api relay uses /api/user/self; a sub2api panel uses /api/v1/user/profile to read the account's balance.",
@@ -230,8 +232,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     assert.equal(await page.locator(".editor .bal-path").inputValue(), "$data.balance", "the key query's field gives way");
     assert.equal(await fix.textContent(), "");
 
+    await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
+
     const said = await page.evaluate(() => quotaError("the Balance URL https://relay.example.com/v1/usage takes the API key, not the login token: set it to https://relay.example.com/api/v1/user/profile (Balance field $data.balance) for the account's balance, or remove the token for the key's own"));
     assert.equal(said, "The Balance URL …/v1/usage takes the API key, not the login token — set it to …/api/v1/user/profile in the provider's settings");
+    await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
     const missing = await page.evaluate(() => [
       "…/v1/usage takes the API key, not this token: for the account's balance, a sub2api panel uses /api/v1/user/profile.",
       "The Balance URL …/v1/usage takes the API key, not the login token — set it to …/api/v1/user/profile in the provider's settings",

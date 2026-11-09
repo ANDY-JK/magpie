@@ -16,6 +16,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const ago = (min) => new Date(Date.now() - min * 6e4).toISOString();
@@ -143,6 +144,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await panel.locator(".pq-card.bal", { hasText: "Plain" }).locator(".pq-amt").textContent(), "¥9.00");
       const pover = await panel.evaluate(() => [...document.querySelectorAll(".pq-card.bal")].filter((c) => c.scrollWidth > c.clientWidth + 1).length);
       assert.equal(pover, 0, "nothing runs out of a balance's card");
+
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
 
       const missing = await page.evaluate(() => ["As of {when}", "Updated {when}", "As of {when} — couldn't be read just now"].filter((k) => !I18N.zh[k])
         .concat(Object.keys(I18N).flatMap((l) => ["Granted", "Topped up"].filter((k) => !I18N[l][k]).map((k) => l + ":" + k))));

@@ -44,7 +44,11 @@ function serve(lang, state) {
     if (url.pathname === "/api/usage/quotas") return json(state.cards);
     if (url.pathname === "/api/groups") return json({ groups: [], pools: [] });
     if (url.pathname.startsWith("/api/")) {
-      assert.equal(route.request().method(), "GET", `unexpected mutation: ${url.pathname}`);
+      // tintTitleBar paints Windows' own bar the page's colour (app.js);
+      // any other POST here would be the page writing what it should not
+      if (url.pathname !== "/api/window/titlebar") {
+        assert.equal(route.request().method(), "GET", `unexpected mutation: ${url.pathname}`);
+      }
       return json({});
     }
     if (url.host !== "magpie.test" || !/^\/[\w./-]*$/.test(url.pathname)) return route.fulfill({ status: 404, body: "" });

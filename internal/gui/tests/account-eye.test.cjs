@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const SEAT = "某某·GLM高级版", TEAM = "3141592636@qq.com", ME = "me@example.com";
@@ -191,6 +192,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.equal(await page.locator("select").count(), 0, "no native select");
         assert.deepEqual(await stripes(page, ".accts .acct-who, .accts .acct-who *"), [], "no border stripes");
         assert.equal(await wide(page), 0, `no sideways scroll at ${width}px`);
+        await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
         const missing = await page.evaluate(([keys, lang]) => lang === "en" ? [] : keys.filter((k) => !I18N[lang]?.[k]), [KEYS, lang]);
         assert.deepEqual(missing, [], `every string has its ${lang}`);
         assert.deepEqual(errors, []);

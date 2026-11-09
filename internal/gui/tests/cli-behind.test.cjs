@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 
@@ -86,6 +87,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         "The `magpie` command is a copy",
         "The `magpie` command at {path} is a copied file, not the installer's link to the app: it won't follow the app's updates, and an old copy can break what a new one fixed. Re-run the installer, or link it by hand.",
       ];
+      await allWords(ok); // each language's words are a file of its own (i18n.<lang>.js)
       const missing = await ok.evaluate((ks) => ks.filter((x) => !I18N.zh[x]), keys);
       assert.deepEqual(missing, [], "the advice has its Chinese");
       assert.deepEqual(errors, []);

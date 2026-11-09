@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const relay = {
@@ -69,6 +70,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           return page;
         };
         let page = await open(relay);
+        await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
         const w = await page.evaluate(([keys, lang]) => Object.fromEntries(keys.map((k) => [k, lang === "en" ? k : I18N[lang][k]])), [[LINE, CHIP, PICKED, "Only through routing groups"], lang]);
         assert.deepEqual(Object.entries(w).filter(([, v]) => !v).map(([k]) => k), [], "every string has its words");
 

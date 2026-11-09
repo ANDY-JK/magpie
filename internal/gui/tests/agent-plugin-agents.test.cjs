@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = process.env.MAGPIE_GUI_ASSETS || path.resolve(__dirname, "../assets");
 const INSTALLS = [

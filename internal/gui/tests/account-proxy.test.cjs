@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const codex = {
@@ -175,8 +176,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(saved.body.accountProxies, { "me@example.com": "direct", "third@example.com": "http://10.0.0.7:3128" });
       assert.deepEqual(saved.body.models, ["gpt-6"], "its picks go with it");
 
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
+
       const border = await page.evaluate(() => [...document.querySelectorAll(".acct-proxies, .acct-proxies *")].map((e) => getComputedStyle(e).borderLeftWidth).filter((b) => parseFloat(b) > 1));
       assert.deepEqual(border, [], "no border stripes");
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
       const missing = await page.evaluate(() => [
         "Provider's proxy",
         "Each account can go through a proxy of its own; Provider's proxy is the one above",

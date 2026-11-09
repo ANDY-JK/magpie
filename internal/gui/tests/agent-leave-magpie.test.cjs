@@ -15,6 +15,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const options = [
@@ -97,6 +98,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.route("**/*", srv);
       await page.goto("http://magpie.test/?view=agents");
       await page.locator(`${row} .ag-conn`).waitFor();
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
       const missing = await page.evaluate(() => [
         "via magpie", "{agent} asks magpie for it", "direct, not via magpie", "off magpie",
         "{agent} as installed: magpie's endpoint and models come out", "Take {agent} off magpie?",

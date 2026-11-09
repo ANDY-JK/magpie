@@ -15,6 +15,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 const { watchSettingsReads, settingsDrawn, openPart } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
@@ -202,6 +203,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await row.locator(".sub", { hasText: w.moved }).waitFor();
         assert.ok(await row.locator("button.cli-add").isHidden());
         assert.equal(await row.locator(".cli-shell button").count(), 0);
+        await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
         const missing = await page.evaluate(() => {
           const src = String(renderCLI);
           const keys = [...src.matchAll(/t\("((?:[^"\\]|\\.)*)"/g)].map((m) => JSON.parse('"' + m[1] + '"'));
