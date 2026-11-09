@@ -855,17 +855,6 @@ func (s *Server) seenBody(ctx context.Context, proto provider.Protocol, body []b
 	})
 }
 
-// smallModelWhere is smallModel among the provider's models that keep
-// holds, what it costs, and whether it has allowance left (smallReady);
-// "" when there is none. kind names keep (keptSmallCands).
-func smallModelWhere(p provider.Provider, kind string, keep func(catalog.Model) bool) (string, float64, bool) {
-	c, ready := smallReadyOf(p, keptSmallCands(p, kind, keep), provider.Chat)
-	if c.id == "" {
-		return "", 0, false
-	}
-	return c.id, c.cost, ready
-}
-
 // imageRefusedWords are how a vendor turns away an image its model can't
 // take: DeepSeek's 400 "Failed to deserialize the JSON body into the
 // target type: messages[0]: unknown variant `image_url`, expected `text`"

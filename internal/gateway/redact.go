@@ -18,17 +18,12 @@ import (
 	"github.com/yetone/magpie/internal/settings"
 )
 
-// redacted masks a request's secrets, as the settings say, before it goes
-// to a vendor, and wraps w so what the vendor answers has them back; done
-// writes what the wrapper still holds. Nothing masked, nothing wrapped. It
-// fails closed: masking wanted with no masker serving, or a masker that
-// fails, is an error, and the request goes nowhere (gwmw.Masking).
-func redacted(ctx context.Context, w http.ResponseWriter, body []byte) (http.ResponseWriter, []byte, func(), error) {
-	w, body, done, _, err := redactedHits(ctx, w, body)
-	return w, body, done, err
-}
-
-// redactedHits is redacted with what it swapped, for the record of it
+// redactedHits masks a request's secrets, as the settings say, before it
+// goes to a vendor, and wraps w so what the vendor answers has them back;
+// done writes what the wrapper still holds. Nothing masked, nothing
+// wrapped. It fails closed: masking wanted with no masker serving, or a
+// masker that fails, is an error, and the request goes nowhere
+// (gwmw.Masking). What it swapped comes with it, for the record of it
 // (noteMasked). A masker that waits (for the local model's turn) stops
 // waiting when ctx ends, and the request goes nowhere.
 func redactedHits(ctx context.Context, w http.ResponseWriter, body []byte) (http.ResponseWriter, []byte, func(), maskHits, error) {
@@ -89,15 +84,10 @@ func toldBack(rw http.ResponseWriter, done func(), h *maskHits) func() {
 	}
 }
 
-// redactedPrompt masks a parsed image or video prompt before any vendor
-// body is built, including multipart forms, and restores the reply's text.
-// It fails closed as redacted does.
-func redactedPrompt(ctx context.Context, w http.ResponseWriter, prompt string) (http.ResponseWriter, string, func(), error) {
-	w, masked, done, _, err := redactedPromptHits(ctx, w, prompt)
-	return w, masked, done, err
-}
-
-// redactedPromptHits is redactedPrompt with what it swapped.
+// redactedPromptHits masks a parsed image or video prompt before any
+// vendor body is built, including multipart forms, and restores the
+// reply's text, with what it swapped. It fails closed as redactedHits
+// does.
 func redactedPromptHits(ctx context.Context, w http.ResponseWriter, prompt string) (http.ResponseWriter, string, func(), maskHits, error) {
 	m, masked, h, err := maskTextHits(ctx, prompt)
 	if err != nil || m == nil { // masking off: nothing to put back
@@ -112,16 +102,10 @@ func redactedPromptHits(ctx context.Context, w http.ResponseWriter, prompt strin
 	return rw, masked, done, h, nil
 }
 
-// maskedText is s masked as the settings say, and how many values it
-// swapped; an error when it can't be (fail closed).
-func maskedText(ctx context.Context, s string) (string, int, error) {
-	_, masked, h, err := maskTextHits(ctx, s)
-	return masked, h.n, err
-}
-
-// maskTextHits is maskedText with the masker that masked it and what it
-// swapped. Its wait for the local model ends with ctx, as redactedHits'
-// does.
+// maskTextHits is s masked as the settings say, with the masker that
+// masked it and how many values it swapped; an error when it can't be
+// (fail closed). Its wait for the local model ends with ctx, as
+// redactedHits' does.
 func maskTextHits(ctx context.Context, s string) (gwmw.Masker, string, maskHits, error) {
 	m, err := gwmw.Masking(redactionWanted())
 	if m == nil {

@@ -342,15 +342,9 @@ func resolveRetrievalModel(id string) (provider.Provider, string, bool) {
 	return provider.Provider{}, "", false
 }
 
-// retrieveFrom posts body to url as the provider signs its requests, and
-// reads the answer; a failure's code is the vendor's, with its message.
-func (s *Server) retrieveFrom(ctx context.Context, p provider.Provider, url string, body []byte) ([]byte, int, error) {
-	b, _, code, err := s.retrieveAs(ctx, p, url, "application/json", body)
-	return b, code, err
-}
-
-// retrieveAs is retrieveFrom with a body of its own Content-Type, a
-// multipart form's with its boundary; it also gives the answer's.
+// retrieveAs posts body to url as the provider signs its requests, with a
+// body of its own Content-Type, a multipart form's with its boundary; it
+// also gives the answer's.
 func (s *Server) retrieveAs(ctx context.Context, p provider.Provider, url, ctype string, body []byte) ([]byte, string, int, error) {
 	accept := ""
 	if ctype == "application/json" {

@@ -2982,7 +2982,9 @@ func heldOffEntries() []Entry {
 // entriesOf is the catalog of the providers of, less the models off reports.
 func entriesOf(of func(Provider) bool, off func(pid, model string) bool) []Entry {
 	var out []Entry
-	s := settings.Load()
+	// read only: entryFor looks the user's names, efforts and limits up in
+	// it, never writing into it — Shared, as the other looks here take
+	s := settings.Shared()
 	gone := retiredNow() // its vendor said it is retired (retired.go)
 	for _, p := range All() {
 		if !of(p) || p.DecideOnly() { // a dedicated decision API only routes
@@ -3106,7 +3108,7 @@ func ServedEntryOf(id string) (Entry, bool) {
 	if err != nil || !p.serves(model) {
 		return Entry{}, false
 	}
-	s := settings.Load()
+	s := settings.Shared() // read only: the entry carries it, nothing writes
 	for _, ms := range [][]catalog.Model{p.Available(), p.Exposed()} {
 		for _, m := range ms {
 			if m.ID == model {

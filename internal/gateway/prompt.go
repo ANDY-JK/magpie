@@ -1217,18 +1217,6 @@ func promptCounted(us []RouteUsage) int {
 	return u.Input + u.CacheRead + u.CacheWrite
 }
 
-// windowFor is the context window of a provider's model; 0 when unknown.
-func windowFor(id, model string) int {
-	if id == "" || model == "" {
-		return 0
-	}
-	p, err := provider.Find(id)
-	if err != nil || p == nil {
-		return 0
-	}
-	return windowOf(*p, model)
-}
-
 // inspectPrompt reads the request's prompt beside it, putting the estimate
 // in the trace as soon as it is read; wait returns it, for the route's
 // end to scale to what was counted. masked is the body as the vendor would

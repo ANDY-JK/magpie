@@ -134,13 +134,6 @@ var ownAddr = func(a netip.Addr) bool {
 	return false
 }
 
-// AllowedFrom: a request from a may reach magpie under the allow list —
-// there is none, a is this computer's, or a is in it.
-func AllowedFrom(a netip.Addr) bool {
-	ps, on, _ := allowPrefixes()
-	return allowedIn(ps, on, a)
-}
-
 // allowedIn is AllowedFrom for the list ps (on: there is one).
 func allowedIn(ps []netip.Prefix, on bool, a netip.Addr) bool {
 	if !on || a.IsLoopback() {

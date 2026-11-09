@@ -149,12 +149,6 @@ func (m *memberWriter) setMember(id, wire string) {
 	m.mu.Unlock()
 }
 
-func (m *memberWriter) memberID() string {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.member
-}
-
 // target is the name the reply's model says, "" for the vendor's own:
 // the member's id, or the model asked for unless the try went out
 // under that very name.
