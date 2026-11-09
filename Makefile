@@ -51,10 +51,14 @@ test:
 UI_TESTS = $(wildcard internal/gui/tests/*.test.cjs)
 # Files are independent and run in parallel; 1 diagnoses a flaky one.
 UI_TEST_CONCURRENCY ?= 2
+# A slice of the suite, as node --test's --test-shard takes it (1/6): the
+# Test workflow's nightly job splits the whole suite over its matrix
+# runners, so each waits on one shard, not the whole suite.
+UI_TEST_SHARD ?=
 
 test-ui:
 	@test -n "$(UI_TESTS)" || { echo "no GUI tests found under internal/gui/tests" >&2; exit 1; }
-	node --test --test-concurrency=$(UI_TEST_CONCURRENCY) $(UI_TESTS)
+	node --test --test-concurrency=$(UI_TEST_CONCURRENCY) $(if $(UI_TEST_SHARD),--test-shard=$(UI_TEST_SHARD)) $(UI_TESTS)
 
 # macOS bundle: menu bar app with no Dock icon (LSUIElement).
 app: build

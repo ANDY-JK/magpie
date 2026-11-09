@@ -76,7 +76,9 @@ listed as not run, never left out.
    `BROWSER=webkit node --test …`). The suite must also pass in Chinese,
    English, and `gui-zh-tw`/`gui-ja`/`gui-de` (every string has its
    Traditional Chinese, Japanese and German, with the same placeholders).
-   CI doesn't run this suite, so it is run locally. Run the whole suite, not only the touched page's tests, when a
+   CI runs a core subset of this suite on every push and the whole suite
+   nightly, on Linux; it is still run
+   locally, in both engines and every language. Run the whole suite, not only the touched page's tests, when a
    change adds an API the GUI calls, a selector or class other pages share,
    a CSS feature older WebKit lacks (`:has()`), or a layout breakpoint. On
    10-07, 479865bc, 134d388b, 61838f7c and 51626258 cleared four tests left

@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    # 03:30 Beijing: after the day's pushes, before the review window.
+    # Runs the whole Test workflow, the test-ui-nightly job with it.
+    - cron: '30 19 * * *'
 
 # On main a run finishes: a release waits for a green run, and one cancelled
 # by every next push left none to wait for (LESSONS.md). A newer push still
@@ -148,6 +152,106 @@ jobs:
       - name: Windows VS Code detection
         if: runner.os == 'Windows'
         run: go test -v -count=1 ./internal/agent -run '^TestVSCodeDetected$'
+
+  # The browser regressions under internal/gui/tests, in Playwright's
+  # Chromium and WebKit (internal/gui/tests/README.md). The whole suite is
+  # a many-hour affair — 10 files took 9.5 minutes on a loaded box, and
+  # dfe868a1e's record had 882 files still going past a 3500s bound — so a
+  # push runs the core files below, and the nightly schedule runs the
+  # whole suite, split over six runners through node --test's --test-shard
+  # (the Makefile's UI_TEST_SHARD). continue-on-error while main's GUI
+  # suite has known reds (#4600, #4585 among them): the job shows its red
+  # without holding a release; make it blocking once a night has been
+  # green. The fixtures fake the platform marker, so the engines are what
+  # is under test and Linux covers them; the local run stays the one that
+  # covers the OS you develop on.
+  test-ui:
+    name: test-ui (core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Playwright comes from the manifest beside the tests, the pattern
+      # .github/ui-preview/package.json uses; the browsers need their
+      # system libraries, WebKit's especially.
+      - name: Install Playwright
+        working-directory: internal/gui/tests
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium webkit
+
+      # The cross-page guards, and the pages the reds keep coming back on
+      # (LESSONS keeps naming click-scroll, menu-scroll, i18n-keys,
+      # searcher-pick, fold-show-grip, api-key-theme, the routing and
+      # settings pages).
+      - name: GUI browser regressions (core)
+        run: >
+          make test-ui UI_TEST_CONCURRENCY=4 UI_TESTS="
+          internal/gui/tests/click-scroll.test.cjs
+          internal/gui/tests/menu-scroll.test.cjs
+          internal/gui/tests/sidebar-tab-top.test.cjs
+          internal/gui/tests/segs-press-redraw.test.cjs
+          internal/gui/tests/segs-glide.test.cjs
+          internal/gui/tests/text-size.test.cjs
+          internal/gui/tests/nav-timeout.test.cjs
+          internal/gui/tests/i18n-keys.test.cjs
+          internal/gui/tests/rail-tip.test.cjs
+          internal/gui/tests/agent-models.test.cjs
+          internal/gui/tests/agent-layout.test.cjs
+          internal/gui/tests/routing-sessions.test.cjs
+          internal/gui/tests/routing-days-fit.test.cjs
+          internal/gui/tests/routing-kind.test.cjs
+          internal/gui/tests/usage-ledger.test.cjs
+          internal/gui/tests/api-key-theme.test.cjs
+          internal/gui/tests/settings-sections.test.cjs
+          internal/gui/tests/add-sheet.test.cjs
+          internal/gui/tests/plain-names.test.cjs
+          internal/gui/tests/bare-ids.test.cjs
+          internal/gui/tests/panel-fold.test.cjs
+          internal/gui/tests/update-check.test.cjs
+          internal/gui/tests/searcher-pick.test.cjs
+          internal/gui/tests/fold-show-grip.test.cjs
+          internal/gui/tests/sse-body.test.cjs
+          internal/gui/tests/json-tree.test.cjs
+          "
+
+  # The whole browser suite, six ways, on the nightly schedule (and on a
+  # manual dispatch). Long: each shard waits on ~190 files at concurrency
+  # 4, hours by the local record above, hence the 4h ceiling.
+  test-ui-nightly:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: test-ui (shard ${{ matrix.shard }}/${{ matrix.shards }})
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+        shards: [6]
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        working-directory: internal/gui/tests
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium webkit
+
+      - name: GUI browser regressions (whole suite)
+        run: make test-ui UI_TEST_SHARD=${{ matrix.shard }}/${{ matrix.shards }} UI_TEST_CONCURRENCY=4
 
   cli:
     name: cli (${{ matrix.goos }}/${{ matrix.goarch }}, nogui)

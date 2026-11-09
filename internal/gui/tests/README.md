@@ -2099,12 +2099,17 @@ With Node.js and Playwright available, `make test-ui` manually runs the whole su
 every `internal/gui/tests/*.test.cjs`, discovered automatically. Files are
 independent and run a few at a time (`UI_TEST_CONCURRENCY`, default 2); set
 `UI_TEST_CONCURRENCY=1` to run one at a time when diagnosing a flaky file.
+`UI_TEST_SHARD=i/n` runs only that slice of the files, as node --test's
+`--test-shard` splits them; the Test workflow's test-ui-nightly job runs
+the whole suite this way, six shards on Linux, on the nightly schedule.
 
 ```sh
 make test-ui
 ```
 
-If Playwright is installed outside the repository, set `NODE_PATH` to the
+Playwright comes from the manifest in this folder (`npm install` here); the
+Test workflow installs it the same way. If Playwright is installed outside
+the repository, set `NODE_PATH` to the
 directory containing its package. The suite uses Playwright's Chromium and
 WebKit binaries (`playwright install chromium webkit`). No frontend dependency
 is needed by the app itself. Tested with Playwright 1.62.1.
@@ -2117,7 +2122,10 @@ an external directory to retain screenshots and Playwright traces, including
 failed assertions. These browser checks run through `make test-ui`, separately
 from `make test` (which is Go only) and from the UI preview workflow (which
 only records screenshots).
-The Test workflow does not run this suite.
+The Test workflow runs a core subset of this suite on every push and the
+whole suite nightly (test-ui-nightly, six shards), on Linux, in Chromium
+and WebKit; both jobs report their red without holding a release while
+main's suite has known reds.
 
 `quota-refresh-order.test.cjs`, `usage-stale-answer.test.cjs` and
 `providers-fetching-retry.test.cjs` use Node's VM and need no browser. Set
