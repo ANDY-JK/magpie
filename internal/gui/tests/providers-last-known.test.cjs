@@ -2,11 +2,13 @@
 // #1519 (fatkun): the Providers page showed skeletons for as long as
 // /api/providers took, seconds after a start. Like the Agents page, it now
 // draws the list kept from the last read (/api/providers?last=1) at once,
-// and the fresh one replaces it when it is in; a row opens only on the
-// fresh list, since the kept one leaves out headers and proxies. Started on
-// another page, the app reads the list in the background once the state is
-// in, and the Providers page opens on it without a skeleton. With nothing
-// kept, the page shows its skeletons until the read, as before.
+// and the fresh one replaces it when it is in; a row opens on the kept one
+// at once, on what it shows, and the fresh one fills the rest in (headers,
+// proxies) when it is in — an editor something was typed in keeps its draft.
+// Started on another page, the app reads the list in the background once
+// the state is in, and the Providers page opens on it without a skeleton.
+// A page entered again within a moment of the last read draws what it has.
+// With nothing kept, the page shows its skeletons until the read, as before.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -28,7 +30,7 @@ const list = (p) => ({ providers: [p], presets: [], excluded: [], gateway: { run
 const keptList = list(provider("Kept Relay"));
 const freshList = list(provider("Fresh Relay", { headers: { "X-Team": "t1" }, proxy: "" }));
 
-function serve(lang, kept, reads) {
+function serve(lang, kept, reads, hold) {
   const state = { agents: [], profiles: [], settings: { lang, theme: "light" } };
   return async (route) => {
     const url = new URL(route.request().url());
@@ -39,6 +41,7 @@ function serve(lang, kept, reads) {
     if (url.pathname === "/api/providers") {
       if (url.searchParams.get("last") === "1") return json(kept ? keptList : null);
       reads.asked++;
+      if (hold) await hold; // a test that holds the fresh read where it is
       await new Promise((r) => setTimeout(r, SLOW));
       reads.done++;
       return json(freshList);
@@ -51,7 +54,7 @@ function serve(lang, kept, reads) {
   };
 }
 
-async function open(engine, t, lang, kept, view, width = 900) {
+async function open(engine, t, lang, kept, view, width = 900, hold = null) {
   const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
   t.after(() => browser.close());
   const page = await (await browser.newContext({ viewport: { width, height: 700 }, reducedMotion: "reduce" })).newPage();
@@ -60,7 +63,7 @@ async function open(engine, t, lang, kept, view, width = 900) {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const reads = { asked: 0, done: 0 };
-  await page.route("**/*", serve(lang, kept, reads));
+  await page.route("**/*", serve(lang, kept, reads, hold));
   await page.goto("http://magpie.test/?view=" + view);
   return { page, errors, reads };
 }
@@ -84,15 +87,37 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(errors, []);
     });
 
-    test(`${engine} ${lang}: a row clicked on the kept list opens on the fresh one`, async (t) => {
-      const { page, errors, reads } = await open(engine, t, lang, true, "providers");
+    test(`${engine} ${lang}: a row clicked on the kept list opens at once, the fresh one fills the rest in`, async (t) => {
+      let release;
+      const hold = new Promise((r) => { release = r; });
+      const { page, errors, reads } = await open(engine, t, lang, true, "providers", 900, hold);
       await row(page).first().waitFor();
       const top = await page.evaluate(() => document.querySelector("#view-providers").scrollTop);
       await row(page).first().click();
-      await page.locator(".editor").waitFor({ timeout: SLOW + 4000 });
-      assert(reads.done >= 1, "the editor opened before the fresh list was in");
+      // the editor opens on what the kept list shows, before the fresh read is in
+      await page.locator(".editor").waitFor({ timeout: 1000 });
+      assert.equal(reads.done, 0, "the editor opened before the fresh list was in");
+      assert.equal(await page.locator(".editor .ehead b").first().textContent(), "Kept Relay");
+      assert.equal(await page.evaluate(() => document.querySelector(".editor .headers input")?.value), "", "what the kept list leaves out is not shown yet");
+      // the fresh one fills the rest in when it is in
+      release();
+      await page.waitForFunction(() => document.querySelector("#providers .row.provider .name")?.firstChild.textContent === "Fresh Relay", null, { timeout: SLOW + 4000 });
+      assert.equal(await page.locator(".editor .ehead b").first().textContent(), "Fresh Relay");
+      assert.equal(await page.evaluate(() => document.querySelector(".editor .headers input")?.value), "X-Team", "the fresh list's headers are in");
       assert.equal(await name(page), "Fresh Relay");
       assert.equal(await page.evaluate(() => document.querySelector("#view-providers").scrollTop), top, "the click moved the page");
+      assert.deepEqual(errors, []);
+    });
+
+    test(`${engine} ${lang}: a page entered again within a moment of the read is not asked again`, async (t) => {
+      const { page, errors, reads } = await open(engine, t, lang, true, "providers");
+      await page.waitForFunction(() => document.querySelector("#providers .row.provider .name")?.firstChild.textContent === "Fresh Relay", null, { timeout: SLOW + 4000 });
+      assert.equal(reads.asked, 1, "one read to begin with");
+      await page.locator('#nav button[data-view="agents"]').click();
+      await page.locator('#nav button[data-view="providers"]').click();
+      await page.waitForTimeout(400);
+      assert.equal(reads.asked, 1, "the switch asked no read: the page draws what it has");
+      assert.equal(await name(page), "Fresh Relay");
       assert.deepEqual(errors, []);
     });
 

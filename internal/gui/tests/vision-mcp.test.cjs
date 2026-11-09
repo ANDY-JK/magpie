@@ -1,10 +1,11 @@
 // Run with Node's test runner and Playwright on the module path; see README.md.
 // magpie's image recognition as an MCP server (JonahFu on X): Settings ›
 // Models › Image recognition has an "MCP server" row with the gateway's
-// address of it, /mcp/magpie/vision, to copy into any agent, and says a
-// gateway key, and the image as a URL, go with it from another computer.
-// An image an agent asked it about reads in Routing as that agent's MCP
-// call, not as a description for one of magpie's models. In every language.
+// address of it, /mcp/magpie/vision, to copy into any agent; its line says
+// what it reads with, and its one tool and the gateway key, and the image
+// as a URL, from another computer are folded under it. An image an agent
+// asked it about reads in Routing as that agent's MCP call, not as a
+// description for one of magpie's models. In every language.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -87,11 +88,12 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         const row = await page.evaluate(() => {
           const r = document.querySelector("#imagesList #visionMcpRow");
           r.scrollIntoView({ block: "nearest" });
-          return { name: r.querySelector(".name").textContent, sub: r.querySelector(".sub").textContent,
+          return { name: r.querySelector(".name").textContent, sub: r.querySelector(".sub").textContent, more: r.querySelector(".mcp-more")?.textContent ?? "",
             code: r.querySelector("code").textContent, buttons: r.querySelectorAll("button").length };
         });
         assert.equal(row.name, w.name);
-        assert.match(row.sub, w.sub);
+        assert.match(row.sub, /Streamable HTTP/);
+        assert.match(row.more, w.sub);
         assert.equal(row.code, address);
         assert.equal(row.buttons, 1, "a copy button");
         // nothing spills out of the window at a narrow width

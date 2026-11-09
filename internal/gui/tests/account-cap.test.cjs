@@ -15,6 +15,8 @@ const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
 
+const { allWords } = require("./strings.cjs");
+
 const assets = path.resolve(__dirname, "../assets");
 const inHours = (h) => new Date(Date.now() + h * 3600e3 + 60e3).toISOString();
 const fresh = () => ({
@@ -89,7 +91,7 @@ function serve(lang, posts, use = usage, alone = false) {
 }
 
 const words = {
-  en: { direct: "At its cap · Codex still uses it", directWhy: /refused with a usage-cap error until it renews.*\nCodex is signed in to this account and asks its vendor itself, not through magpie/s, opus: "Opus week at its cap · back in 3h", opusWhy: /^Opus week is at 90%, past this account's 70% cap, so magpie sends the requests it counts to the other accounts until it renews; other models still use this account/, none: "No cap", cap: (n) => `Cap ${n}%`, held: "At its cap · back in 3h", other: "Other…", menu: "Usage cap" },
+  en: { direct: "At its cap · Codex still uses it", directWhy: /refused with a usage-cap error until it renews.*\nCodex signs in to this account and asks its vendor itself/s, opus: "Opus week at its cap · back in 3h", opusWhy: /^Opus week is at 90%, past this account's 70% cap, so magpie sends the requests it counts to the other accounts until it renews; other models still use this account/, none: "No cap", cap: (n) => `Cap ${n}%`, held: "At its cap · back in 3h", other: "Other…", menu: "Usage cap" },
   zh: { direct: "已达上限 · Codex 仍在使用", directWhy: /经 magpie 的请求会返回.*\nCodex 登录此账号并直接向厂商发请求/s, opus: "Opus week已达上限 · 3 小时后恢复", opusWhy: /^Opus week已用 90%，超过该账号的 70% 上限.*其他模型仍用此账号/, none: "不设上限", cap: (n) => `上限 ${n}%`, held: "已达上限 · 3 小时后恢复", other: "其他…", menu: "用量上限" },
 };
 
@@ -186,13 +188,15 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
 
       const border = await page.evaluate(() => [...document.querySelectorAll(".accts .acap, .accts .acap-held, .accts .aq-cap, .proto-menu, .proto-menu *")].map((e) => getComputedStyle(e).borderLeftWidth).filter((b) => parseFloat(b) > 1));
       assert.deepEqual(border, [], "no border stripes");
+      await allWords(page); // the other languages are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "No cap", "Cap {n}%", "Usage cap", "Usage cap {n}%", "Usage cap, in percent", "Use each window to 100%", "Other…",
         "A share of your own, 1–99%", "A cap is a share from 1% to 99%", "At its cap", "At its cap · back {in}",
         "A usage window is at {n}%, past this account's {cap}% cap, so magpie counts it as used up and sends requests to the other accounts until that window renews",
         "With no other account on, requests are refused with a usage-cap error until then",
-        "Stops at {n}% of each usage window: once magpie reads a window at {n}% or past it, it counts this account as used up and sends it nothing more until the window renews. A turn already under way can still take it past {n}%, so the cap doesn't promise the rest is left. Click to change",
-        "Used to 100% of its usage windows. Click to cap it at a share of each, so magpie goes on to the other accounts past it",
+        "Once magpie reads a usage window at {n}% or past, the account counts as used up and gets nothing until it renews; a turn under way can go past {n}%",
+        "Its windows run to 100%; a cap moves magpie to the other accounts sooner",
+        "A window's meter below can hold its own cap",
         "{who} stops at {n}% of each window", "{who} has no usage cap",
         "held at its {cap}% usage cap",
         "{who} is left out: a usage window is at {n}, past the {cap}% cap set on the account, so it counts as used up until that window renews.",
@@ -211,14 +215,15 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const note = row(page, "me@example.com").locator(".acap-held");
       assert.equal(await note.textContent(), w.direct);
       assert.match(await note.getAttribute("title"), w.directWhy);
-      assert.match(await pill(page, "me@example.com").getAttribute("title"), w.directWhy.source.includes("Codex is") ? /\n\nCodex is signed in to this account/ : /\n\nCodex 登录此账号/);
+      assert.match(await pill(page, "me@example.com").getAttribute("title"), w.directWhy.source.includes("Codex signs") ? /· Codex signs in to this account/ : /· Codex 登录此账号/);
       assert.notEqual(await note.evaluate((e) => getComputedStyle(e).color), await row(page, "me@example.com").locator(".n").evaluate((e) => getComputedStyle(e).color), "a warning, not plain text");
       // the spare, off, has no pill note of its own
       assert.equal(await row(page, "Spare@Example.com").locator(".acap-held").count(), 0);
+      await allWords(page); // the other languages are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "At its cap · {agent} still uses it",
         "A usage window is at {n}%, past this account's {cap}% cap: requests through magpie are refused with a usage-cap error until it renews",
-        "{agent} is signed in to this account and asks its vendor itself, not through magpie, so with no other account on to move it to, {agent} goes on using it past the cap. Add another account, or pick {agent}'s models via magpie, for the cap to hold it",
+        "{agent} signs in to this account and asks its vendor itself, so the cap can't stop it: add another account or pick {agent}'s models via magpie",
       ].filter((k) => !I18N.zh[k]));
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
@@ -227,7 +232,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     test(`${engine} ${lang}: with another account on, the pill and the note don't say the agent goes past the cap`, async (t) => {
       const { page } = await open(t, "codex");
       assert.equal(await row(page, "me@example.com").locator(".acap-direct").count(), 0);
-      assert.doesNotMatch(await pill(page, "me@example.com").getAttribute("title"), /Codex is signed in|Codex 登录此账号/);
+      assert.doesNotMatch(await pill(page, "me@example.com").getAttribute("title"), /Codex signs in|Codex 登录此账号/);
     });
 
     test(`${engine} ${lang}: a window of one model past the cap holds the account for that model, and says so`, async (t) => {
@@ -235,6 +240,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const note = row(page, "me@example.com").locator(".acap-held");
       assert.equal(await note.textContent(), w.opus);
       assert.match(await note.getAttribute("title"), w.opusWhy);
+      await allWords(page); // the other languages are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "{names} at its cap", "{names} at its cap · back {in}",
         "{names} is at {n}%, past this account's {cap}% cap, so magpie sends the requests it counts to the other accounts until it renews; other models still use this account",

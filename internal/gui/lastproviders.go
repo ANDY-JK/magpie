@@ -20,8 +20,10 @@ import (
 //
 // What is kept leaves out what the page never needs before the fresh list
 // is in and what can hold a secret: the gateway's recent calls and lanes,
-// each provider's headers, proxies and extra body. The page opens no
-// provider's editor from the kept list; it waits for the fresh one.
+// each provider's headers, proxies and extra body. The page opens a
+// provider's editor from the kept list at once, on what it shows, and the
+// fresh one fills the rest in when it is in — unless something is typed in
+// already, which keeps its draft.
 
 var lastProviders struct {
 	sync.Mutex

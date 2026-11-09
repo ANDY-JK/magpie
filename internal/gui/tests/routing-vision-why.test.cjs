@@ -62,10 +62,10 @@ function serve(lang) {
 }
 
 const want = {
-  en: { tag: "Image description", unknown: [/nothing magpie knows says deepseek\/deepseek-v4\.1-flash can see images/, /tick “Accepts images” for it in its provider's models/, /Settings › Models › Image recognition picks the model that describes/, /codex\/gpt-6\.1-sol describe an image for Codex's/],
+  en: { tag: "Image description", unknown: [/nothing magpie knows says deepseek\/deepseek-v4\.1-flash can see images/, /tick “Accepts images” for it in its provider's models/, /codex\/gpt-6\.1-sol describe an image for Codex's/],
     listed: [/which its provider's list or its own setting says takes text only/, /Settings › Models › Image recognition/],
     missing: [/gone\/qwen-vl-max, the Image recognition model picked in Settings, isn't set up any more/, /codex\/gpt-6\.1-sol, its automatic choice/, /Pick another in Settings › Models › Image recognition/] },
-  zh: { tag: "图片描述", unknown: [/magpie 所知的信息都没有说 deepseek\/deepseek-v4\.1-flash 能看图/, /勾选“支持图片输入”/, /设置 › 模型 › 识图模型/, /让 codex\/gpt-6\.1-sol 为 Codex/],
+  zh: { tag: "图片描述", unknown: [/magpie 所知的信息都没有说 deepseek\/deepseek-v4\.1-flash 能看图/, /勾选“支持图片输入”/, /让 codex\/gpt-6\.1-sol 为 Codex/],
     listed: [/服务商的模型列表或它自己的设置说它只收文本/, /设置 › 模型 › 识图模型/],
     missing: [/设置里选的识图模型 gone\/qwen-vl-max 已不可用/, /自动选择的 codex\/gpt-6\.1-sol/, /设置 › 模型 › 识图模型 里另选一个/] },
 };

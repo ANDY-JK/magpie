@@ -3,6 +3,8 @@
 // then Off or Auto, then Custom again shows the same address and login,
 // after a restart too. The page never sends the remembered copy itself:
 // settings.Save keeps it from the proxy, which the fixture does as Go does.
+// The settings state holds the login masked (settings.ForUI); the login
+// comes back from /api/settings/proxy, which the fixture serves as Go does.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -24,16 +26,20 @@ function server(lang, posts) {
     if (url.pathname === "/boot.js") return route.fulfill({ contentType: "text/javascript", body: `window.bootPrefs = ${JSON.stringify({ lang, theme: "light", web: true })};` });
     if (url.pathname === "/wails/runtime.js") return route.fulfill({ contentType: "text/javascript", body: "export const Window = {};" });
     if (url.pathname === "/api/state") return json({ agents: [], profiles: [], settings: { lang, theme: "light" }, fx: cur.fx });
+    // the settings API: proxyCustom is the server's, set from proxy, and
+    // the state is told it without its login
+    const noLogin = (v) => (v || "").replace(/^(\w+:\/\/)?[^/?#]*@/, "$1");
+    const state = () => ({ ...cur, proxy: noLogin(cur.proxy), proxyCustom: noLogin(cur.proxyCustom), proxyNow: noLogin(cur.proxyNow) });
     if (url.pathname === "/api/settings") {
       if (req.method() === "POST") {
         const body = req.postDataJSON();
         posts.push(body);
-        // as the settings API: proxyCustom is the server's, set from proxy
         const own = body.proxy && body.proxy !== "direct";
         cur = { ...cur, ...body, proxyCustom: own ? body.proxy : cur.proxyCustom, proxyNow: body.proxy, proxySource: body.proxy === "direct" ? "off" : body.proxy ? "settings" : "none" };
       }
-      return json(cur);
+      return json(state());
     }
+    if (url.pathname === "/api/settings/proxy") return json({ proxy: cur.proxy || "", proxyCustom: cur.proxyCustom || "" });
     if (url.pathname === "/api/plugins") return json({ plugins: [] });
     if (url.pathname === "/api/usage/quotas") return json([]);
     if (url.pathname === "/api/groups") return json({ groups: [], models: [] });

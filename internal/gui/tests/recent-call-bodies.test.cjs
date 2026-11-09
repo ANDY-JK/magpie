@@ -78,7 +78,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert((await rows.first().innerText()).includes("hello"));
       assert((await rows.first().innerText()).includes("world"));
       assert.equal(await rows.first().locator(".call-body-truncated").count(), 2);
-      await page.evaluate(() => loadProviders());
+      await page.evaluate(() => loadProviders(true));
       await rows.first().locator(".call-body pre").first().waitFor();
       assert.equal(seen.length, 1, "a summary refresh preserves loaded detail");
       await rows.first().locator(".call").click();
@@ -98,9 +98,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await rows.nth(2).locator(".call-body").count(), 0, "an evicted call isn't an empty body");
       await rows.nth(2).locator(".call").click();
       shown = [calls[1]];
-      await page.evaluate(() => loadProviders());
+      await page.evaluate(() => loadProviders(true));
       shown = calls;
-      await page.evaluate(() => loadProviders());
+      await page.evaluate(() => loadProviders(true));
       await rows.first().locator(".call").click();
       await page.waitForFunction(() => document.querySelector("#activity .call-item .call-body pre"));
       assert.equal(seen.length, 5, "an evicted body's browser cache is discarded");

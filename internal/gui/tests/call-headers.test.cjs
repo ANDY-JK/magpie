@@ -132,7 +132,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       if (process.env.ARTIFACT_DIR) await item.screenshot({ path: path.join(process.env.ARTIFACT_DIR, `${engine}-${lang}-call-headers-open.png`) });
       assert.deepEqual(await fits(item), { out: [], accent: [], scroll: false });
       // a refresh of the list keeps it open
-      await page.evaluate(() => loadProviders());
+      await page.evaluate(() => loadProviders(true));
       await item.locator(".call-wire-grid").waitFor();
       await item.locator(".call-wire-toggle").click();
       await item.locator(".call-wire-grid").waitFor({ state: "detached" });

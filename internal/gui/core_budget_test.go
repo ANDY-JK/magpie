@@ -16,8 +16,8 @@ import (
 // needs more raises them and says why in its commit. What each is, and
 // every change that moved it, is in docs/gui-script-budget.md.
 const (
-	appScriptBudget  = 1_316_874
-	coreScriptBudget = 1_540_870
+	appScriptBudget  = 1_317_540
+	coreScriptBudget = 1_566_552
 )
 
 func TestCoreScriptBudget(t *testing.T) {

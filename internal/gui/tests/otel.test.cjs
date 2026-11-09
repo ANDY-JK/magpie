@@ -24,7 +24,7 @@ function settingsPayload(over) {
 }
 
 // POST replaces saved preferences, as the Settings handler does.
-function server(lang, posts) {
+function server(lang, posts, headerPosts) {
   const fixed = settingsPayload({ lang, otelEnv: true });
   let cur = fixed;
   const answer = () => cur;
@@ -42,6 +42,16 @@ function server(lang, posts) {
       }
       return json(answer());
     }
+    if (url.pathname === "/api/settings/otel-headers") {
+      if (req.method() === "POST") {
+        const body = req.postDataJSON();
+        headerPosts.push(body.headers);
+        cur = { ...cur, otel: { ...(cur.otel || {}), headers: body.headers } };
+        return json({ headers: body.headers });
+      }
+      return json({ headers: cur.otel?.headers || {} });
+    }
+    if (url.pathname === "/api/settings/otel-headers") return json({ headers: cur.otel?.headers || {} });
     if (url.pathname === "/api/plugins") return json({ plugins: [] });
     if (url.pathname === "/api/usage/quotas") return json([]);
     if (url.pathname === "/api/groups") return json({ groups: [], models: [] });
@@ -58,11 +68,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     t.after(() => browser.close());
     for (const lang of ["en", "zh"]) {
       await t.test(lang, async () => {
-        const posts = [], errors = [];
+        const posts = [], headerPosts = [], errors = [];
         const context = await browser.newContext({ viewport: { width: 1100, height: 900 }, reducedMotion: "reduce" });
         const page = await context.newPage();
         page.on("pageerror", (e) => errors.push(e.message));
-        await page.route("**/*", server(lang, posts));
+        await page.route("**/*", server(lang, posts, headerPosts));
         await watchSettingsReads(page);
         await page.goto("http://magpie.test/?view=settings&tab=otel");
         await settingsDrawn(page); // rows found are the ones that stay (#1659)
@@ -101,16 +111,24 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           await action(); await response; await page.waitForTimeout(200);
           assert.equal(posts.length, n); return posts[n - 1];
         };
+        // the headers' values go on their own (settings/otel-headers), what
+        // the settings' save is never told
+        const savedHeaders = async (action) => {
+          const n = headerPosts.length + 1;
+          const response = page.waitForResponse((r) => r.url().endsWith("/api/settings/otel-headers") && r.request().method() === "POST");
+          await action(); await response; await page.waitForTimeout(200);
+          assert.equal(headerPosts.length, n); return headerPosts[n - 1];
+        };
         let p = await saved(async () => {
           const field = page.locator("#otelEndpointRow input");
           await field.fill("https://collector.test/api/public/otel/"); await field.press("Enter");
         });
         assert.equal(p.otel.endpoint, "https://collector.test/api/public/otel");
-        p = await saved(async () => {
+        p = await savedHeaders(async () => {
           const field = page.locator("#otelHeadersRow input");
           await field.fill("Authorization=Basic%20YWJjZA==,X-Tag=a%2Cb%2Bc"); await field.press("Enter");
         });
-        assert.deepEqual(p.otel.headers, { Authorization: "Basic YWJjZA==", "X-Tag": "a,b+c" });
+        assert.deepEqual(p, { Authorization: "Basic YWJjZA==", "X-Tag": "a,b+c" });
         p = await saved(() => page.locator("#otelExportRow .opt").nth(1).click());
         assert.equal(p.otel.enabled, true);
         p = await saved(() => page.locator("#otelMetricsRow .opt").nth(1).click());

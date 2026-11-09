@@ -13,7 +13,7 @@ const { watchSettingsReads, settingsDrawn } = require("./reader.cjs");
 const assets = path.resolve(__dirname, "../assets");
 const basic = (pk, sk) => "Basic " + Buffer.from(pk + ":" + sk).toString("base64");
 
-function server(lang, otel, posts) {
+function server(lang, otel, posts, headerPosts) {
   const fixed = {
     theme: "light", lang, tray: "panel", currency: "usd", redactWords: [], version: "0.1.400", dir: "~/.config/magpie",
     gateway: "http://127.0.0.1:3425", proxyNow: "none", proxySource: "none", visionModels: [], imageGenModels: [],
@@ -30,9 +30,22 @@ function server(lang, otel, posts) {
       if (req.method() === "POST") {
         const body = req.postDataJSON();
         posts.push(body);
+        const had = cur.otel?.headers; // the save never writes the values (Merge carries the saved ones)
         cur = { ...fixed, ...body };
+        if (cur.otel) cur.otel.headers = had;
       }
       return json(cur);
+    }
+    // the headers' values are set on their own (settings/otel-headers),
+    // what the settings' save is never told
+    if (url.pathname === "/api/settings/otel-headers") {
+      if (req.method() === "POST") {
+        const body = req.postDataJSON();
+        headerPosts.push(body.headers);
+        cur = { ...fixed, otel: { ...(cur.otel || {}), headers: body.headers } };
+        return json({ headers: body.headers });
+      }
+      return json({ headers: cur.otel?.headers || {} });
     }
     if (url.pathname === "/api/plugins") return json({ plugins: [] });
     if (url.pathname === "/api/usage/quotas") return json([]);
@@ -45,11 +58,11 @@ function server(lang, otel, posts) {
 }
 
 async function open(browser, lang, otel, width = 1100) {
-  const posts = [], errors = [];
+  const posts = [], headerPosts = [], errors = [];
   const context = await browser.newContext({ viewport: { width, height: 1000 }, reducedMotion: "reduce" });
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.route("**/*", server(lang, otel, posts));
+  await page.route("**/*", server(lang, otel, posts, headerPosts));
   await watchSettingsReads(page);
   await page.goto("http://magpie.test/?view=settings&tab=otel");
   await settingsDrawn(page);
@@ -63,7 +76,28 @@ async function open(browser, lang, otel, width = 1100) {
     assert.equal(posts.length, n);
     return posts[n - 1].otel;
   };
-  return { context, page, posts, errors, saved };
+  // a save of the headers' values, waited for by its answer
+  const savedHeaders = async (action) => {
+    const n = headerPosts.length + 1;
+    const response = page.waitForResponse((r) => r.url().endsWith("/api/settings/otel-headers") && r.request().method() === "POST");
+    await action(); await response;
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    assert.equal(headerPosts.length, n);
+    return headerPosts[n - 1];
+  };
+  // a Langfuse commit's two saves, the headers' on their own
+  const savedBoth = async (action) => {
+    const ns = posts.length + 1, nh = headerPosts.length + 1;
+    const settingsP = page.waitForResponse((r) => r.url().endsWith("/api/settings") && r.request().method() === "POST");
+    const headersP = page.waitForResponse((r) => r.url().endsWith("/api/settings/otel-headers") && r.request().method() === "POST");
+    await action();
+    await Promise.all([settingsP, headersP]);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    assert.equal(posts.length, ns);
+    assert.equal(headerPosts.length, nh);
+    return { o: posts[ns - 1].otel, h: headerPosts[nh - 1] };
+  };
+  return { context, page, posts, headerPosts, errors, saved, savedHeaders, savedBoth };
 }
 
 const keys = (page) => page.locator("#otelLangfuseKeysRow input");
@@ -74,7 +108,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     t.after(() => browser.close());
 
     await t.test("a first setup needs only the two keys", async () => {
-      const { context, page, posts, errors, saved } = await open(browser, "en", {});
+      const { context, page, posts, headerPosts, errors, savedBoth } = await open(browser, "en", {});
       assert.equal(await page.locator("#otelKindRow .opt.on").textContent(), "OTLP");
       await page.locator("#otelKindRow .opt", { hasText: "Langfuse" }).click();
       await page.locator("#otelLangfuseHostRow").waitFor();
@@ -86,21 +120,23 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await keys(page).first().press("Tab");
       await page.waitForTimeout(150);
       assert.equal(posts.length, 0, "nothing saved before both keys are there");
-      let o = await saved(async () => { await keys(page).nth(1).fill("sk-lf-2"); await keys(page).nth(1).press("Enter"); });
+      assert.equal(headerPosts.length, 0, "no headers saved before both keys are there");
+      let both = await savedBoth(async () => { await keys(page).nth(1).fill("sk-lf-2"); await keys(page).nth(1).press("Enter"); });
+      let o = both.o;
       assert.equal(o.endpoint, "https://cloud.langfuse.com/api/public/otel");
-      assert.deepEqual(o.headers, { Authorization: basic("pk-lf-1", "sk-lf-2"), "x-langfuse-ingestion-version": "4" });
+      assert.deepEqual(both.h, { Authorization: basic("pk-lf-1", "sk-lf-2"), "x-langfuse-ingestion-version": "4" });
       assert.equal(o.metrics, false);
       assert.equal(o.enabled, true);
       assert.equal(await page.locator("#otelExportRow .opt.on").textContent(), "On");
       assert((await page.locator("#otelLangfuseKeysRow .sub").textContent()).includes("https://cloud.langfuse.com/api/public/otel"));
       // the US region, then a host of the user's own
-      o = await saved(() => page.locator("#otelLangfuseHostRow .opt", { hasText: "Cloud US" }).click());
+      o = (await savedBoth(() => page.locator("#otelLangfuseHostRow .opt", { hasText: "Cloud US" }).click())).o;
       assert.equal(o.endpoint, "https://us.cloud.langfuse.com/api/public/otel");
-      assert.equal(o.headers.Authorization, basic("pk-lf-1", "sk-lf-2"));
+      assert.equal(headerPosts.at(-1).Authorization, basic("pk-lf-1", "sk-lf-2"));
       await page.locator("#otelLangfuseHostRow .opt", { hasText: "Self-hosted" }).click();
       const host = page.locator("#otelLangfuseHostRow input");
       await host.waitFor();
-      o = await saved(async () => { await host.fill("langfuse.example.com/api/public/otel/"); await host.press("Enter"); });
+      o = (await savedBoth(async () => { await host.fill("langfuse.example.com/api/public/otel/"); await host.press("Enter"); })).o;
       assert.equal(o.endpoint, "https://langfuse.example.com/api/public/otel");
       assert.equal(await page.locator("#otelLangfuseHostRow .opt.on").textContent(), "Self-hosted");
       assert.equal(await host.inputValue(), "https://langfuse.example.com");
@@ -119,13 +155,13 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         enabled: false, metrics: true, endpoint: "https://cloud.langfuse.com/api/public/otel",
         headers: { Authorization: basic("pk-lf-a", "sk-lf-a"), "X-Team": "a,b" },
       };
-      const { context, page, posts, errors, saved } = await open(browser, "en", hand);
+      const { context, page, posts, headerPosts, errors, savedBoth } = await open(browser, "en", hand);
       await page.locator("#otelLangfuseKeysRow").waitFor();
       assert.equal(await keys(page).first().inputValue(), "pk-lf-a");
       await page.waitForTimeout(150);
       assert.equal(posts.length, 0, "opening the page saves nothing");
-      const o = await saved(async () => { await keys(page).nth(1).fill("sk-lf-b"); await keys(page).nth(1).press("Enter"); });
-      assert.deepEqual(o.headers, { Authorization: basic("pk-lf-a", "sk-lf-b"), "X-Team": "a,b" }, "no header added or dropped");
+      const { o, h } = await savedBoth(async () => { await keys(page).nth(1).fill("sk-lf-b"); await keys(page).nth(1).press("Enter"); });
+      assert.deepEqual(h, { Authorization: basic("pk-lf-a", "sk-lf-b"), "X-Team": "a,b" }, "no header added or dropped");
       assert.equal(o.metrics, true, "metrics as the user set them");
       assert.equal(o.enabled, false, "export as the user set it");
       assert.deepEqual(errors, []);
@@ -133,11 +169,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     });
 
     await t.test("another collector's headers stay with it", async () => {
-      const { context, page, errors, saved } = await open(browser, "en", { enabled: true, endpoint: "http://localhost:4318", headers: { Authorization: "Bearer other", "X-Other": "1" } });
+      const { context, page, errors, savedBoth } = await open(browser, "en", { enabled: true, endpoint: "http://localhost:4318", headers: { Authorization: "Bearer other", "X-Other": "1" } });
       await page.locator("#otelKindRow .opt", { hasText: "Langfuse" }).click();
       await keys(page).first().fill("pk-lf-1");
-      const o = await saved(async () => { await keys(page).nth(1).fill("sk-lf-2"); await keys(page).nth(1).press("Enter"); });
-      assert.deepEqual(o.headers, { Authorization: basic("pk-lf-1", "sk-lf-2"), "x-langfuse-ingestion-version": "4" });
+      const { o, h } = await savedBoth(async () => { await keys(page).nth(1).fill("sk-lf-2"); await keys(page).nth(1).press("Enter"); });
+      assert.deepEqual(h, { Authorization: basic("pk-lf-1", "sk-lf-2"), "x-langfuse-ingestion-version": "4" });
       assert.equal(o.endpoint, "https://cloud.langfuse.com/api/public/otel");
       assert.deepEqual(errors, []);
       await context.close();

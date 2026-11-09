@@ -20,17 +20,17 @@ const words = {
     notSearched: /grok\/grok-4\.3, the searcher magpie picked, didn't search for Codex's zai\/glm-5\.2: it answered without searching the web, so its account or plan may not offer web search\. So magpie had codex\/gpt-6\.1-sol/,
   },
   zh: {
-    failed: /grok\/grok-4\.3 是在 设置 › 模型 › 联网搜索 里选的代搜模型，但它没能为 Codex 的 zai\/glm-5\.2 搜索：502 upstream closed。所以 magpie 改让下一个可用的代搜模型 codex\/gpt-6\.1-sol 来搜。不属于对话轮次。$/,
+    failed: /grok\/grok-4\.3 是在 设置 › 模型 › 联网搜索 里选的代搜模型，但它没能为 Codex 的 zai\/glm-5\.2 搜索：502 upstream closed。所以 magpie 改让下一个可用的代搜模型 codex\/gpt-6\.1-sol 来搜。 不属于对话轮次。$/,
     nothing: /grok\/grok-4\.3 是 magpie 自动选的代搜模型，但它没能为 Codex 的 zai\/glm-5\.2 搜索：它的回复里没有搜到的网页。/,
     notSearched: /grok\/grok-4\.3 是 magpie 自动选的代搜模型，但它没能为 Codex 的 zai\/glm-5\.2 搜索：它没有联网搜索就直接回答了，它的账号或套餐可能不支持联网搜索。/,
   },
   "zh-TW": {
-    failed: /grok\/grok-4\.3 是在 設定 › 模型 › 聯網搜尋 裡選的代搜模型，但它沒能為 Codex 的 zai\/glm-5\.2 搜尋：502 upstream closed。所以 magpie 改讓下一個可用的代搜模型 codex\/gpt-6\.1-sol 來搜。不屬於對話輪次。$/,
+    failed: /grok\/grok-4\.3 是在 設定 › 模型 › 聯網搜尋 裡選的代搜模型，但它沒能為 Codex 的 zai\/glm-5\.2 搜尋：502 upstream closed。所以 magpie 改讓下一個可用的代搜模型 codex\/gpt-6\.1-sol 來搜。 不屬於對話輪次。$/,
     nothing: /grok\/grok-4\.3 是 magpie 自動選的代搜模型，但它沒能為 Codex 的 zai\/glm-5\.2 搜尋：它的回覆裡沒有搜到的網頁。/,
     notSearched: /grok\/grok-4\.3 是 magpie 自動選的代搜模型，但它沒能為 Codex 的 zai\/glm-5\.2 搜尋：它沒有聯網搜尋就直接回答了，它的帳號或方案可能不支援聯網搜尋。/,
   },
   ja: {
-    failed: /設定 › モデル › ウェブ検索 で選んだ検索モデル grok\/grok-4\.3 は Codex の zai\/glm-5\.2 の代わりに検索できませんでした：502 upstream closed。そのため magpie は次に使える検索モデル codex\/gpt-6\.1-sol に代わりに検索させました。会話のターンではありません。$/,
+    failed: /設定 › モデル › ウェブ検索 で選んだ検索モデル grok\/grok-4\.3 は Codex の zai\/glm-5\.2 の代わりに検索できませんでした：502 upstream closed。そのため magpie は次に使える検索モデル codex\/gpt-6\.1-sol に代わりに検索させました。 会話のターンではありません。$/,
     nothing: /magpie が自動で選んだ検索モデル grok\/grok-4\.3 は Codex の zai\/glm-5\.2 の代わりに検索できませんでした：返答に見つけたページがありませんでした。/,
     notSearched: /magpie が自動で選んだ検索モデル grok\/grok-4\.3 は Codex の zai\/glm-5\.2 の代わりに検索できませんでした：ウェブ検索をせずに回答しました。アカウントやプランがウェブ検索に対応していない可能性があります。/,
   },

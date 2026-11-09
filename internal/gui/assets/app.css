@@ -3280,6 +3280,14 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
 .editor label { font-size: 12px; color: var(--fg-2); text-align: right; padding-top: 5px; }
 .editor label.by-list { padding-top: 11px; }
 .editor .hint { font-size: 11px; color: var(--fg-2); margin-top: 4px; }
+/* a hint that folds its syntax away (the Balance field's): the sentence is
+   the summary, the rest opens under it, marked as the app's disclosures are */
+.editor .hint details summary { list-style: none; cursor: pointer; }
+.editor .hint details summary::-webkit-details-marker { display: none; }
+.editor .hint details summary::after { content: "▸"; margin-left: 3px; color: var(--faint); }
+.editor .hint details[open] summary::after { content: "▾"; }
+.editor .hint details summary:hover { color: var(--fg); }
+.editor .hint details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* a provider's own proxy (#237): the address beside the options, its room
    kept while it is hidden so a pick never changes the dialog's height */
 .editor .proxy-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -3881,6 +3889,16 @@ input.words.compact-num { flex: none; width: 76px; font-variant-numeric: tabular
 .set-hint.on { opacity: 1; transform: none; }
 .set-hint > p { margin: 0; }
 .set-hint > p + p { margin-top: 4px; }
+/* an MCP server row's tools and keys, folded under its line (the app's own
+   disclosure, as the editor folds its Advanced) */
+.row .who > details.mcp-more { margin-top: 2px; font-size: 11.5px; color: var(--muted); }
+.row .who > details.mcp-more summary { list-style: none; cursor: pointer; width: max-content; max-width: 100%; }
+.row .who > details.mcp-more summary::-webkit-details-marker { display: none; }
+.row .who > details.mcp-more summary::after { content: "▸"; margin-left: 3px; color: var(--faint); }
+.row .who > details.mcp-more[open] summary::after { content: "▾"; }
+.row .who > details.mcp-more summary:hover { color: var(--fg); }
+.row .who > details.mcp-more summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.row .who > details.mcp-more[open] { line-height: 1.45; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .set-hint { transition: none; transform: none; } }
 :root[data-motion="reduce"] .set-hint { transition: none; transform: none; }
 .prefs .val.rule-add { flex: 1 1 100%; max-width: none; margin-left: 0; gap: 6px; }

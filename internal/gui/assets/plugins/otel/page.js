@@ -12,6 +12,9 @@ const LANGFUSE_HOSTS = [["https://cloud.langfuse.com", "Cloud EU"], ["https://us
 // null for what the saved endpoint says; lfDraft holds keys typed but not yet
 // saved, so a redraw doesn't drop them
 let otelKind = null, lfDraft = null;
+// The saved headers' values, asked once (settings/otel-headers): the settings
+// state holds the names alone, and the values are set through that route too
+let otelHeaders = null, otelHeadersAsked = false;
 // the rows whose control takes a line of its own under their words
 const OTEL_STACKED = ["otelEndpointRow", "otelHeadersRow", "otelBodiesRow", "otelLangfuseHostRow", "otelLangfuseKeysRow"];
 
@@ -48,6 +51,22 @@ function renderOTel(s, keep) {
   const page = $("#otelList");
   page.replaceChildren();
   let config = { ...(s.otel || {}) };
+  if (otelHeaders) config.headers = otelHeaders;
+  if (!otelHeadersAsked) {
+    otelHeadersAsked = true;
+    api("settings/otel-headers").then((r) => {
+      otelHeaders = r?.headers || {};
+      // the values are the otel part's alone: drawn again here when it is
+      // the part shown, left stale for when it is opened next. The whole
+      // page, as this drew before, rebuilds every part — and a row of
+      // another part may hold what the reader is typing (the proxy's login
+      // among them), which the rebuild would drop.
+      if (prefs) {
+        if (setShown === "otel") renderSettingsPart("otel", prefs, prefsKeep(prefs));
+        else setStaleParts.add("otel");
+      }
+    }).catch(() => {});
+  }
   const saved = langfuseOf(config);
   const kind = otelKind || (saved ? "langfuse" : "otlp");
   // a heading over a card of its own, as on every other Settings tab
@@ -75,6 +94,15 @@ function renderOTel(s, keep) {
     config = { ...config, ...change };
     savePrefs({ ...keep, otel: { ...config } });
   };
+  // the headers' values, on their own: the settings' save is told none of
+  // them, so a save of another choice never writes one over what is saved
+  const setHeaders = (headers) => {
+    api("settings/otel-headers", { headers }).then((r) => {
+      otelHeaders = r?.headers || headers;
+      renderSettings();
+      status(t("Saved"), "ok", 1500);
+    }).catch(settingsErr);
+  };
   const field = (value, placeholder, type, label) => {
     const f = input(value, placeholder, type);
     f.className = "words";
@@ -88,7 +116,7 @@ function renderOTel(s, keep) {
     segs([["off", t("Off")], ["on", t("On")]], config.enabled ? "on" : "off", (v) => save({ enabled: v === "on" })));
   row("otelKindRow", "Collector", t("Langfuse needs only its host and your project's keys; any other OTLP/HTTP collector takes its address and headers"),
     segs([["otlp", "OTLP"], ["langfuse", "Langfuse"]], kind, (v) => { otelKind = v; renderOTel(s, keep); }));
-  if (kind === "langfuse") renderLangfuse(saved, config, save, row, field);
+  if (kind === "langfuse") renderLangfuse(saved, config, save, setHeaders, row, field);
   else {
     const endpoint = field(config.endpoint || "", "http://localhost:4318", "url", "OTLP endpoint");
     endpoint.onchange = () => save({ endpoint: endpoint.value.trim().replace(/\/+$/, "") });
@@ -102,7 +130,7 @@ function renderOTel(s, keep) {
           if (i < 1) throw new Error(t("Use comma-separated name=value headers"));
           values[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
         }
-        save({ headers: values });
+        setHeaders(values);
       } catch (e) { toast(e.message, true); }
     };
     row("otelHeadersRow", "OTLP headers", t("Comma-separated name=value pairs; percent-encode spaces and commas in values"), headers);
@@ -139,7 +167,7 @@ function renderOTel(s, keep) {
 // OTLP data can show up to 10 minutes late), turns metrics off (Langfuse
 // takes traces only) and export on. Every other header, and an ingestion
 // header the user set themselves, is kept as it was.
-function renderLangfuse(saved, config, save, row, field) {
+function renderLangfuse(saved, config, save, setHeaders, row, field) {
   if (lfDraft && saved && lfDraft.pk === saved.pk && lfDraft.sk === saved.sk && lfDraft.host === saved.host) lfDraft = null;
   const d = lfDraft || { host: saved?.host || LANGFUSE_HOSTS[0][0], pk: saved?.pk || "", sk: saved?.sk || "" };
   const preset = LANGFUSE_HOSTS.some(([h]) => h === d.host) ? d.host : "other";
@@ -162,7 +190,8 @@ function renderLangfuse(saved, config, save, row, field) {
     }
     headers.Authorization = "Basic " + btoa(unescape(encodeURIComponent(d.pk + ":" + d.sk)));
     if (!version && first) headers["x-langfuse-ingestion-version"] = "4";
-    save({ endpoint: host + LANGFUSE_PATH, headers, ...(first ? { metrics: false, enabled: true } : {}) });
+    setHeaders(headers);
+    save({ endpoint: host + LANGFUSE_PATH, ...(first ? { metrics: false, enabled: true } : {}) });
   };
   const other = field(preset === "other" ? d.host : "", "https://langfuse.example.com", "url", "Langfuse host");
   other.onchange = () => { d.host = other.value; commit(); };

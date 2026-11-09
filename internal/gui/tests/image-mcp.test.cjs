@@ -2,9 +2,9 @@
 // magpie's image generation as an MCP server (JonahFu on X): Settings ›
 // Models has an "Image generation MCP server" row, after image
 // recognition's, with the gateway's address of it, /mcp/magpie/image, to
-// copy into any agent, and says what its tools give back and that a
-// gateway key goes with it from another computer. In every language, in
-// both engines, wide and narrow.
+// copy into any agent. Its line says what it draws with, and its tools,
+// what they give back and the gateway key from another computer are
+// folded under it. In every language, in both engines, wide and narrow.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -73,12 +73,13 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         const row = await page.evaluate(() => {
           const r = document.querySelector("#imagesList #imageMcpRow");
           r.scrollIntoView({ block: "nearest" });
-          return { name: r.querySelector(".name").textContent, sub: r.querySelector(".sub").textContent,
+          return { name: r.querySelector(".name").textContent, sub: r.querySelector(".sub").textContent, more: r.querySelector(".mcp-more")?.textContent ?? "",
             code: r.querySelector("code").textContent, buttons: r.querySelectorAll("button").length,
             after: r.previousElementSibling?.id };
         });
         assert.equal(row.name, w.name);
-        assert.match(row.sub, w.sub);
+        assert.match(row.sub, /Streamable HTTP/);
+        assert.match(row.more, w.sub);
         assert.equal(row.code, address);
         assert.equal(row.buttons, 1, "a copy button");
         assert.equal(row.after, "visionMcpRow", "beside image recognition's server");

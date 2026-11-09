@@ -60,10 +60,10 @@ function renderPort(s) {
         // copy, say where it is now, not the port before (noahhrreion on
         // Discord: it kept the old one until Providers was opened)
         if (res.settings?.gateway) renderSideGw({ ...sideGwAt, url: res.settings.gateway, running: true });
-        if (providers) loadProviders().catch(() => {});
-        renderSettings();
+        if (providers) loadProviders(true).catch(() => {}); // the port changed: asked however fresh the list is
+        echoPrefs();
       })
-      .catch((e) => { d.value = field.value; d.err = portSays(e.message); status(d.err, "err"); renderSettings(); });
+      .catch((e) => { d.value = field.value; d.err = portSays(e.message); status(d.err, "err"); echoPrefs(); });
   };
   field.oninput = () => { d.value = field.value; };
   field.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") save.onclick(); if (e.key === "Escape") { portDraft = { value: null, err: "" }; renderPort(s); } };
@@ -80,8 +80,8 @@ function renderPort(s) {
 function renderBareIds(s) {
   renderBusyLoad(s); // the row under it
   $("#bareIdsSegs").replaceChildren(segs([[false, t("Off")], [true, t("On")]], !!s.bareModelIDs, (on) =>
-    writingPrefs(api("settings/bare-ids", { on })).then((ns) => { prefs = state.settings = ns; renderSettings(); })
-      .catch((e) => { status(t(e.message), "err"); renderSettings(); })));
+    writingPrefs(api("settings/bare-ids", { on })).then((ns) => { prefs = state.settings = ns; echoPrefs(); })
+      .catch((e) => { status(t(e.message), "err"); echoPrefs(); })));
 }
 
 // renderBusyLoad: the load past which a model its plugin says is busy
@@ -92,8 +92,8 @@ let busyDraft = null;
 const BUSY_CUSTOM = -1;
 function renderBusyLoad(s) {
   const at = s.busyLoad || 0, sub = $("#busyLoadRow .sub"), d = busyDraft;
-  const put = (n) => writingPrefs(api("settings/busy-load", { at: n })).then((ns) => { busyDraft = null; prefs = state.settings = ns; renderSettings(); })
-    .catch((e) => { status(t(e.message), "err"); renderSettings(); });
+  const put = (n) => writingPrefs(api("settings/busy-load", { at: n })).then((ns) => { busyDraft = null; prefs = state.settings = ns; echoPrefs(); })
+    .catch((e) => { status(t(e.message), "err"); echoPrefs(); });
   sub.dataset.en ??= sub.textContent; // its English, as translateStatic keeps it
   sub.classList.toggle("err", !!d?.err);
   sub.textContent = d ? d.err || t("A load is in percent, as the plugin reports it: 100 is all its vendor serves at once, and past 100 requests queue (200 is twice that). Type 1 to 9999") : t(sub.dataset.en);
@@ -148,8 +148,8 @@ function renderCORS(s) {
   const origins = s.corsOrigins || [];
   const d = corsDraft;
   const set = (next, done) => writingPrefs(api("settings/cors", { origins: next }))
-    .then((ns) => { prefs = ns; d.err = ""; done?.(); renderSettings(); status(t("Saved"), "ok", 1500); })
-    .catch((e) => { d.err = corsSays(e.message); status(d.err, "err"); renderSettings(); });
+    .then((ns) => { prefs = ns; d.err = ""; done?.(); echoPrefs(); status(t("Saved"), "ok", 1500); })
+    .catch((e) => { d.err = corsSays(e.message); status(d.err, "err"); echoPrefs(); });
   const field = input(d.value, "http://localhost:3000");
   field.className = "words rule-match";
   field.setAttribute("aria-label", t("Web page origin"));
@@ -210,12 +210,12 @@ function renderAllow(s) {
   const list = env ? (s.allowIPsFromEnv || []) : (s.allowIPs || []);
   const d = allowDraft;
   const set = (next, done) => writingPrefs(api("settings/allowips", { ips: next }))
-    .then((ns) => { prefs = ns; d.err = d.addr = ""; d.tried = null; done?.(); renderSettings(); status(t("Saved"), "ok", 1500); })
+    .then((ns) => { prefs = ns; d.err = d.addr = ""; d.tried = null; done?.(); echoPrefs(); status(t("Saved"), "ok", 1500); })
     .catch((e) => {
       d.err = allowSays(e.message);
       d.addr = /shut out (\S+), the address/.exec(e.message)?.[1] || "";
       d.tried = d.addr ? { next, done } : null;
-      status(d.err, "err"); renderSettings();
+      status(d.err, "err"); echoPrefs();
     });
   const r = el("div", "row pref rule-row");
   const who = el("div", "who");
@@ -311,12 +311,12 @@ function renderLAN(s) {
     return r;
   };
   const set = (body) => writingPrefs(api("settings/lan", body)).then((ns) => {
-    prefs = ns; renderSettings();
+    prefs = ns; echoPrefs();
     // the sidebar's gateway names the address shared, or this computer's
     api("providers").then((r) => renderSideGw(r?.gateway), () => {});
     if (ns.rekeyed) status(ns.rekeyed, "err");
   })
-    .catch((e) => { status(t(e.message), "err"); renderSettings(); });
+    .catch((e) => { status(t(e.message), "err"); echoPrefs(); });
   row(t("Share on local network"), t("Agents on other computers on this network, or through a tunnel to this one such as Cloudflare Tunnel, can use magpie’s models with a gateway key from Gateway"), "",
     segs([["off", t("Off")], ["on", t("On")]], s.lan ? "on" : "off", (v) => set({ on: v === "on" })));
   if (!s.lan) return;

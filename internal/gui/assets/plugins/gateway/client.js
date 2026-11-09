@@ -110,7 +110,7 @@ function gatewayFixButton(g, older) {
     let out;
     try { out = await api(older ? "gateway/take-over" : "gateway/restart", {}); } catch (e) { out = { reason: "error", error: e.message }; }
     gatewayFix = { busy: false, err: out?.ok ? "" : gatewayFixSays(out || {}), when };
-    try { await loadProviders(); } catch {}
+    try { await loadProviders(true); } catch {} // the gateway it runs changed: asked however fresh the list is
     renderGateway();
   };
   return b;
@@ -252,7 +252,7 @@ function renderGatewayLan() {
     writingPrefs(api("settings/lan", { on: v === "on" }))
       .then((ns) => { prefs = ns; if (ns.rekeyed) status(ns.rekeyed, "err"); })
       .catch((e) => status(t(e.message), "err"))
-      .then(() => loadProviders().catch(() => {}))
+      .then(() => loadProviders(true).catch(() => {})) // sharing turned on or off: asked however fresh the list is
       .finally(() => {
         gatewayLanBusy = false;
         if (view !== "gateway" || !providers) return;

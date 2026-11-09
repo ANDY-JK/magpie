@@ -92,7 +92,7 @@ const NEW = [
   "{window} of {who} follows the account's cap", "{window} of {who} has no cap", "{who} stops at {n}% of {window}",
   "Cap for {window}, in percent", "Account's cap · {n}%", "Account's cap · none", "As the account's other windows",
   "No cap on this window", "Use this window to 100%", "Cap for {window}", "Caps by window",
-  "A window can have a cap of its own: click its meter below",
+  "A window's meter below can hold its own cap",
 ];
 
 for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {

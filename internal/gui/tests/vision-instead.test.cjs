@@ -17,15 +17,15 @@ const words = {
     auto: /probe\/eye, the model magpie picked to describe images, couldn't describe an image for Codex's call to magpie's analyze_image MCP tool: it failed\. So magpie had other\/bigeye/,
   },
   zh: {
-    picked: /probe\/eye 是在 设置 › 模型 里选的识图模型，但它没能为 Codex 的 zai\/glm-5\.2 描述图片：502 upstream closed。所以 magpie 改让下一个可用的识图模型 other\/bigeye 来描述。不属于对话轮次。$/,
+    picked: /probe\/eye 是在 设置 › 模型 里选的识图模型，但它没能为 Codex 的 zai\/glm-5\.2 描述图片：502 upstream closed。所以 magpie 改让下一个可用的识图模型 other\/bigeye 来描述。 不属于对话轮次。$/,
     auto: /probe\/eye 是 magpie 自动选的识图模型，但它没能为 Codex 对 magpie 的 analyze_image MCP 工具的调用 描述图片：它出错了。/,
   },
   "zh-TW": {
-    picked: /probe\/eye 是在 設定 › 模型 裡選的識圖模型，但它沒能為 Codex 的 zai\/glm-5\.2 描述圖片：502 upstream closed。所以 magpie 改讓下一個可用的識圖模型 other\/bigeye 來描述。不屬於對話輪次。$/,
+    picked: /probe\/eye 是在 設定 › 模型 裡選的識圖模型，但它沒能為 Codex 的 zai\/glm-5\.2 描述圖片：502 upstream closed。所以 magpie 改讓下一個可用的識圖模型 other\/bigeye 來描述。 不屬於對話輪次。$/,
     auto: /probe\/eye 是 magpie 自動選的識圖模型，但它沒能為 Codex 對 magpie 的 analyze_image MCP 工具的呼叫 描述圖片：它出錯了。/,
   },
   ja: {
-    picked: /設定 › モデル で選んだ画像認識モデル probe\/eye は Codex の zai\/glm-5\.2 のための画像を説明できませんでした：502 upstream closed。そのため magpie は次に使える画像を見られるモデル other\/bigeye に代わりに説明させました。会話のターンではありません。$/,
+    picked: /設定 › モデル で選んだ画像認識モデル probe\/eye は Codex の zai\/glm-5\.2 のための画像を説明できませんでした：502 upstream closed。そのため magpie は次に使える画像を見られるモデル other\/bigeye に代わりに説明させました。 会話のターンではありません。$/,
     auto: /magpie が自動で選んだ画像認識モデル probe\/eye は Codex による magpie の analyze_image MCP ツールの呼び出し のための画像を説明できませんでした：エラーになりました。/,
   },
   de: {

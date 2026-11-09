@@ -3372,16 +3372,19 @@ function routingPage(part) {
   const rowTags = (r) => tagKind(r) ? [kindTag(r)] : movedSays(r) ? [movedTag(r)] : [];
   function kindWhy(r) {
     const agent = agentName(r.agent);
+    // every magpie-side call of its own carries the same tail note, one
+    // key here instead of a copy inside every line's words
+    const notTurn = " " + t("Not a turn of the conversation.");
     if (purposeOf(tagKind(r)) === "kind:collab_spawn" && r.subagent) return subagentWhy(r);
     if (purposeOf(tagKind(r)) === "kind:collab_spawn") return r.group
       ? t("{agent} requested a subagent; magpie selects its model within this routing group.", { agent })
       : t("{agent} requested a subagent on {model}.", { agent, model: r.model });
-    if (purposeOf(r.kind) === "kind:ambient_suggestions") return t("{agent} drafted the suggested prompts on its home page by itself, in the background, searching the project's files and connected apps, and checked them for safety. Not a turn of the conversation; Codex's Settings › Configuration › Suggested prompts turns it off.", { agent });
-    if (purposeOf(r.kind) === "kind:composer_predictions") return t("{agent} guessed your next message for its composer by itself, reading the whole conversation again. Not a turn of the conversation; Codex composer predictions, under Settings in Codex's row on the Agents page, picks its model, and Codex's Settings › General › Show predictions turns it off.", { agent });
+    if (purposeOf(r.kind) === "kind:ambient_suggestions") return t("{agent} drafted the suggested prompts on its home page by itself, in the background. Codex's Settings › Configuration › Suggested prompts turns it off.", { agent }) + notTurn;
+    if (purposeOf(r.kind) === "kind:composer_predictions") return t("{agent} guessed your next message for its composer by itself. Codex composer predictions picks its model under Settings in Codex's row on the Agents page; Codex's Settings › General › Show predictions turns it off.", { agent }) + notTurn;
     // Claude Desktop's check that magpie answers names its model itself
     // (cybercaius on Discord: "Desktop requested deepseek-flash" while
     // the chat was on another model)
-    if (r.kind === "connection_check") return t("{agent} checked that magpie answers, as it does when it starts and from its Test connection. It names this check's model itself, from the names in its model list ({model}), not the model chosen in the conversation, and only reads whether an answer comes back; magpie sends it to the model chosen in {agent}'s model menu, or to its first listed model when none is. Not a turn of the conversation.", { agent, model: r.model });
+    if (r.kind === "connection_check") return t("{agent} checked that magpie answers. It names this check's model itself, from the names in its model list ({model}), not the model chosen in the conversation; magpie sends it to the model chosen in {agent}'s model menu, or to its first listed one when none is.", { agent, model: r.model }) + notTurn;
     if (r.kind === "luna_reserve") return t("{agent} sent this turn on Luna Reserve, which it turns to once the plan's own allowance is used up; it picks the model itself.", { agent });
     // the searcher asked first failed or found nothing, and this one
     // searched in its place: say which and why, not just who searched
@@ -3393,14 +3396,14 @@ function routingPage(part) {
         : t("a model that can't search the web by itself");
       const why = f.notSearched ? t("it answered without searching the web, so its account or plan may not offer web search") : f.nothingFound ? t("its reply named no page it found") : f.why || t("it failed");
       return f.picked
-        ? t("{failed}, the searcher picked in Settings › Models › Web search, didn't search for {whom}: {why}. So magpie had {searcher}, the next searcher it can use, search in its place. Not a turn of the conversation.", { failed: f.instead, whom, why, searcher: r.model })
-        : t("{failed}, the searcher magpie picked, didn't search for {whom}: {why}. So magpie had {searcher}, the next searcher it can use, search in its place. Not a turn of the conversation.", { failed: f.instead, whom, why, searcher: r.model });
+        ? t("{failed}, the searcher picked in Settings › Models › Web search, didn't search for {whom}: {why}. So magpie had {searcher}, the next searcher it can use, search in its place.", { failed: f.instead, whom, why, searcher: r.model }) + notTurn
+        : t("{failed}, the searcher magpie picked, didn't search for {whom}: {why}. So magpie had {searcher}, the next searcher it can use, search in its place.", { failed: f.instead, whom, why, searcher: r.model }) + notTurn;
     }
     // the agent called magpie's web search MCP server itself, for no model
-    if (r.kind === "web_search" && r.for?.mcp) return t("{agent} called magpie's web_search MCP tool: {searcher} searched for it. Not a turn of the conversation.", { agent: agentName(r.for.agent), searcher: r.model });
+    if (r.kind === "web_search" && r.for?.mcp) return t("{agent} called magpie's web_search MCP tool: {searcher} searched for it.", { agent: agentName(r.for.agent), searcher: r.model }) + notTurn;
     if (r.kind === "web_search") return r.for
-      ? t("magpie ran this web search for {agent}'s {model}, which can't search the web by itself: {searcher} searched, and {model} goes on answering once it has what was found. Not a turn of the conversation.", { agent: agentName(r.for.agent), model: r.for.model, searcher: r.model })
-      : t("magpie ran this web search for a model that can't search the web by itself: {searcher} searched, and that model goes on answering once it has what was found. Not a turn of the conversation.", { searcher: r.model });
+      ? t("magpie ran this web search for {agent}'s {model}, which can't search the web by itself: {searcher} searched, and {model} goes on answering once it has what was found.", { agent: agentName(r.for.agent), model: r.for.model, searcher: r.model }) + notTurn
+      : t("magpie ran this web search for a model that can't search the web by itself: {searcher} searched, and that model goes on answering once it has what was found.", { searcher: r.model }) + notTurn;
     // why the model was counted as unable to see, and where the user says
     // otherwise or picks the describer (#1287: a DeepSeek model's images
     // went to Codex's GPT, and nothing said why or where to change it)
@@ -3416,16 +3419,16 @@ function routingPage(part) {
         : t("a model that can't see images");
       const why = f.why || t("it failed");
       return f.picked
-        ? t("{failed}, the Image recognition model picked in Settings › Models, couldn't describe an image for {whom}: {why}. So magpie had {describer}, the next model it can use that sees, describe it in its place. Not a turn of the conversation.", { failed: f.instead, whom, why, describer: r.model })
-        : t("{failed}, the model magpie picked to describe images, couldn't describe an image for {whom}: {why}. So magpie had {describer}, the next model it can use that sees, describe it in its place. Not a turn of the conversation.", { failed: f.instead, whom, why, describer: r.model });
+        ? t("{failed}, the Image recognition model picked in Settings › Models, couldn't describe an image for {whom}: {why}. So magpie had {describer}, the next model it can use that sees, describe it in its place.", { failed: f.instead, whom, why, describer: r.model }) + notTurn
+        : t("{failed}, the model magpie picked to describe images, couldn't describe an image for {whom}: {why}. So magpie had {describer}, the next model it can use that sees, describe it in its place.", { failed: f.instead, whom, why, describer: r.model }) + notTurn;
     }
     // the agent called magpie's image recognition MCP server itself
-    if (r.kind === "vision" && r.for?.mcp) return t("{agent} called magpie's analyze_image MCP tool: {describer} looked at the image for it. Not a turn of the conversation.", { agent: agentName(r.for.agent), describer: r.model });
-    if (r.kind === "vision" && r.for?.missing) return t("{picked}, the Image recognition model picked in Settings, isn't set up any more, so magpie had {describer}, its automatic choice, describe an image for {agent}'s {model} in its place. Pick another in Settings › Models › Image recognition. Not a turn of the conversation.", { picked: r.for.missing, agent: agentName(r.for.agent), model: r.for.model, describer: r.model });
-    if (r.kind === "vision" && r.for?.unknown) return t("magpie had {describer} describe an image for {agent}'s {model}: nothing magpie knows says {model} can see images, so it is counted as text-only and given the description in the image's place. If it does see them, tick “Accepts images” for it in its provider's models. Settings › Models › Image recognition picks the model that describes. Not a turn of the conversation.", { agent: agentName(r.for.agent), model: r.for.model, describer: r.model });
+    if (r.kind === "vision" && r.for?.mcp) return t("{agent} called magpie's analyze_image MCP tool: {describer} looked at the image for it.", { agent: agentName(r.for.agent), describer: r.model }) + notTurn;
+    if (r.kind === "vision" && r.for?.missing) return t("{picked}, the Image recognition model picked in Settings, isn't set up any more, so magpie had {describer}, its automatic choice, describe an image for {agent}'s {model} in its place. Pick another in Settings › Models › Image recognition.", { picked: r.for.missing, agent: agentName(r.for.agent), model: r.for.model, describer: r.model }) + notTurn;
+    if (r.kind === "vision" && r.for?.unknown) return t("magpie had {describer} describe an image for {agent}'s {model}: nothing magpie knows says {model} can see images. If it does see them, tick “Accepts images” for it in its provider's models.", { agent: agentName(r.for.agent), model: r.for.model, describer: r.model }) + notTurn;
     if (r.kind === "vision") return r.for
-      ? t("magpie had {describer} describe an image for {agent}'s {model}, which its provider's list or its own setting says takes text only: {model} is given the description in the image's place. Settings › Models › Image recognition picks the model that describes. Not a turn of the conversation.", { agent: agentName(r.for.agent), model: r.for.model, describer: r.model })
-      : t("magpie had {describer} describe an image for a model that can't see images, which is given the description in the image's place. Not a turn of the conversation.", { describer: r.model });
+      ? t("magpie had {describer} describe an image for {agent}'s {model}, which its provider's list or its own setting says takes text only: {model} is given the description in the image's place. Settings › Models › Image recognition picks the model that describes.", { agent: agentName(r.for.agent), model: r.for.model, describer: r.model }) + notTurn
+      : t("magpie had {describer} describe an image for a model that can't see images, which is given the description in the image's place.", { describer: r.model }) + notTurn;
     return t("{agent} made this call itself ({kind}), not as a turn of the conversation, and picks its model itself.", { agent, kind: kindName(r.kind) });
   }
 

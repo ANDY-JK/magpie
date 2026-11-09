@@ -25,14 +25,18 @@ function server(lang, posts, proxy = "") {
     if (url.pathname === "/boot.js") return route.fulfill({ contentType: "text/javascript", body: `window.bootPrefs = ${JSON.stringify({ lang, theme: "light", web: true })};` });
     if (url.pathname === "/wails/runtime.js") return route.fulfill({ contentType: "text/javascript", body: "export const Window = {};" });
     if (url.pathname === "/api/state") return json({ agents: [], profiles: [], settings: { lang, theme: "light" }, fx: cur.fx });
+    // the settings state holds the proxy's login masked (settings.ForUI);
+    // the login comes back from /api/settings/proxy, as Go serves it
+    const noLogin = (v) => (v || "").replace(/^(\w+:\/\/)?[^/?#]*@/, "$1");
     if (url.pathname === "/api/settings") {
       if (req.method() === "POST") {
         const body = req.postDataJSON();
         posts.push(body);
         cur = { ...cur, ...body, proxyNow: body.proxy, proxySource: body.proxy === "direct" ? "off" : body.proxy ? "settings" : "none" };
       }
-      return json(cur);
+      return json({ ...cur, proxy: noLogin(cur.proxy), proxyNow: noLogin(cur.proxyNow) });
     }
+    if (url.pathname === "/api/settings/proxy") return json({ proxy: cur.proxy || "", proxyCustom: cur.proxyCustom || "" });
     if (url.pathname === "/api/plugins") return json({ plugins: [] });
     if (url.pathname === "/api/usage/quotas") return json([]);
     if (url.pathname === "/api/groups") return json({ groups: [], models: [] });
@@ -64,16 +68,32 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const posts = [], errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
       await page.route("**/*", server(lang, posts));
-      await page.goto("http://magpie.test/?view=settings&tab=network");
       const box = page.locator("#proxySegs");
       const address = box.locator("input.proxy");
       const user = box.getByRole("textbox", { name: l.user, exact: true });
       const pass = box.getByLabel(l.pass, { exact: true });
+      // The state holds the login masked; the fields get it from the proxy
+      // echo, which redraws the row once it lands. A load or a reload waits
+      // for it, so what is asserted is the row as it stands.
+      const load = async (url) => {
+        // the echo is asked once the page draws: a boot slower than the
+        // 4s default (a cold engine on a busy box) is not a red here, so
+        // it waits as long as the navigation does
+        const echo = page.waitForResponse((r) => r.url().endsWith("/api/settings/proxy"), { timeout: 60000 });
+        await (url ? page.goto(url) : page.reload());
+        await echo;
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      };
+      await load("http://magpie.test/?view=settings&tab=network");
       const saved = async (action, want) => {
         const count = posts.length;
         const response = page.waitForResponse((r) => r.url().endsWith("/api/settings") && r.request().method() === "POST");
         await action();
         await response;
+        // the save answers with the row drawn again, in the same turn as
+        // its "Saved"; the status may still show a save before this one's,
+        // so wait past the redraw before typing on (as load does)
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
         await page.waitForFunction((word) => document.querySelector("#status")?.textContent.includes(word), l.saved);
         assert.equal(posts.length, count + 1, "save once for the whole proxy");
         assert.equal(posts.at(-1).proxy, want);
@@ -93,7 +113,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await pass.press("Tab");
         await page.locator("#proxySub").click();
       }, encoded);
-      await page.reload();
+      await load();
       assert.equal(await address.inputValue(), "socks5://127.0.0.1:1080");
       assert.equal(await user.inputValue(), "a@b:/% 用户");
       assert.equal(await pass.inputValue(), "p@ss:/% #密码");
@@ -115,7 +135,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await user.fill("");
       await pass.fill("");
       await saved(() => pass.press("Enter"), "socks5://127.0.0.1:1080");
-      await page.reload();
+      await load();
       assert.equal(await user.inputValue(), "");
       assert.equal(await pass.inputValue(), "");
 
@@ -151,7 +171,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // the bytes internal/netproxy's TestProxyLoginWithReservedCharacters signs in with
       const httpLogin = "http://me%40corp%3Ax:p%40ss%3Aw%2Frd%25%20%231%20x@127.0.0.1:7890";
       await saved(() => pass.press("Enter"), httpLogin);
-      await page.reload();
+      await load();
       assert.equal(await address.inputValue(), "http://127.0.0.1:7890");
       assert.equal(await user.inputValue(), "me@corp:x");
       assert.equal(await pass.inputValue(), "p@ss:w/rd% #1 x");
@@ -175,7 +195,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await user.fill("u");
       await pass.fill("p w");
       await saved(() => pass.press("Enter"), "u:p%20w@127.0.0.1:7891");
-      await page.reload();
+      await load();
       assert.equal(await address.inputValue(), "127.0.0.1:7891");
       assert.equal(await pass.inputValue(), "p w");
 
@@ -198,7 +218,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       page.on("pageerror", (e) => errors.push(e.message));
       // as one typed whole before: a raw @ in the password, as Go reads it
       await page.route("**/*", server(lang, posts, "https://al%20ice:se@cr%23et@proxy.example:8443"));
+      const echo = page.waitForResponse((r) => r.url().endsWith("/api/settings/proxy"));
       await page.goto("http://magpie.test/?view=settings&tab=network");
+      await echo;
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
       const box = page.locator("#proxySegs");
       assert.equal(await box.locator("input.proxy").inputValue(), "https://proxy.example:8443");
       assert.equal(await box.getByRole("textbox", { name: l.user, exact: true }).inputValue(), "al ice");
