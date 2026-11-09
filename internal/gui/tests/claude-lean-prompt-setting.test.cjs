@@ -50,7 +50,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
       t.after(() => browser.close());
       const page = await (await browser.newContext({ viewport: { width, height: 900 } })).newPage();
-      page.setDefaultTimeout(5000);
+      // a click waits 10s: the first case of each engine pays the page's
+      // first layout, which a loaded machine stretches past 5 (de 420)
+      page.setDefaultTimeout(10000);
       page.setDefaultNavigationTimeout(60000);
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));
@@ -62,11 +64,20 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const row = page.locator("#replyList #claudeLeanRow");
       await row.waitFor();
       // scrolled to as a reader does, with the wheel: WebKit at 420 put
-      // back a scroll made from script
+      // back a scroll made from script. Bounded by time, not by turns: the
+      // page's length and a loaded machine both decide how far 120 goes,
+      // and a row left out of sight is a click that lands nowhere (de 420).
       await page.mouse.move(width / 2, 450);
-      for (let i = 0; i < 40; i++) {
+      // clear of the foot too: the scroll-to-ends capsule floats at the
+      // lower right (scrollends.js) and a row resting under it is a row
+      // whose switch it takes the click for
+      const inView = async () => {
         const box = await row.boundingBox();
-        if (box && box.y >= 0 && box.y + box.height <= 900) break;
+        return box && box.y >= 0 && box.y + box.height <= 900 - 96;
+      };
+      const deadline = Date.now() + 20000;
+      while (!(await inView())) {
+        if (Date.now() > deadline) throw new Error("the row never came into view");
         await page.mouse.wheel(0, 120);
         await page.waitForTimeout(50);
       }
