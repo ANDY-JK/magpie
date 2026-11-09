@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const claude = ({ switchOnly = false, spare = true } = {}) => ({
@@ -89,6 +90,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.ok(await only.getAttribute("title"), "it says what it does");
         assert.equal(await only.locator("input").isChecked(), false);
         if (lang === "en") {
+          await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
           const missing = await page.evaluate((ks) => ["zh", "zh-TW", "ja", "de"].flatMap((l) => ks.filter((k) => !I18N[l][k]).map((k) => `${l}: ${k}`)), strings);
           assert.deepEqual(missing, [], "every string has its translations");
         }
