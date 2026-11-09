@@ -56,6 +56,9 @@ func allowList() (list []string, fromEnv, unknown bool) {
 	if v := strings.TrimSpace(os.Getenv(AllowIPsEnv)); v != "" {
 		return settings.SplitAllowIPs(v), true, false
 	}
+	// LoadChecked, not Shared: an unreadable settings.json is answered
+	// differently from one with no list (unknown, this computer alone),
+	// and Shared has no way to say which it is
 	s, err := settings.LoadChecked()
 	lastAllow.Lock()
 	defer lastAllow.Unlock()

@@ -118,7 +118,9 @@ func OnNetwork() bool {
 
 // remoteKeyed: requests from another machine are answered, with an enabled
 // gateway key — while the gateway is shared, or listens on the network.
-func remoteKeyed() bool { return settings.Load().LAN || OnNetwork() }
+// Read only, a field looked at: Shared, as the other per-request looks take
+// the settings (a Load is a copy of the whole file, reflective).
+func remoteKeyed() bool { return settings.Shared().LAN || OnNetwork() }
 
 // PublicHost is MAGPIE_PUBLIC_URL's host, "" when it isn't set.
 func PublicHost() string {

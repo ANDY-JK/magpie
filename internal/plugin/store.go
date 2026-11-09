@@ -338,7 +338,18 @@ var gitSpec = regexp.MustCompile(`^(?:(?:github|gitlab|bitbucket):|git\+[a-z]+:/
 // IsGit is whether spec names a git repository rather than an npm package
 // or a path. The package bun installs from it is named by its own
 // package.json, not by spec.
-func IsGit(spec string) bool { return !IsPath(spec) && gitSpec.MatchString(spec) }
+func IsGit(spec string) bool {
+	if IsPath(spec) || !gitSpec.MatchString(spec) {
+		return false
+	}
+	// a ref is a branch, a tag or a commit, and none of them starts with a
+	// dash: `#--upload-pack=…` would be an option to the git bun runs, not
+	// a ref it checks out
+	if i := strings.IndexByte(spec, '#'); i >= 0 && strings.HasPrefix(spec[i+1:], "-") {
+		return false
+	}
+	return true
+}
 
 // gitName is the package bun installed from the git spec: the dependency
 // of plugins/package.json bun added it as (it keeps spec as given), ""

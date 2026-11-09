@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,8 +144,10 @@ func saveRests() {
 // each file. A rest ended since keeps its count, as it would have here,
 // unless it ended over restsKeep ago; a key no longer in providers.json
 // is let go. A file that can't be read or parsed adds nothing: no rest is
-// guessed from it, and the next change writes it anew. A rest this
-// process has already is kept over the file's.
+// guessed from it, and the next change writes it anew — said either way,
+// a rests.json gone unread is every resting key asked of its vendor
+// again and nothing on the page names why. A rest this process has
+// already is kept over the file's.
 func loadRests() {
 	path := restsPath()
 	restsLoaded.Lock()
@@ -155,10 +158,12 @@ func loadRests() {
 	restsLoaded.from[path] = true
 	b, err := os.ReadFile(path)
 	if err != nil {
+		log.Printf("rests.json: unreadable, the rests kept in memory alone: %v", err)
 		return
 	}
 	var saved map[string]savedRest
-	if json.Unmarshal(b, &saved) != nil {
+	if err := json.Unmarshal(b, &saved); err != nil {
+		log.Printf("rests.json: unparsable, the rests kept in memory alone: %v", err)
 		return
 	}
 	known, err := restKeysStored()

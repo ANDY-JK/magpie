@@ -195,9 +195,11 @@ func hostPort(hp, scheme string) string {
 	return net.JoinHostPort(strings.Trim(hp, "[]"), port)
 }
 
-// corsAllowed: origin is one the user listed.
+// corsAllowed: origin is one the user listed. Read only: the slice is
+// looked at and CleanOrigins copies what it keeps, so Shared's own may be
+// had (a Load is a copy of the whole file, reflective, per request).
 func corsAllowed(origin string) bool {
-	saved := settings.Load().CORSOrigins
+	saved := settings.Shared().CORSOrigins
 	if len(saved) == 0 {
 		return false
 	}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"regexp"
+	"sync"
 
 	"github.com/yetone/magpie/internal/provider"
 )
@@ -47,6 +48,25 @@ var toolsMissing = regexp.MustCompile("(?i)must define tools|toolconfig field mu
 // a call to it: not found, not defined, unknown.
 const toolNotDeclared = `(?:not (?:found|defined|declared|provided|offered|available|present|exist|in (?:the )?(?:tools?|request|list))|unknown|undefined|undeclared|does ?n[o']t exist|no such|missing|invalid)`
 
+// refusalRe is the pattern that names a tool n in a refusal, compiled once
+// and kept: a session refused again is refused with the same names, and the
+// names a history called are few.
+var refusalRe sync.Map // tool name -> *regexp.Regexp
+
+// refusalOf is the pattern for tool name n, compiled at most once.
+func refusalOf(n string) *regexp.Regexp {
+	if re, ok := refusalRe.Load(n); ok {
+		return re.(*regexp.Regexp)
+	}
+	name := `(?:^|[^A-Za-z0-9_.-])` + regexp.QuoteMeta(n) + `(?:$|[^A-Za-z0-9_-])`
+	re, err := regexp.Compile(`(?i)` + toolNotDeclared + `[^\n{}]{0,80}?` + name + `|` + name + `[^\n{}]{0,80}?` + toolNotDeclared)
+	if err != nil {
+		return nil
+	}
+	refusalRe.Store(n, re)
+	return re
+}
+
 // refusesHistoryTools reports whether b, a 4xx body, refuses a history
 // call to one of names, the tools the history called that the request
 // doesn't declare, or calls in a request with no tools (toolless).
@@ -55,10 +75,7 @@ func refusesHistoryTools(b []byte, names []string, toolless bool) bool {
 		return true
 	}
 	for _, n := range names {
-		q := regexp.QuoteMeta(n)
-		name := `(?:^|[^A-Za-z0-9_.-])` + q + `(?:$|[^A-Za-z0-9_-])`
-		re, err := regexp.Compile(`(?i)` + toolNotDeclared + `[^\n{}]{0,80}?` + name + `|` + name + `[^\n{}]{0,80}?` + toolNotDeclared)
-		if err == nil && re.Match(b) {
+		if re := refusalOf(n); re != nil && re.Match(b) {
 			return true
 		}
 	}

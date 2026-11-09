@@ -42,6 +42,11 @@ func TestIsGit(t *testing.T) {
 		"file:///abs/plugin":                       false,
 		`C:\plugins\x`:                             false,
 		"https://example.com/x.tgz":                false,
+		// a ref is a branch, a tag or a commit, and none starts with a dash:
+		// `#--upload-pack=…` would be an option to the git bun runs
+		"owner/repo#--upload-pack=/bin/sh": false,
+		"github:owner/repo#-x":             false,
+		"owner/repo#-":                     false,
 	} {
 		if got := IsGit(spec); got != want {
 			t.Errorf("IsGit(%q) = %v, want %v", spec, got, want)
