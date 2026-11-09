@@ -124,15 +124,15 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     t.after(() => browser.close());
 
     await t.test("every language has the strings", async () => {
-      const { page } = await open(browser, "en", []);
+      // each language is a file of its own (i18n.zh.js and the rest), which
+      // the page loads for the language it is in: an English page holds no
+      // other language's words, so the files are read here as strings() does
+      const { I18N } = require("./strings.cjs").strings();
       for (const lang of ["zh", "zh-TW", "ja", "de"]) {
-        const missing = await page.evaluate(([lang, keys]) => keys.filter((k) => {
-          const d = I18N[lang];
-          return !d || !d[k] || d[k] === k;
-        }), [lang, Object.values(en).filter((s) => !["Add", "Remove"].includes(s))]);
+        const d = I18N[lang];
+        const missing = Object.values(en).filter((k) => !["Add", "Remove"].includes(k) && (!d || !d[k] || d[k] === k));
         assert.deepEqual(missing, [], lang);
       }
-      await page.context().close();
     });
 
     await t.test("hidden while magpie answers only this computer", async () => {

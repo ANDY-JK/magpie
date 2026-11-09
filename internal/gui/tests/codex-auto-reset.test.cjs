@@ -20,6 +20,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const later = new Date(Date.now() + 3 * 864e5).toISOString();
@@ -123,6 +124,7 @@ const strings = [
 // wordsOf: a language's words, from its dictionary when not spelled out here
 async function wordsOf(page, lang) {
   if (words[lang]) return words[lang];
+  await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
   const d = await page.evaluate(([lang, keys]) => Object.fromEntries(Object.entries(keys).map(([k, v]) => [k, I18N[lang][v]])), [lang, keys]);
   const fill = (s) => (who) => s.replace("{who}", who);
   return { ...d, keptOn: "· " + d.keptOn, keptOff: "· " + d.keptOff, keptWeek: "· " + d.keptWeek, both: fill(d.both), weekOnly: fill(d.weekOnly), expiryOnly: fill(d.expiryOnly), none: fill(d.none) };
@@ -283,6 +285,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await panel.locator(ptwo).waitFor();
       await flip(panel, expiry(ptwo), panelPosts, { user: "two@example.com", on: true, when: "expiring" }, true, w.expiryOnly("two@example.com"));
 
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
       const missing = await page.evaluate((strings) => ["zh", "zh-TW", "ja", "de"].flatMap((l) => strings.filter((k) => !I18N[l][k]).map((k) => l + ": " + k)), strings);
       assert.deepEqual(missing, [], "every string has its translations");
       // the credit is 重置卡 in Chinese wherever it is counted or spent

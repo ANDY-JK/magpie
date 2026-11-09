@@ -174,7 +174,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
 
       const border = await page.evaluate(() => [...document.querySelectorAll(".accts .amodels, .acct-models, .acct-models *")].map((e) => getComputedStyle(e).borderLeftWidth).filter((b) => parseFloat(b) > 1));
       assert.deepEqual(border, [], "no border stripes");
-      const missing = await page.evaluate(() => [
+      // each language is a file of its own now (i18n.zh.js and the rest),
+      // which an English page never loads: read the files, as strings() does
+      const zhWords = require("./strings.cjs").strings().I18N.zh;
+      const missing = [
         "Serves only {models}",
         "Every model of the provider goes to this account. Click to keep it for some only",
         "Every model of the provider goes to this key. Click to keep it for some only",
@@ -187,7 +190,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         "Only the models picked go to this key; the others go to the provider's other keys.",
         "set to serve other models, not {model}",
         "{who} is left out: it is set to serve other models, not {model}.",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !zhWords[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

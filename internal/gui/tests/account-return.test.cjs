@@ -93,12 +93,15 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await work.locator(".using").textContent(), w.again);
       assert.ok(await work.locator(".using").getAttribute("title"));
       assert.match(await page.locator(".editor").textContent(), w.note);
-      const missing = await page.evaluate(() => [
+      // each language is a file of its own now (i18n.zh.js and the rest),
+      // which an English page never loads: read the files, as strings() does
+      const zhWords = require("./strings.cjs").strings().I18N.zh;
+      const missing = [
         "First for now", "First again once it has room",
         "{user} was nearly used up, so magpie signed {agent} in to this one; it goes back to {user} once that has room again",
         "magpie signs {agent} back in to this account once it has room again",
         "Routing picks the account for each request through magpie; {agent} on its own uses the one it is signed in to, which magpie moves to the next ticked account with room once it is 98% used, and back to the first once that has room again.",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !zhWords[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       await work.locator(".using").click();
       assert.equal(await page.evaluate(() => document.scrollingElement.scrollTop), top, "the page doesn't move");
@@ -112,11 +115,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.doesNotMatch(note, w.note);
       assert.equal(await page.locator(".editor .acc", { hasText: "work@example.com" }).locator(".using").count(), 0);
       // the other languages' words are files of their own now (i18n.<lang>.js,
-      // plugins/<id>/i18n.<lang>.js): asked for before they are read
-      await page.evaluate(async () => {
-        for (const l of ["zh", "zh-TW", "ja", "de"]) { await loadLocaleWords(l); await pluginLocaleWords(l); }
-      });
-      const missing = await page.evaluate((k) => ["zh", "zh-TW", "ja", "de"].filter((l) => !I18N[l][k]), stays);
+      // plugins/<id>/i18n.<lang>.js): read here, as strings() reads them
+      const words = require("./strings.cjs").strings().I18N;
+      const missing = ["zh", "zh-TW", "ja", "de"].filter((l) => !words[l][stays]);
       assert.deepEqual(missing, [], "every language has the note");
       assert.deepEqual(errors, []);
     });

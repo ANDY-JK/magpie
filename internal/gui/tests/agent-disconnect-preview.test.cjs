@@ -130,7 +130,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           inside(visible.code, visible.clip, "the restored value is visible inside both scrolling regions");
           await ask.locator(".bar").getByRole("button", { name: lang === "zh" ? "取消" : "Cancel", exact: true }).click();
           await ask.waitFor({ state: "detached" });
-          assert.deepEqual(posts, [], "reading, expanding and cancelling the preview change no config");
+          // tintTitleBar paints Windows' own bar the page's colour (app.js);
+          // everything else the flow posted would be a config change
+          assert.deepEqual(posts.filter((p) => p !== "/api/window/titlebar"), [], "reading, expanding and cancelling the preview change no config");
         }
         assert.deepEqual(errors, [], "the real page has no runtime or console errors");
         await context.close();

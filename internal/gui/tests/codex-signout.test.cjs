@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { allWords } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const codex = (logins) => ({
@@ -113,6 +114,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(posts, [{ agent: "codex", user: "me@example.com" }]);
       await page.waitForFunction((s) => document.querySelector("#status")?.textContent.includes(s), w.done);
       assert.equal(await page.evaluate(() => document.scrollingElement.scrollTop), top, "the page doesn't move");
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
       const missing = await page.evaluate(() => [
         "Sign out", "Signs Codex out of this account, as codex logout does", "Sign {agent} out of {user}?",
         "{agent} is signed out, as codex logout does, and magpie forgets the account. Sign in again to use it; an open {agent} may need quitting and opening again. The account itself is left as it is.",
@@ -146,6 +148,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await confirm.getByRole("button", { name: w.remove, exact: true }).click();
       await page.waitForFunction(() => document.querySelector("#status")?.textContent.includes("me@example.com"));
       assert.deepEqual(posts, [{ agent: "codex", user: "me@example.com" }]);
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
       const missing = await page.evaluate(() => ["{agent} is signed in to another of its accounts, and magpie forgets this one; the account itself is untouched"]
         .filter((k) => !I18N.zh[k] || !I18N.ja[k] || !I18N.de[k]));
       assert.deepEqual(missing, [], "every string has its zh, ja and de");
@@ -177,6 +180,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await more(row);
       assert.equal(await row.getByRole("button", { name: w.remove, exact: true }).count(), 0);
       assert.equal(await row.getByRole("button", { name: w.out, exact: true }).count(), 0, "magpie never signs Claude Code out");
+      await allWords(page); // each language's words are a file of its own (i18n.<lang>.js)
       const missing = await page.evaluate(() => ["{agent} is signed in to {user}, the only account in magpie it can be signed in to, and magpie doesn't sign it out: add another account first, or sign out in {agent} itself, then remove this one"]
         .filter((k) => !I18N.zh[k] || !I18N["zh-TW"][k] || !I18N.ja[k] || !I18N.de[k]));
       assert.deepEqual(missing, [], "every string has its zh, zh-TW, ja and de");
