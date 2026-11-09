@@ -412,7 +412,17 @@ func groupsIn(entries []Entry) []Group {
 // page lists, copied every group and its rules each time (115 MB of a live
 // magpie's 2.6 GB in a minute and a half).
 func sharedGroups() []Group {
-	return heldFrom("groups", providerEntries(), buildGroupsIn)
+	return sharedGroupsIn(providerEntries())
+}
+
+// sharedGroupsIn is sharedGroups from entries a caller already read
+// (GroupFinder's), so the groups and the entries a look-up resolves its
+// members from are of one catalog, as groupsIn gave: the held groups
+// themselves, no copy, so nothing of them may be changed — Groups and
+// groupsIn clone so each caller can change its own, and a look-up that
+// only reads, handing out a group of its own, has no use for that.
+func sharedGroupsIn(entries []Entry) []Group {
+	return heldFrom("groups", entries, buildGroupsIn)
 }
 
 // cloneGroups is gs with nothing shared with it: no slice, map or pointer
@@ -663,7 +673,7 @@ func AutoStandIn(id string) (string, bool) {
 	}
 	f := load()
 	entries := providerEntries()
-	if _, ok := groupOf(groupsIn(entries), gid); ok {
+	if _, ok := groupOf(sharedGroupsIn(entries), gid); ok {
 		return "", false
 	}
 	if !f.NoAutoGroups {
@@ -878,7 +888,7 @@ func GroupFor(id string) (string, bool) {
 	if id == "" || strings.Contains(id, "/") {
 		return "", false
 	}
-	return groupForIn(Groups(), id)
+	return groupForIn(sharedGroups(), id)
 }
 
 // groupForIn is GroupFor over the groups all, read once for many ids.
@@ -945,10 +955,12 @@ func GroupFinder() func(id string) (Group, []Member, bool) {
 		}
 		if !read {
 			entries, read = providerEntries(), true
-			all, find = groupsIn(entries), entriesBy(entries)
+			all, find = sharedGroupsIn(entries), entriesBy(entries)
 		}
 		if g, ok := groupOf(all, gid); ok && !g.Disabled {
-			return g, membersFound(entries, find, all, g, disabledNow(), nil), true
+			// all is the groups the request's other looks read too: the one
+			// handed out is its own copy to change, as Groups' are
+			return cloneGroups([]Group{g})[0], membersFound(entries, find, all, g, disabledNow(), nil), true
 		}
 		return Group{}, nil, false
 	}
@@ -966,9 +978,11 @@ func FindDrawingGroup(id string, draws func(p Provider, model string) bool) (Gro
 		return Group{}, nil, false
 	}
 	entries := providerEntries()
-	all := groupsIn(entries)
+	all := sharedGroupsIn(entries)
 	if g, ok := groupOf(all, gid); ok && !g.Disabled {
-		return g, membersFound(entries, entriesBy(entries), all, g, disabledNow(), draws), true
+		// all is the groups the request's other looks read too: the one
+		// handed out is its own copy to change, as Groups' are
+		return cloneGroups([]Group{g})[0], membersFound(entries, entriesBy(entries), all, g, disabledNow(), draws), true
 	}
 	return Group{}, nil, false
 }

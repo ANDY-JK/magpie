@@ -41,10 +41,15 @@ type codexListStamp struct {
 
 func codexListStampNow() codexListStamp {
 	held.Lock()
-	gen := held.gen
+	gen, env, holds := held.gen, held.env, held.holds
 	held.Unlock()
+	if holds == 0 {
+		// the environment as the current hold has it, read afresh
+		// outside one (held.env)
+		env = environSum()
+	}
 	home := catalog.CodexHome()
-	return codexListStamp{gen: gen, fgen: filememo.Gen(), env: environSum(), files: [6]rootStamp{
+	return codexListStamp{gen: gen, fgen: filememo.Gen(), env: env, files: [6]rootStamp{
 		stampOf(Path()), stampOf(settings.Path()), stampOf(catalog.CachePath()),
 		stampOf(filepath.Join(home, "config.toml")), stampOf(filepath.Join(home, "auth.json")),
 		stampOf(catalog.CodexModelsCache()),

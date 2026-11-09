@@ -25,7 +25,13 @@ var held struct {
 	gen   uint64
 	// what was built, and when, by what it is
 	built map[string]heldValue
-	// env is the environment it was built in (environSum)
+	// env is the environment the current hold is of (environSum): Hold
+	// reads it afresh when a batch starts and drops what was built under
+	// another, and the stamps of a request holding the catalog take it
+	// from there — keptFit and heldFrom ask for a stamp several times a
+	// request, and each hashed every variable again. Outside a hold a
+	// stamp reads the environment afresh; a change mid-hold is seen by
+	// the next request, as stampNowFiles' looks at the files are
 	env uint64
 	// fgen is filememo's generation it was built in: a write that only
 	// tells filememo (settings.Save, an account's file) has it built again
@@ -75,9 +81,13 @@ func heldFreshLocked(look bool) {
 
 var environSeed = maphash.MakeSeed()
 
+// envSums counts environSum's reads of the environment, for a test.
+var envSums atomic.Int64
+
 // environSum is a hash of this process's environment: the folders every
 // file and account is read from are named by it.
 func environSum() uint64 {
+	envSums.Add(1)
 	var h maphash.Hash
 	h.SetSeed(environSeed)
 	for _, kv := range os.Environ() {
@@ -166,8 +176,10 @@ func dropHeld() {
 // Two equal stamps mean nothing magpie wrote or was told of came between
 // them: no Changed (a provider, an account, a setting saved), no plugin's
 // change, no catalog.Reset or Touched, no filememo.Forget, the same
-// environment, and the providers', the settings' and the catalog's own
-// files with the same time and size, as another process leaves them.
+// environment (as the request's hold has it: one changed mid-hold moves
+// the next request's stamp, as a file another process wrote does), and
+// the providers', the settings' and the catalog's own files with the same
+// time and size, as another process leaves them.
 // What it can't see — another app rewriting an account's file, a model
 // retired by its date — a caller that keeps what it built across stamps
 // builds again now and then all the same.
@@ -179,9 +191,14 @@ type Stamp struct {
 // StampNow is the Stamp as things are now.
 func StampNow() Stamp {
 	held.Lock()
-	gen := held.gen
+	gen, env, holds := held.gen, held.env, held.holds
 	held.Unlock()
-	return Stamp{gen: gen, fgen: filememo.Gen(), env: environSum(), roots: stampNowFiles()}
+	if holds == 0 {
+		// no request holds the catalog: nobody has read the environment
+		// since the last hold ended
+		env = environSum()
+	}
+	return Stamp{gen: gen, fgen: filememo.Gen(), env: env, roots: stampNowFiles()}
 }
 
 // stampLooks counts StampNow's looks at its files, for a test.

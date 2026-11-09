@@ -72,7 +72,7 @@ func WindowTyped(id string) bool {
 			return false
 		}
 		entries := providerEntries()
-		all := groupsIn(entries)
+		all := sharedGroupsIn(entries)
 		g, ok := groupOf(all, gid)
 		switch {
 		case !ok || g.Disabled:

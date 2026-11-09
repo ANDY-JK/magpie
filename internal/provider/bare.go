@@ -54,7 +54,7 @@ func BareEntries(shown []Entry) []Bare {
 		ids[e.ID] = true
 	}
 	entries := providerEntries()
-	all := groupsIn(entries)
+	all := sharedGroupsIn(entries)
 	var out []Bare
 	seen := map[string]bool{}
 	for _, e := range shown {
