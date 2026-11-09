@@ -8,10 +8,21 @@ ifneq ($(shell sed -n 's/^module //p' go.mod 2>/dev/null),github.com/yetone/magp
 endif
 
 # A tag may hold $, ( or `, which the shell lines below would run: the
-# version keeps only what a version is spelled with.
-VERSION ?= $(or $(shell git describe --tags --always --dirty 2>/dev/null | tr -cd 'A-Za-z0-9._+-'),dev)
+# version keeps only what a version is spelled with. archive/* tags keep
+# old lines aside and are no release: `git describe` must not name one
+# (its slashes would be cut, and every local build would read
+# "archive2026-11-07claude…" in About).
+VERSION ?= $(or $(shell git describe --tags --always --dirty --exclude 'archive/*' --exclude 'wip/*' 2>/dev/null | tr -cd 'A-Za-z0-9._+-'),dev)
 LDFLAGS  = -s -w -X main.version=$(VERSION)
 TAGS     = production
+
+# A Windows build is a GUI program: magpie.exe, and no console window beside
+# the window it draws (a console build shows one, and the app looks stuck
+# behind it). Go leaves the suffix off when -o names none.
+ifeq ($(shell go env GOOS),windows)
+EXE     := .exe
+GUIFLAG := -H windowsgui
+endif
 TARGETS  = darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64 windows/arm64 android/arm64
 
 # The GUI links the platform webview through cgo, so it is built natively.
@@ -35,7 +46,7 @@ endif
 .PHONY: build cli install test test-ui app icons release release-cli release-windows release-linux clean dev dev-once
 
 build:
-	go build -tags "$(TAGS)" -trimpath -ldflags="$(LDFLAGS)" -o magpie .
+	go build -tags "$(TAGS)" -trimpath -ldflags="$(LDFLAGS) $(GUIFLAG)" -o magpie$(EXE) .
 
 cli:
 	CGO_ENABLED=0 go build -tags nogui -trimpath -ldflags="$(LDFLAGS)" -o magpie .
