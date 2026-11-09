@@ -82,7 +82,7 @@ func TestLastKnownState(t *testing.T) {
 	if !last.Last || !hasCodex(last) {
 		t.Fatalf("last-known state: last=%v codex=%v", last.Last, hasCodex(last))
 	}
-	if last.Settings.Theme != "dark" || last.Settings.GitHubToken != "ghp_secret1519" {
+	if last.Settings.Theme != "dark" || last.Settings.GitHubToken != "" {
 		t.Errorf("last-known state's settings are not today's: theme %q token %q", last.Settings.Theme, last.Settings.GitHubToken)
 	}
 

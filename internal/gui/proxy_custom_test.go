@@ -40,14 +40,23 @@ func TestProxyCustomRemembered(t *testing.T) {
 		return out
 	}
 	own := "socks5://n%40me:p%40ss@127.0.0.1:1080"
-	if out := post(`{"theme":"dark","lang":"en","proxy":"` + own + `"}`); out["proxyCustom"] != own {
+	// the page is told the login masked (settings.ForUI); the proxy route is
+	// where Custom brings it back from
+	masked := settings.ProxyWithoutLogin(own)
+	if out := post(`{"theme":"dark","lang":"en","proxy":"` + own + `"}`); out["proxyCustom"] != masked {
 		t.Fatalf("custom saved, page told %v", out["proxyCustom"])
 	}
 	for _, other := range []string{"direct", ""} {
 		out := post(`{"theme":"dark","lang":"en","proxy":"` + other + `","proxyCustom":"http://page.example:1"}`)
-		if s := settings.Load(); s.Proxy != other || s.ProxyCustom != own || out["proxyCustom"] != own {
+		if s := settings.Load(); s.Proxy != other || s.ProxyCustom != own || out["proxyCustom"] != masked {
 			t.Fatalf("proxy %q: saved %q, remembered %q, page told %v", other, s.Proxy, s.ProxyCustom, out["proxyCustom"])
 		}
+	}
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, httptest.NewRequest("GET", "/api/settings/proxy", nil))
+	var got struct{ Proxy, ProxyCustom string }
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &got) != nil || got.ProxyCustom != own {
+		t.Fatalf("the proxy route does not hold the login: %d %v", rec.Code, got)
 	}
 	next := "http://127.0.0.1:7890"
 	post(`{"theme":"dark","lang":"en","proxy":"` + next + `"}`)

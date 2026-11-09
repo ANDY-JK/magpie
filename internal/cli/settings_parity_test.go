@@ -233,6 +233,9 @@ var notYet = map[string]string{
 	"POST /api/settings/trae-checkin":            S2, // api.go
 	"POST /api/settings/update-skip":             S2, // api.go
 	"POST /api/settings/workbuddy-checkin":       S2, // api.go
+	"GET /api/settings/otel-headers":             W,  // api.go: the values the settings state holds the names of, for the row to edit
+	"GET /api/settings/proxy":                    W,  // api.go: the login the settings state strips, for Custom to bring it back
+	"POST /api/settings/otel-headers":            S2, // api.go
 	"POST /api/usage/arrange":                    W,  // api.go
 	"POST /api/warm-now":                         A,  // api.go
 	"POST /api/window/{action}":                  W,  // api.go

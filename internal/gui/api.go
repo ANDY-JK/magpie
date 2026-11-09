@@ -719,7 +719,12 @@ func codexWindowUnder(st settings.Settings, model string) *codexRunWindow {
 }
 
 func settingsState() settingsJSON {
-	s := settingsJSON{Settings: settings.Load(), Version: Version, Dir: tilde(settings.Dir()), Portable: settings.Portable() != "", Gateway: gateway.URL()}
+	raw := settings.Load()
+	// the GitHub token, masked, and where the library's requests take one
+	// from: Settings, or the environment variable named. Read before ForUI,
+	// which leaves none of it in the state
+	own := strings.TrimSpace(raw.GitHubToken)
+	s := settingsJSON{Settings: raw.ForUI(), Version: Version, Dir: tilde(settings.Dir()), Portable: settings.Portable() != "", Gateway: gateway.URL()}
 	s.AddrEnv = os.Getenv("MAGPIE_ADDR")
 	s.Log = tilde(applog.Current())
 	s.Builtins = builtinsState()
@@ -735,11 +740,6 @@ func settingsState() settingsJSON {
 	s.WSL = runtime.GOOS == "windows"
 	s.Web = webPage.Load()
 	s.GatewayOn, s.GatewayWhy = gatewayMode(s.Web)
-	s.LANKey = "" // the retained credential belongs on disk, not in UI state
-	// the GitHub token, masked, and where the library's requests take one
-	// from: Settings, or the environment variable named
-	own := strings.TrimSpace(s.GitHubToken)
-	s.GitHubToken = ""
 	if tok, from := library.GitHubToken(); tok != "" {
 		s.GitHubTokenMask, s.GitHubTokenFrom = provider.Mask(tok), from
 	} else if _, refused := ghtoken.SettingsRefused(); refused && own != "" {
@@ -757,7 +757,9 @@ func settingsState() settingsJSON {
 	if (s.UsageAlert > 0 || s.BalanceAlert > 0 || s.ResetReminder > 0 || s.TurnDoneAlert > 0 || s.MaskAlert) && notifyProblem != nil {
 		s.NotifyProblem = notifyProblem()
 	}
+	// the proxy at work now, its login stripped as the settings' own is
 	s.ProxyNow, s.ProxySource = netproxy.Describe()
+	s.ProxyNow = settings.ProxyWithoutLogin(s.ProxyNow)
 	s.NoAccountsEnv = settings.AccountDiscoveryOff() && !s.NoAccountDiscovery
 	for _, name := range []string{"MAGPIE_OTEL_ENABLED", "MAGPIE_OTEL_ENDPOINT", "MAGPIE_OTEL_HEADERS", "MAGPIE_OTEL_METRICS", "MAGPIE_OTEL_BODIES", "MAGPIE_OTEL_BODIES_WHOLE", "MAGPIE_OTEL_SESSIONS"} {
 		if _, ok := os.LookupEnv(name); ok {
@@ -2387,7 +2389,9 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 		}
 		writeJSON(rw, settingsState())
 	})
-	// the values masking lets go as written, all of them each time (#1977)
+	// the values masking lets go as written, all of them each time (#1977).
+	// The page is shown them masked (settings.ForUI) and sends that back:
+	// a value the list holds only masked is the value it was
 	mux.HandleFunc("POST /api/settings/redact-allow", func(rw http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Allow []string `json:"allow"`
@@ -2397,12 +2401,41 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 			return
 		}
 		s := settings.Load()
-		s.RedactAllow = in.Allow
+		s.RedactAllow = settings.UnmaskAllow(s.RedactAllow, in.Allow)
 		if err := settings.Save(s); err != nil {
 			fail(rw, err)
 			return
 		}
 		writeJSON(rw, settingsState())
+	})
+	// the proxy as saved, login and all: the settings state strips the
+	// login, and Custom again in Settings brings it back (Zane on Discord),
+	// so the page asks for it here when it draws the row
+	mux.HandleFunc("GET /api/settings/proxy", func(rw http.ResponseWriter, r *http.Request) {
+		s := settings.Load()
+		writeJSON(rw, map[string]string{"proxy": s.Proxy, "proxyCustom": s.ProxyCustom})
+	})
+	// the OTLP headers' values, set on their own: the settings state holds
+	// the names alone, and the settings' save never writes them, so the
+	// page reads them here when it draws the tab and saves them here
+	mux.HandleFunc("GET /api/settings/otel-headers", func(rw http.ResponseWriter, r *http.Request) {
+		writeJSON(rw, map[string]map[string]string{"headers": settings.Load().OTel.Headers})
+	})
+	mux.HandleFunc("POST /api/settings/otel-headers", func(rw http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Headers map[string]string `json:"headers"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			fail(rw, err)
+			return
+		}
+		s := settings.Load()
+		s.OTel.Headers = in.Headers
+		if err := settings.Save(s); err != nil {
+			fail(rw, err)
+			return
+		}
+		writeJSON(rw, map[string]map[string]string{"headers": s.OTel.Headers})
 	})
 	// the GitHub token the library's requests to GitHub carry: set, or
 	// taken away with ""
@@ -2659,7 +2692,7 @@ func held(h http.Handler) http.Handler {
 }
 
 func state() stateJSON {
-	s := stateJSON{Agents: []agentJSON{}, Profiles: []profileJSON{}, Catalog: catalog.Source(), Settings: settings.Load()}
+	s := stateJSON{Agents: []agentJSON{}, Profiles: []profileJSON{}, Catalog: catalog.Source(), Settings: settings.Load().ForUI()}
 	// state() is asked for after nearly every click, so the rate — a
 	// network fetch once every TTL — is only worth its rare latency when
 	// cny is actually chosen; usd never looks at it

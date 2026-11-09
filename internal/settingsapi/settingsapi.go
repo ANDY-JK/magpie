@@ -269,6 +269,7 @@ func Merge(body []byte, cur settings.Settings, web bool) (settings.Settings, err
 	in.RouterNote = cur.RouterNote                     // set on its own (the Library's servers/hub-note)
 	in.GitHubToken = cur.GitHubToken                   // set on its own (github-token), never sent to the page
 	in.ProxyCustom = cur.ProxyCustom                   // set by settings.Save from the proxy, never by the page
+	in.OTel.Headers = cur.OTel.Headers                 // the OTLP headers' values, set on their own (otel-headers); the page is told the names alone
 	in.RequestArchive = cur.RequestArchive             // the Gateway page's, set on its own
 	in.RequestArchiveMaxMB = cur.RequestArchiveMaxMB   // in settings.json only
 	in.ClaudeRunsMost = cur.ClaudeRunsMost             // magpie claude-code runs, or settings.json (#2956)
