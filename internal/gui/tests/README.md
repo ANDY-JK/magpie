@@ -2672,7 +2672,7 @@ node --test internal/gui/tests/nav-timeout.test.cjs
 
 ## Smoke run
 
-`node scripts/gui-smoke.cjs` (or `npm run test:gui`) runs twelve fast files
+`node scripts/gui-smoke.cjs` runs twelve fast files
 that cover this season's ground — the provider editor's tabs and a refetch,
 Allowances' and Routing's tabs, the Library's filters and export, the image
 MCP's words, the balance help, Vertex's editors, the doctor — on Chromium and
