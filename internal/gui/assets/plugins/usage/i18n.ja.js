@@ -281,5 +281,8 @@ magpie.strings({
     "The agent spoke {from}; sent upstream as {to}": "エージェントは {from} で要求し、上流へは {to} で送信",
     "Sent upstream as {to}, as the agent spoke it": "エージェントと同じ {to} で上流へ送信",
     "What it cost in its plan's credits, as the reply said": "このリクエストが消費したプランのクレジット（応答の申告どおり）",
+    "cut at the limit": "出力上限に到達",
+    "{stop} · cut at the limit": "{stop} · 出力上限に到達",
+    "The vendor stopped the reply at its output limit: the model's own, or this provider's Max output. Raise it there, or continue in a shorter conversation.": "ベンダーが出力上限で応答を終了しました。モデル自身の上限か、このプロバイダーの「最大出力」設定です。そこを増やすか、短い会話で続けてください。",
   },
 });

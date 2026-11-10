@@ -281,5 +281,8 @@ magpie.strings({
     "The agent spoke {from}; sent upstream as {to}": "Der Agent sprach {from}; an den Upstream als {to} gesendet",
     "Sent upstream as {to}, as the agent spoke it": "An den Upstream als {to} gesendet, wie der Agent es sprach",
     "What it cost in its plan's credits, as the reply said": "Was die Anfrage laut Antwort an Credits des Tarifs gekostet hat",
+    "cut at the limit": "am Ausgabelimit",
+    "{stop} · cut at the limit": "{stop} · am Ausgabelimit",
+    "The vendor stopped the reply at its output limit: the model's own, or this provider's Max output. Raise it there, or continue in a shorter conversation.": "Der Anbieter hat die Antwort am Ausgabelimit beendet: dem des Modells oder dem „Maximale Ausgabe“ dieses Anbieters. Erhöhen Sie es dort, oder setzen Sie in einem kürzeren Gespräch fort.",
   },
 });

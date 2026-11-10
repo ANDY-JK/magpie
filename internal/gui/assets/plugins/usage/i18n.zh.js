@@ -281,5 +281,8 @@ magpie.strings({
     "The agent spoke {from}; sent upstream as {to}": "agent 用 {from} 协议请求；以 {to} 协议发往上游",
     "Sent upstream as {to}, as the agent spoke it": "以 {to} 协议发往上游，与 agent 所用协议相同",
     "What it cost in its plan's credits, as the reply said": "按回复所说，这次请求消耗的套餐积分",
+    "cut at the limit": "达到输出上限",
+    "{stop} · cut at the limit": "{stop} · 达到输出上限",
+    "The vendor stopped the reply at its output limit: the model's own, or this provider's Max output. Raise it there, or continue in a shorter conversation.": "厂商在输出上限处结束了回复：可能是模型自身的上限，也可能是本供应商的「最大输出」设置。请在那里调大，或缩短对话后继续。",
   },
 });

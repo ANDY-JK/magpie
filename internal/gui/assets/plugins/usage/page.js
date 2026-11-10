@@ -1507,6 +1507,11 @@ function ledProtoBadge(r) {
 // a request that failed: told by its status, or, for one read from a
 // session file, which records none, by the error that ended it
 const ledFailed_ = (r) => r.status >= 400 || !!r.err;
+// ledCut says the vendor stopped the reply at its output limit: each API
+// names that in its own words (OpenAI's length, Anthropic's max_tokens,
+// Responses' max_output_tokens), and a reply cut that way is why "it stopped
+// after two sentences" is not the provider being flaky (the owner, 11-10)
+const ledCut = (r) => /^(length|max_tokens|max_output_tokens)$/i.test(r.stop || "");
 const ledKey = (r) => [r.t, r.agent, r.model, r.rid, r.session, r.computer || ""].join("|");
 const ledOpen = new Set(); // the rows opened, kept across a refresh
 
@@ -1565,8 +1570,9 @@ function ledDetail(r, cols) {
   const protos = ledProtos(r);
   if (protos) add("Protocol", protos.from !== protos.to ? protos.from + " → " + protos.to : protos.to);
   // why the upstream said its reply ended, in its own words: a reply that
-  // ended too soon is told apart by it (蓝猫 on Discord)
-  add("Upstream stop reason", r.stop);
+  // ended too soon is told apart by it (蓝猫 on Discord), and one cut at its
+  // output limit says so where it is read
+  add("Upstream stop reason", ledCut(r) ? t("{stop} · cut at the limit", { stop: r.stop }) : r.stop, ledCut(r) ? "bad" : "");
   // the provider an aggregator (OpenRouter …) said answered behind it
   add("Upstream provider", r.upstream);
   add("Session ID", r.session);
@@ -2734,8 +2740,12 @@ function renderLedger() {
     if (r.handed_on) word += " · " + t("handed on");
     else if (r.tries > 1) word += " · " + t("{n} tries", { n: r.tries });
     st.append(el("i", "dot"), document.createTextNode(word));
+    // cut at its output limit: the row says so, its reason on hover, so a
+    // reply that stopped after two sentences is told from a provider's failure
+    if (ledCut(r)) st.append(Object.assign(el("span", "badge led-cut", t("cut at the limit")), { title: t("The vendor stopped the reply at its output limit: the model's own, or this provider's Max output. Raise it there, or continue in a shorter conversation.") }));
     td(st, "", [r.handed_on && t("This try failed and the request was handed on to the next: the request is counted by how it ended, not by this try"),
-      bad ? (r.err || t("Failed: the agent was answered {status}", { status: r.status })) : ""].filter(Boolean).join("\n"));
+      bad ? (r.err || t("Failed: the agent was answered {status}", { status: r.status })) : "",
+      ledCut(r) ? t("The vendor stopped the reply at its output limit: the model's own, or this provider's Max output. Raise it there, or continue in a shorter conversation.") : ""].filter(Boolean).join("\n"));
     const detail = ledOpen.has(key) ? ledDetail(r, LED_COLS.length) : null;
     const toggle = () => {
       if (ledOpen.delete(key)) { tr.classList.remove("open"); tr.setAttribute("aria-expanded", "false"); tr.nextElementSibling?.classList.contains("led-detail") && tr.nextElementSibling.remove(); return; }
