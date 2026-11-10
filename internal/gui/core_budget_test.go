@@ -16,7 +16,7 @@ import (
 // needs more raises them and says why in its commit. What each is, and
 // every change that moved it, is in docs/gui-script-budget.md.
 const (
-	appScriptBudget  = 1_323_401
+	appScriptBudget  = 1_326_269
 	coreScriptBudget = 1_566_552
 )
 

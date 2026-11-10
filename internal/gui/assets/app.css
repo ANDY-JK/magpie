@@ -3268,6 +3268,11 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
    at the padding and the fields end the same way on the right (the
    owner, 10-29: a 72px column left the left edge twice the right) */
 .editor { padding: 16px 18px 14px; display: grid; grid-template-columns: fit-content(132px) minmax(0, 1fr); gap: 10px 14px; align-items: start; }
+/* the editor's three groups (Connection, Accounts & routing, Behaviour): a
+   tab shows one alone, All (the default) shows all. Each field is marked
+   with its group and stays a child of the editor's own grid. */
+.edtabs { grid-column: 1 / -1; flex-wrap: wrap; gap: 6px; padding: 2px 0 6px; }
+.edtabs[hidden] { display: none; }
 .editor .ehead { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid var(--line-2); }
 .editor .ehead .ic { width: 20px; height: 20px; }
 .editor .icon-pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

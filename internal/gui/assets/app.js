@@ -8877,13 +8877,21 @@ function openModal(content, quiet) {
 }
 // edAligned: a row across an editor starts where its fields do (--ed-at)
 const edAlign = new ResizeObserver((es) => {
-  for (const { target: n } of es) {
-    if (!n.isConnected) { edAlign.unobserve(n); continue; }
-    const cs = getComputedStyle(n.parentElement), cols = cs.gridTemplateColumns.split(" ");
+  const measure = (n) => {
+    if (!n.isConnected) { edAlign.unobserve(n); return; }
+    // the grid it sits in: past a group's display:contents wrapper (the
+    // editor's three groups), which has no columns of its own
+    let grid = n.parentElement;
+    while (grid && getComputedStyle(grid).display === "contents") grid = grid.parentElement;
+    const cs = getComputedStyle(grid), cols = cs.gridTemplateColumns.split(" ");
     const lab = cols.length > 1 ? parseFloat(cols[0]) || 0 : 0;
     n.style.setProperty("--ed-lab", lab + "px");
     n.style.setProperty("--ed-at", (lab && lab + parseFloat(cs.columnGap)) + "px");
-  }
+  };
+  for (const { target: n } of es) measure(n);
+  // again once the frame is laid out: an editor moved into its scrolling
+  // body after this observation has other columns than it had
+  requestAnimationFrame(() => { for (const { target: n } of es) measure(n); });
 });
 const edAligned = (n) => (edAlign.observe(n), n);
 // frame holds an editor's head and its buttons still while the fields
@@ -9163,6 +9171,51 @@ function drawEditor(p, presetID) {
     if (p?.off) ed.append(el("div", "hint off-note", t("Switched off: agents aren't given its models and no request goes to it. Its keys and settings are kept; switch it on to use it again.")));
   }
 
+  // The editor's fields, in three groups a tab can show alone (the owner,
+  // 11-10: 拆分成多个 tab，方便分组，避免滚动很久): Connection, Accounts &
+  // routing, Behaviour. All is first and the default, so an editor opens as
+  // it always has; the tab picked is kept for the next editor. A group with
+  // no field of its own has no tab. Each field stays a child of the editor,
+  // marked with the group it is in, so the grid and the wheel are the same as
+  // before.
+  let sec = "conn";
+  const add = (...n) => { for (const x of n) { x.dataset.sec = sec; ed.append(x); } };
+  const section = (s) => { sec = s; };
+  const tabBar = el("div", "segs edtabs");
+  ed.append(tabBar);
+  let edTab = "all", tabBtns = [];
+  const tabHid = new Set(); // the fields a tab hid, given back by All
+  try { edTab = localStorage.getItem("magpie.editorTab") || "all"; } catch {}
+  const applyTab = () => {
+    for (const n of tabHid) n.hidden = false;
+    tabHid.clear();
+    if (edTab !== "all") for (const n of ed.querySelectorAll("[data-sec]")) {
+      if (n.dataset.sec !== edTab && !n.hidden) { n.hidden = true; tabHid.add(n); }
+    }
+    for (const b of tabBtns) {
+      b.classList.toggle("on", b.dataset.tab === edTab);
+      b.setAttribute("aria-pressed", b.dataset.tab === edTab ? "true" : "false");
+    }
+  };
+  const finishEditor = () => {
+    const counts = { conn: ed.querySelectorAll('[data-sec="conn"]').length, acct: ed.querySelectorAll('[data-sec="acct"]').length, behave: ed.querySelectorAll('[data-sec="behave"]').length };
+    if (!counts[edTab]) edTab = "all";
+    for (const [k, label] of [["all", t("All")], ["conn", t("Connection")], ["acct", t("Accounts & routing")], ["behave", t("Behaviour")]]) {
+      if (k !== "all" && !counts[k]) continue;
+      const b = el("button", "opt", label);
+      b.dataset.tab = k;
+      b.onclick = () => {
+        edTab = k;
+        try { localStorage.setItem("magpie.editorTab", k); } catch {}
+        applyTab();
+      };
+      tabBtns.push(b);
+      tabBar.append(b);
+    }
+    tabBar.hidden = tabBtns.length < 3; // All and at least two groups
+    applyTab();
+  };
+
   // a vendor's global and China endpoints are presets of their own, one row
   // in the add sheet: here the new provider picks between them, the key kept
   const pair = isNew && pr ? (globalOf(pr) ? [globalOf(pr), pr] : chinaOf(pr) ? [pr, chinaOf(pr)] : null) : null;
@@ -9180,7 +9233,7 @@ function drawEditor(p, presetID) {
       seg.append(b);
     });
     queueMicrotask(() => slide(seg, "area"));
-    ed.append(...field(t("Region"), seg, ""));
+    add(...field(t("Region"), seg, ""));
   }
 
   // who uses it: just the agents already pointed here, so a click changes
@@ -9198,10 +9251,12 @@ function drawEditor(p, presetID) {
         c.onclick = (ev) => pickForAgent(a, p, c, ev);
         chips.append(c);
       }
-      ed.append(...field(t("Agents"), chips, ""));
+      section("acct");
+      add(...field(t("Agents"), chips, ""));
     }
   }
 
+  section("conn");
   let name, url;
   if (another) {
     name = input(draft.name === pr.name ? "" : draft.name, t("e.g. {name} · Work", { name: pr.name }));
@@ -9211,7 +9266,7 @@ function drawEditor(p, presetID) {
     idHint();
     const wrap = el("div");
     wrap.append(name, hint);
-    ed.append(el("label", "", t("Name")), wrap);
+    add(el("label", "", t("Name")), wrap);
   }
   // an added preset's name is the user's, as a custom provider's is: two
   // of a vendor's sites (Kimi and Kimi (China)) named as they tell them
@@ -9221,7 +9276,7 @@ function drawEditor(p, presetID) {
     name = input(draft.name === pr.name ? "" : draft.name, pr.name);
     name.className = "provider-name";
     name.oninput = () => { draft.name = name.value.trim() || pr.name; };
-    ed.append(...field(t("Name"), name));
+    add(...field(t("Name"), name));
   }
   // an added provider's id can change: its models are picked by it, and
   // the agents and routing groups on them move to the new one
@@ -9238,7 +9293,7 @@ function drawEditor(p, presetID) {
     show();
     const w = el("div");
     w.append(idIn, hint);
-    ed.append(el("label", "", t("ID")), w);
+    add(el("label", "", t("ID")), w);
   };
   if (p && !p.account && !custom) idField();
   let fillEndpoints = () => {};
@@ -9267,7 +9322,7 @@ function drawEditor(p, presetID) {
   if (custom) {
     name = input(draft.name, t("e.g. My Relay"));
     name.oninput = () => { draft.name = name.value; if (isNew) draft.id = slug(name.value); };
-    ed.append(...field(t("Name"), name));
+    add(...field(t("Name"), name));
     if (p) idField();
 
     // the base URL is the one the chosen protocol is asked at; a vendor
@@ -9340,7 +9395,7 @@ function drawEditor(p, presetID) {
     };
     // Detect asks OpenAI's, Anthropic's and Gemini's APIs (#1346)
     urlWrap.append(detectAPIs(p, () => url.value, useDetected));
-    ed.append(...field("Base URL", urlWrap));
+    add(...field("Base URL", urlWrap));
   }
 
   // the Cline API serves a model from whichever host its AI gateway picks;
@@ -9385,18 +9440,21 @@ function drawEditor(p, presetID) {
     const a = p.account;
     if (subOf(a.agent)) {
       // no Claude Code on Windows: the gateway runs the one in WSL
-      if (a.agent === "claude" && !p.switchOnly) ed.append(claudeModeRow());
+      section("behave");
+      if (a.agent === "claude" && !p.switchOnly) add(claudeModeRow());
       const via = a.wsl ? t("Runs through WSL · {distro}: Claude Code there signs in and answers; Windows has none of its own.", { distro: a.wsl }) + " " : "";
-      ed.append(...field(t("Accounts"), renderAccounts(a, p), via + (p.routing ? t("Tick every account to use; Routing says how requests spread over them.") : subOf(a.agent).single ? t("{agent} keeps one account; the gateway runs it for every request. Signing in to another replaces it.", { agent: a.agentName }) : subOf(a.agent).own && (a.logins || []).some((l) => l.own) ? t("The gateway uses the first. Tick more and it moves on to the next when the one before it is out of quota. {agent} itself stays signed in as it is.", { agent: a.agentName && a.agentName !== a.agent ? a.agentName : p.name }) : subOf(a.agent).own || subOf(a.agent).plugin ? t("The gateway uses the first. Tick more and it moves on to the next when the one before it is out of quota.") : t("{agent} signs in to the first. Tick more and magpie moves on to the next when the one before it is out of quota. Sessions already running keep theirs until restarted.", { agent: a.agentName }))));
-      if ((a.logins || []).filter((l) => l.active || l.on).length > 1) ed.append(...renderRouting(p));
-      if (p.move) ed.append(...renderMove(p));
+      section("acct");
+      add(...field(t("Accounts"), renderAccounts(a, p), via + (p.routing ? t("Tick every account to use; Routing says how requests spread over them.") : subOf(a.agent).single ? t("{agent} keeps one account; the gateway runs it for every request. Signing in to another replaces it.", { agent: a.agentName }) : subOf(a.agent).own && (a.logins || []).some((l) => l.own) ? t("The gateway uses the first. Tick more and it moves on to the next when the one before it is out of quota. {agent} itself stays signed in as it is.", { agent: a.agentName && a.agentName !== a.agent ? a.agentName : p.name }) : subOf(a.agent).own || subOf(a.agent).plugin ? t("The gateway uses the first. Tick more and it moves on to the next when the one before it is out of quota.") : t("{agent} signs in to the first. Tick more and magpie moves on to the next when the one before it is out of quota. Sessions already running keep theirs until restarted.", { agent: a.agentName }))));
+      if ((a.logins || []).filter((l) => l.active || l.on).length > 1) add(...renderRouting(p));
+      if (p.move) add(...renderMove(p));
     } else {
       const acct = el("div", "acct");
       acct.append(icon(a.agentIcon), el("span", "n", a.user), hideAccounts.eye(a.user, p.id), el("span", "plan", accountPlan(a)));
-      ed.append(...field(t("Account"), acct, t("{agent}'s sign-in, read from its own files. Sign out there and this provider goes away.", { agent: a.agentName })));
+      add(...field(t("Account"), acct, t("{agent}'s sign-in, read from its own files. Sign out there and this provider goes away.", { agent: a.agentName })));
     }
-    ed.append(...field(t("Models"), renderModels(p), pluginFilterNote(subOf(a.agent))));
-    if (p.drawIds?.length) ed.append(...renderDrawers(p));
+    section("behave");
+    add(...field(t("Models"), renderModels(p), pluginFilterNote(subOf(a.agent))));
+    if (p.drawIds?.length) add(...renderDrawers(p));
     // a subscription's window too: Codex's backend says 272K for models
     // that take 872K (#120)
     const cx = input(draft.contexts || "", t("e.g. 128k · or gpt-6=1m, comma separated"));
@@ -9414,12 +9472,14 @@ function drawEditor(p, presetID) {
     advIn.append(...priceRateField(), ...countFreeField(), ...rateWindowsField());
     if (p.cline) advIn.append(...upstreamField());
     advIn.append(...unmaskRow(""));
-    ed.append(...pluginOptionsField(subOf(a.agent)));
+    add(...pluginOptionsField(subOf(a.agent)));
     // a plugin's provider is reached inside magpie: its plugin:// URLs go
     // nowhere to show or test
     const urls = [p.chat, p.responses, p.anthropic].filter(Boolean);
-    if (urls.length && !urls.some((u) => u.startsWith("plugin://"))) ed.append(...field(t("Endpoints"), renderEndpoints(p, p)));
-    ed.append(adv);
+    section("conn");
+    if (urls.length && !urls.some((u) => u.startsWith("plugin://"))) add(...field(t("Endpoints"), renderEndpoints(p, p)));
+    section("behave");
+    add(adv);
     const bar = el("div", "bar");
     // removing only hides it from magpie; the agent stays signed in
     const del = el("button", "text danger", t("Remove"));
@@ -9462,6 +9522,7 @@ function drawEditor(p, presetID) {
       saving(saveBtn, t("Saving…"));
       saveAccountModelsDraft(picked).then(() => savePluginOptions(subOf(a.agent))).then(() => providerAction("save", body, t("{name} saved", { name: p.name })), (e) => { doneSaving(saveBtn); editorError(e.message || String(e)); }); };
     bar.append(cancel, saveBtn);
+    finishEditor();
     ed.append(bar);
     return ed;
   }
@@ -9475,7 +9536,7 @@ function drawEditor(p, presetID) {
     endpoint = input(draft.chat || draft.responses || "", pr.endpoint, "url");
     endpoint.classList.add("endpoint");
     endpoint.oninput = () => { draft.chat = draft.responses = endpoint.value.trim(); refreshEndpoints(); showCompaction(); };
-    ed.append(...field(t("Endpoint"), endpoint, pr.endpointHint ? t(pr.endpointHint) : ""));
+    add(...field(t("Endpoint"), endpoint, pr.endpointHint ? t(pr.endpointHint) : ""));
   }
 
   // a local server's address moves each URL, keeping its path
@@ -9606,15 +9667,17 @@ function drawEditor(p, presetID) {
       ...field(t("Service account"), box("impersonate", t("optional · a service account's email"), "vertex-impersonate"), t("Requests are then made as this service account, impersonated with the credentials above: their account needs roles/iam.serviceAccountTokenCreator on it.")),
     ];
   };
-  if (addressField) ed.append(...addressField);
-  if (p?.keyList?.length) ed.append(...field(t("Accounts"), renderKeyAccounts(p), p.routing ? t("Tick every key to use; Routing says how requests spread over them.") : t("Tick every key to use. Requests go to the first; when it runs out of quota or hits a rate limit, the next ticked key takes over.")));
-  if (p?.keyList?.filter((k) => k.on).length > 1) ed.append(...renderRouting(p));
-  else if (vertex) ed.append(...vertexFields());
+  if (addressField) add(...addressField);
+  section("acct");
+  if (p?.keyList?.length) add(...field(t("Accounts"), renderKeyAccounts(p), p.routing ? t("Tick every key to use; Routing says how requests spread over them.") : t("Tick every key to use. Requests go to the first; when it runs out of quota or hits a rate limit, the next ticked key takes over.")));
+  if (p?.keyList?.filter((k) => k.on).length > 1) add(...renderRouting(p));
+  else if (vertex) { section("conn"); add(...vertexFields()); }
   // keys are replaced in Accounts; the box is for no key yet (Kylin_Cloud on X)
-  else if (!p?.keyList?.length) ed.append(...field(t("API key"), keyWrap, isNew ? t("Kept in ~/.config/magpie/providers.json, readable by you alone. Nothing is read from your shell.") : ""));
+  else if (!p?.keyList?.length) { section("acct"); add(...field(t("API key"), keyWrap, isNew ? t("Kept in ~/.config/magpie/providers.json, readable by you alone. Nothing is read from your shell.") : "")); }
 
   // A user-defined provider can have its own picture; presets keep theirs.
-  if (custom) ed.append(...field(t("Icon"), iconPicker(ed), ""));
+  section("behave");
+  if (custom) add(...field(t("Icon"), iconPicker(ed), ""));
 
   // Request headers of the user's own, for a preset's provider as much as a
   // custom one — which workspace a key is for, who the app is; signed-in
@@ -9699,7 +9762,8 @@ function drawEditor(p, presetID) {
     const row = field(t("Certificate"), ctk, t("For your own server with a self-signed certificate or one from your company's CA. magpie then can't tell it from another machine answering at its address: turn it on only on a network you trust."));
     showTLS = () => { for (const e of row) e.style.display = onHTTPS() ? "" : "none"; };
     showTLS();
-    ed.append(...row);
+    section("conn");
+    add(...row);
   }
   // off, a 429 or quota refusal rests none of its keys (LimitRestOff, zoecats)
   if (custom) {
@@ -9743,7 +9807,8 @@ function drawEditor(p, presetID) {
   // StepFun tells a Step Plan's 5-hour, weekly and credit windows only to
   // its platform's sign-in, never to a key: signed in once in a window of
   // magpie's, the Usage page shows them
-  if (p?.stepPlan) ed.append(...field(t("Step Plan allowances"), renderStepPlan(p.stepPlan, p.id), t("A key tells only the balance. The Step Plan's 5-hour, weekly and credit windows are told only to a StepFun sign-in: bring yours here once and magpie keeps it (for 30 days), used for nothing else.")));
+  section("acct");
+  if (p?.stepPlan) add(...field(t("Step Plan allowances"), renderStepPlan(p.stepPlan, p.id), t("A key tells only the balance. The Step Plan's 5-hour, weekly and credit windows are told only to a StepFun sign-in: bring yours here once and magpie keeps it (for 30 days), used for nothing else.")));
 
   // a key on a team's GLM Coding Plan is told the team's windows only with
   // the team's organization and project, which the console shows (#236)
@@ -9756,8 +9821,9 @@ function drawEditor(p, presetID) {
     const proj = input(draft.zhipuTeam.project, t("optional · only for a team plan"));
     proj.classList.add("team-project");
     proj.oninput = () => { draft.zhipuTeam.project = proj.value; };
-    ed.append(...field(t("Team org ID"), org, ""));
-    ed.append(...field(t("Team project ID"), proj, t("Only for a key on a team's GLM Coding Plan: both are in {p}'s console, under the team's organization and project. With them the Usage page shows the team's 5-hour and weekly windows.", { p: pr?.name || p.name })));
+    section("conn");
+    add(...field(t("Team org ID"), org, ""));
+    add(...field(t("Team project ID"), proj, t("Only for a key on a team's GLM Coding Plan: both are in {p}'s console, under the team's organization and project. With them the Usage page shows the team's 5-hour and weekly windows.", { p: pr?.name || p.name })));
   }
 
   // Volcengine Ark tells a Coding or Agent Plan's windows only to the
@@ -9794,7 +9860,7 @@ function drawEditor(p, presetID) {
         ? t("Token Plan Enterprise's usage is told only to the Tencent Cloud account's API key (console → Access management → API keys), not to the plan's API key. Give its SecretId and SecretKey here for the Usage page to show it; a sub-user's key that may read TokenHub is enough. It is used for nothing else.")
         : t("The plan's 5-hour, weekly and monthly windows are told only to the account's access key (Volcengine console → API Access Keys), not to the plan's API key. Give it here for the Usage page to show them; it is used for nothing else.")),
     ];
-    ed.append(...rows);
+    add(...rows);
     // a preset with the plan at some of its regions only (Tencent Cloud's
     // 企业版 beside its personal plan) asks for it at those, and at an
     // endpoint none of its regions has, which may be one of them
@@ -9840,15 +9906,17 @@ function drawEditor(p, presetID) {
       const on = seg.querySelector(":scope > .on");
       if (on && seg.scrollWidth > seg.clientWidth) seg.scrollLeft = on.offsetLeft - (seg.clientWidth - on.offsetWidth) / 2;
     });
-    ed.append(...field(t(pr.regionLabel || "Region"), seg, t(pr.splitAccounts ? "pick the region of your {p} account" : "which endpoint {p} is reached through", { p: pr.name })));
+    section("conn");
+    add(...field(t(pr.regionLabel || "Region"), seg, t(pr.splitAccounts ? "pick the region of your {p} account" : "which endpoint {p} is reached through", { p: pr.name })));
   }
 
-  if (p) ed.append(...field(t("Models"), renderModels(p), ""));
+  section("behave");
+  if (p) add(...field(t("Models"), renderModels(p), ""));
   // Azure OpenAI's models are its deployments, which magpie lists with the
   // key once the resource is added (#1995): said here, so no one takes the
   // add page for one where they must type them
-  else if (pr?.id === "azure") ed.append(...field(t("Models"), el("div", "hint azure-models", t("No need to type them: once added, magpie lists the deployments this key can call. Type a deployment's name as a model id only if that list can't be fetched.")), ""));
-  if (p?.drawIds?.length) ed.append(...renderDrawers(p));
+  else if (pr?.id === "azure") add(...field(t("Models"), el("div", "hint azure-models", t("No need to type them: once added, magpie lists the deployments this key can call. Type a deployment's name as a model id only if that list can't be fetched.")), ""));
+  if (p?.drawIds?.length) add(...renderDrawers(p));
   {
     // the window agents are told a model has, over what the vendor or
     // models.dev says: one for all of them, and model=size for one
@@ -9872,7 +9940,7 @@ function drawEditor(p, presetID) {
       ex.value = draft.extra.join(", ");
       pick.draw();
     };
-    ed.append(...field(t("Models"), pick.box, t("Optional: Fetch models to pick from the vendor's list, or type ids; none picked, magpie asks for the list after saving.")));
+    add(...field(t("Models"), pick.box, t("Optional: Fetch models to pick from the vendor's list, or type ids; none picked, magpie asks for the list after saving.")));
   }
 
   // Jev's endpoint can be the one its gateway's docs give — Cloudflare's
@@ -9898,14 +9966,15 @@ function drawEditor(p, presetID) {
     wsIn.oninput = () => { draft.workspace = wsIn.value; fill(); };
     du.oninput = () => { draft.decide = du.value; };
     onRegion = (r) => { draft.region = r.id; if (r.decide) { draft.decide = du.value = r.decide; fill(); } };
-    ed.append(...wsRow);
+    section("conn");
+    add(...wsRow);
     fill();
     // Jev's own presets (TypeSafe, Vercel, Cloudflare) name it and the
     // gateway docs' address; a provider that also serves conversations
     // (OpenRouter, OpenCode Zen, Ollama …) asks its own decision models
     // on System One, and Jev's title and Cloudflare's example aren't its
     const jev = decideOnly(p || pr) && /jev/i.test(pr?.name || p?.name || "");
-    ed.append(...field(t(jev ? "Jev endpoint" : "System One endpoint"), du, tmpl().includes(WORKSPACE) ? t("The address the decision model is asked at, POST …/systemone under it; the workspace ID above fills it in") : jev ? t("The address Jev is asked at; paste the one from your gateway's docs, e.g. Cloudflare's …/accounts/<account id>/ai/run") : t("The address its decision models are asked at, POST …/systemone under it")));
+    add(...field(t(jev ? "Jev endpoint" : "System One endpoint"), du, tmpl().includes(WORKSPACE) ? t("The address the decision model is asked at, POST …/systemone under it; the workspace ID above fills it in") : jev ? t("The address Jev is asked at; paste the one from your gateway's docs, e.g. Cloudflare's …/accounts/<account id>/ai/run") : t("The address its decision models are asked at, POST …/systemone under it")));
   }
 
   if (!custom && !(decides && !p)) {
@@ -9925,9 +9994,11 @@ function drawEditor(p, presetID) {
       ebox.replaceChildren(renderEndpoints(p, src));
     };
     refreshEndpoints();
-    ed.append(...row);
+    section("conn");
+    add(...row);
   }
-  ed.append(adv);
+  section("behave");
+  add(adv);
 
   if (custom) {
     const more = edAligned(el("details", "more"));
@@ -10003,7 +10074,8 @@ function drawEditor(p, presetID) {
     balHint.append(t("sums with + - * / and brackets: data.total / 500000, (1 - credits.used / 70) %; \"$\" in front adds the sign, \"%\" after shows a percent with a bar; several, each with a label, apart by \";\": 5h: a.used / a.cap %; $credits.left; a list's items are a.*.used, matching ones a[status=active].used, in sum(), max(), min() or count(); an amount the reply hasn't shows \"—\" and the others still show"));
     inner.append(...field(t("Balance field"), balPair, balHint));
     more.append(inner);
-    ed.append(more);
+    section("conn");
+  add(more);
   }
 
   const bar = el("div", "bar");
@@ -10136,6 +10208,7 @@ function drawEditor(p, presetID) {
   bar.append(cancel, saveBtn);
   // a plugin's panels for a provider (magpie.panels' provider), told which
   if (p) { const slot = magpie.slot?.("provider", { provider: { id: p.id, name: p.name || p.id } }); if (slot) ed.append(slot); }
+  finishEditor();
   ed.append(bar);
   setTimeout(() => (isNew ? (custom || another ? name : endpoint || vertexProject || key) : null)?.focus(), 0);
   return ed;
