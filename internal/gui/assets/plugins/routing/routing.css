@@ -1000,3 +1000,8 @@ body.window .rt-gedit > .bar { --vfoot: 8px; }
 .rt-gtpl-card .acts { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px; }
 .rt-gtplbtn { display: inline-flex; align-items: center; gap: 4px; }
 .rt-log-head .mask-badge { margin-left: 8px; }
+
+/* the page's own tabs: Live, Groups, Pools, History — a jump to each part,
+   which with dozens of requests is screens below (the owner, 11-10) */
+.rt-tabs { margin: 2px 0 10px; flex-wrap: wrap; }
+.rt-tabs[hidden] { display: none; }

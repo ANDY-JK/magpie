@@ -7649,6 +7649,49 @@ function routingPage(part) {
     gsec.scrollIntoView({ block: "start", behavior: still() ? "auto" : "smooth" });
     gsec.focus({ preventScroll: true });
   };
+  // A tab for each part of the page (the owner, 11-10): with dozens of
+  // requests the groups, pools and history sit screens below. A tab brings
+  // its part to the top of the view, as the head's Routing groups does; the
+  // page itself is unchanged, and a part that isn't there has no tab.
+  {
+    const tabs = el("div", "segs rt-tabs");
+    const parts = [
+      ["live", () => $("#view-routing"), "Live"],
+      ["groups", () => gsec, "Groups"],
+      ["pools", () => box.querySelector(".rt-pools"), "Pools"],
+      ["history", () => dayBar, "History"],
+    ];
+    for (const [key, , label] of parts) {
+      const b = el("button", "opt" + (key === "live" ? " on" : ""), t(label));
+      b.dataset.jump = key;
+      b.onclick = (ev) => {
+        // a click no reader made moves nothing, as the head's does
+        if (!window.scrollOnPurpose?.(ev)) return;
+        const at = parts.find(([k]) => k === key)?.[1]();
+        if (!at) return;
+        for (const x of tabs.children) x.classList.toggle("on", x === b);
+        // at once: a jump that a redraw of the trace could pull back mid-way
+        if (key === "live") $("#view-routing").scrollTo({ top: 0, behavior: "auto" });
+        else at.scrollIntoView({ block: "start", behavior: "auto" });
+      };
+      tabs.append(b);
+    }
+    const has = (key) => key === "live" || (key === "groups" ? !!gsec.querySelector(".rt-group")
+      : key === "pools" ? !!box.querySelector(".rt-pools .rt-pool")
+      : !!dayBar.querySelector(".rt-day") && dayBar.getClientRects().length > 0);
+    const sync = () => {
+      let shown = 0;
+      for (const b of tabs.children) {
+        const on = has(b.dataset.jump);
+        b.hidden = !on;
+        if (on) shown++;
+      }
+      tabs.hidden = shown < 2;
+    };
+    box.before(tabs);
+    new MutationObserver(() => requestAnimationFrame(sync)).observe(box, { childList: true, subtree: true });
+    sync();
+  }
   // fitGo: it takes only room the head has spare, so nothing else in the
   // head moves or wraps for it: named where its name fits, its arrow alone
   // where only that does, and left out of a head with no room (a phone's)
