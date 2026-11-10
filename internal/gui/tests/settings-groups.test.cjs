@@ -128,11 +128,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           workbuddyCheckins: [{ user: "Ann", day: today, at: new Date().toISOString(), outcome: "claimed", credit: 2, streak: 3 }],
         });
 
-        // the Usage part: its list, then the tabs where a heading would be,
-        // then the card
+        // the Usage part: its own tabs, its list, then the tabs where a
+        // heading would be, then the card
         const parts = await page.evaluate(() => [...document.querySelectorAll("#setPage-usage > *")]
           .map((h) => h.querySelector("#warmTabs") ? "tabs" : h.querySelector("#currencySegs") ? "usage" : h.className));
-        assert.deepEqual(parts, ["usage", "tabs", "warm-panes"]);
+        assert.deepEqual(parts, ["row-head set-subhead warm-tabs", "usage", "tabs", "warm-panes"]);
         assert.deepEqual(await page.locator("#warmTabs [role=tab]:visible").allTextContents(), ["Codex", "Claude Code", "WorkBuddy"]);
         assert.equal(await page.locator("#warmTabs").getAttribute("role"), "tablist");
         assert.equal(await page.locator("#warmTabs").getAttribute("aria-label"), w.tabs);

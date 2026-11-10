@@ -19680,6 +19680,7 @@ function setSetTab(tab, remember) {
     $("#setPage-" + id).hidden = !on;
   }
   setShown = tab;
+  if (tab === "usage") allowSync();
   // each agent's row is read only where it is shown
   if (view === "settings" && tab === "privacy" && !setQuery) loadSessionReads();
   $("#setTabs").setAttribute("aria-label", t("Settings"));
@@ -19704,6 +19705,94 @@ function setSetTab(tab, remember) {
     try { localStorage.setItem("magpie.settingsTab", setTab); } catch {}
   }
   setSetTab(setTab);
+}
+
+// Allowances' own tabs (the owner, 11-10: 拆分成多个 tab，避免滚动很久): the
+// menu bar's rows, the display and alerts, and the warm-ups. All, the
+// default, is the part as it was; the pick is remembered, and a group a
+// feature leaves out has no tab.
+const ALLOW_TABS = ["all", "menu", "display", "warm"];
+var allowTab = "all";
+try {
+  const k = localStorage.getItem("magpie.allowanceTab");
+  if (ALLOW_TABS.includes(k)) allowTab = k;
+} catch {}
+var allowStrip = null;
+var allowHidden = new Map(); // what a pick hid, and the display it had
+function allowParts() {
+  const page = $("#setPage-usage");
+  if (!page) return null;
+  const menuIds = ["trayUsageRow", "trayWindowsRow", "trayEveryRow", "trayLogosRow", "trayBirdRow", "trayPaceRow", "trayCostRow", "trayNumberRow"];
+  const menu = menuIds.map((id) => $("#" + id)).filter(Boolean);
+  const first = page.querySelector(".list.prefs");
+  const display = [...(first?.children || [])].filter((n) => n.classList.contains("row") && !menu.includes(n));
+  const warmHead = page.querySelector(".warm-head");
+  const warm = [warmHead, ...[...page.querySelectorAll(":scope > .list.prefs")].filter((l) => l !== first)].filter(Boolean);
+  return { menu, display, warm };
+}
+function allowApply() {
+  for (const [n, d] of allowHidden) { n.style.display = d; n.hidden = false; }
+  allowHidden.clear();
+  if (allowTab === "all") return;
+  const parts = allowParts();
+  if (!parts) return;
+  const hide = allowTab === "menu" ? [...parts.display, ...parts.warm]
+    : allowTab === "display" ? [...parts.menu, ...parts.warm] : [...parts.menu, ...parts.display];
+  for (const n of hide) {
+    if (n.hidden || n.style.display === "none") continue;
+    // the rows' own display (flex) outbids [hidden]: hide both ways
+    allowHidden.set(n, n.style.display);
+    n.hidden = true;
+    n.style.display = "none";
+  }
+}
+function allowSync() {
+  const parts = allowParts();
+  if (!parts || !allowStrip) return;
+  // whether a group has a row of its own, not whether the page is in sight
+  // yet: a remembered pick is worked out before Settings is shown
+  const vis = (n) => allowHidden.has(n) || (!n.hidden && n.style.display !== "none" && !featureHides(n));
+  const ok = { all: true, menu: parts.menu.some(vis), display: parts.display.some(vis), warm: parts.warm.some(vis) };
+  if (allowTab !== "all" && !ok[allowTab]) allowTab = "all";
+  let shown = 0;
+  for (const b of allowStrip.querySelectorAll("button[data-aset]")) {
+    const on = b.dataset.aset === allowTab;
+    b.style.display = ok[b.dataset.aset] ? "" : "none";
+    if (ok[b.dataset.aset]) shown++;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", String(on));
+    b.tabIndex = on ? 0 : -1;
+  }
+  allowStrip.hidden = shown < 2;
+  allowApply();
+}
+function setAllowTab(key, remember) {
+  if (!ALLOW_TABS.includes(key)) return;
+  if (remember) {
+    allowTab = key;
+    try { localStorage.setItem("magpie.allowanceTab", key); } catch {}
+  }
+  allowSync();
+}
+{
+  const page = $("#setPage-usage");
+  if (page) {
+    const strip = el("div", "row-head set-subhead warm-tabs");
+    strip.id = "usageTabs";
+    strip.setAttribute("role", "tablist");
+    strip.setAttribute("aria-label", t("Allowances"));
+    for (const key of ALLOW_TABS) {
+      const b = el("button", "opt", t({ all: "All", menu: "Menu bar", display: "Display and alerts", warm: "Warm-ups" }[key]));
+      b.type = "button";
+      b.setAttribute("role", "tab");
+      b.dataset.aset = key;
+      b.onclick = () => setAllowTab(key, true);
+      strip.append(b);
+    }
+    page.prepend(strip);
+    allowStrip = strip;
+    allowSync();
+  }
 }
 
 // Settings' search (sgfvdsg86265 on X: "配置界面太多了，找不到了"): the

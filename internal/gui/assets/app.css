@@ -3663,6 +3663,9 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
 .warm-tabs button:hover:not(.on) { color: var(--fg-2); }
 .warm-tabs button.on { color: var(--fg); background: var(--pill); }
 .warm-tabs button[hidden] { display: none; }
+/* Allowances' own tabs: the menu bar, display and alerts, the warm-ups */
+.set-subhead { margin: 0 0 8px; padding: 0 2px; }
+.set-subhead[hidden] { display: none; }
 .warm-panes { margin-bottom: 8px; }
 /* the page's parts (#471): a tab each at the top in the same look, a line
    more when they don't fit across (a narrow window, a larger text size),
