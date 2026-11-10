@@ -10071,7 +10071,16 @@ function drawEditor(p, presetID) {
       balPair.classList.add("wrap");
     }
     const balHint = el("details", "", el("summary", "", t("Where the amount is in the reply, e.g. data.balance")));
-    balHint.append(t("sums with + - * / and brackets: data.total / 500000, (1 - credits.used / 70) %; \"$\" in front adds the sign, \"%\" after shows a percent with a bar; several, each with a label, apart by \";\": 5h: a.used / a.cap %; $credits.left; a list's items are a.*.used, matching ones a[status=active].used, in sum(), max(), min() or count(); an amount the reply hasn't shows \"—\" and the others still show"));
+    const balHelp = el("div", "hint bal-help");
+    for (const line of [
+      "A path into the reply, sums with + - * / and brackets, and labels.",
+      "Examples: data.total / 500000 · (1 - credits.used / 70) % · $credits.left",
+      "Several, apart by \";\", each with a label: 5h: a.used / a.cap %",
+      "A list: a.*.used, or a[status=active].used, in sum(), max(), min() or count().",
+      "\"$\" in front adds the sign; \"%\" after shows a percent with a bar.",
+      "An amount the reply hasn't shows \"—\"; the others still show.",
+    ]) balHelp.append(el("p", "", t(line)));
+    balHint.append(balHelp);
     inner.append(...field(t("Balance field"), balPair, balHint));
     more.append(inner);
     section("conn");
