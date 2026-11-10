@@ -15,6 +15,7 @@ const files = [
   "doctor.test.cjs",
   "image-mcp.test.cjs",
   "library-export.test.cjs",
+  "library-import.test.cjs",
   "library-list-filter.test.cjs",
   "library-subagents-bulk.test.cjs",
   "models-fold.test.cjs",

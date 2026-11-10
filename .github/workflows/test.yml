@@ -217,6 +217,7 @@ jobs:
           internal/gui/tests/routing-tabs.test.cjs
           internal/gui/tests/library-list-filter.test.cjs
           internal/gui/tests/library-export.test.cjs
+          internal/gui/tests/library-import.test.cjs
           internal/gui/tests/image-mcp.test.cjs
           internal/gui/tests/balance-help-short.test.cjs
           internal/gui/tests/doctor.test.cjs
