@@ -417,6 +417,35 @@ func SubagentAgentsSet(name string, agents []string) (*Result, error) {
 	})
 }
 
+// SomeSubagentsAgents gives the subagents named to the agents, or takes them
+// from them, in one change, as SomeHooksAgents does for hooks.
+func SomeSubagentsAgents(names, agents []string, on bool) (*Result, error) {
+	if len(names) == 0 {
+		return nil, errors.New("no subagents to give the agents")
+	}
+	if len(agents) == 0 {
+		return nil, errors.New("no agents to give the subagents to")
+	}
+	return change(func(l *Library) error {
+		for _, name := range names {
+			if l.subagent(name) == nil {
+				return fmt.Errorf("no subagent called %s", name)
+			}
+		}
+		for _, s := range l.Subagents {
+			if !slices.Contains(names, s.Name) {
+				continue
+			}
+			list := slices.Clone(s.Agents)
+			for _, a := range agents {
+				list = set(list, a, on)
+			}
+			s.Agents = orNone(list)
+		}
+		return nil
+	})
+}
+
 // RemoveSubagents takes the subagents named out of the library, and the
 // files magpie wrote of them, still as it wrote them, out of every agent.
 func RemoveSubagents(names []string) (*Result, error) {

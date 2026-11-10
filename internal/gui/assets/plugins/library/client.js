@@ -3181,6 +3181,16 @@ magpie.plugin("library", (ctx) => {
     ], !!some);
   }
 
+  // every subagent, or those picked (the owner, 11-10: the list works as
+  // hooks' and servers' do)
+  function confirmRemoveEverySubagent(some) {
+    const subs = (some || lib.subagents || []).slice(), names = subs.map((x) => x.name), n = names.length;
+    confirmRemoveEvery("subagents", names, !some ? t("Remove all {n} subagents?", { n }) : n === 1 ? t("Remove {name}?", { name: names[0] }) : t("Remove {n} subagents?", { n }), [
+      takenFrom(subs),
+      t("The files magpie wrote of them are taken out of every agent."),
+    ], !!some);
+  }
+
   // ---------- subagents ----------
 
   // A subagent (#2283, chuanchinatest) is a helper with a prompt of its
@@ -3210,13 +3220,23 @@ magpie.plugin("library", (ctx) => {
     body.append(intro(t("A subagent is a helper with a prompt of its own that an agent hands a task to — a reviewer, a test writer. Add it once and magpie writes it into each agent you pick, as that agent's own subagent file.")));
     const all = subagentAgents();
     const subs = lib.subagents || [];
-    pickingFor("subagents", []);
+    pickingFor("subagents", subs);
     if (!subs.length) {
       body.append(empty(t("No subagents in the library yet"), t("Add one, and pick the agents that can hand it a task."), button(t("＋ Add a subagent"), "action", () => editSubagent(null))));
     } else {
+      // the same bar hooks and servers have: pick them to give them to
+      // agents together, or take them out together (the owner, 11-10)
+      if (subs.length > 1) {
+        const rh = el("div", "row-head lib-subagenthead");
+        rh.append(el("span", "label", t("In the library")), el("span", "grow"));
+        if (all.length) rh.append(pickButton("subagents"));
+        rh.append(removeEveryButton("subagents"));
+        body.append(rh);
+      }
       const list = el("div", "list lib-list");
       list.append(...[...subs].sort((a, b) => a.name.localeCompare(b.name)).map((s) => subagentRow(s, all)));
       body.append(list);
+      if (picking) body.append(pickBar(all));
       const after = el("div", "after-list");
       after.append(button(t("＋ Add subagent"), "", () => editSubagent(null)));
       body.append(after);
@@ -3245,6 +3265,7 @@ magpie.plugin("library", (ctx) => {
       agentChips(all, s.agents, chipsChange("subagents/agents", s.name, "subagents", (x) => subagentRow(x, all)), { problems: s.problems, blocked: subagentBlocked, all: true }));
     row.onclick = () => editSubagent(s);
     row.title = t("Edit {name}", { name: s.name });
+    if (picking) return pickRow(row, s.name);
     return row;
   }
 
@@ -3949,13 +3970,13 @@ magpie.plugin("library", (ctx) => {
   // that reads every one of them itself is lit and locked, as a row's chip
   // is; one that reads some says how many, before the click and after it.
   function groupChips(skills, all, repo, kind = "skills") {
-    const servers = kind === "servers", hooks = kind === "hooks";
+    const servers = kind === "servers", hooks = kind === "hooks", subs = kind === "subagents";
     const n = skills.length, names = skills.map((s) => s.name);
     const own = (s, a) => !s.always?.includes(a.id);
-    const can = (s, a) => (servers ? !!reaches(s)(a) : hooks ? !hookBlocked(s)(a) : own(s, a));
+    const can = (s, a) => (servers ? !!reaches(s)(a) : hooks ? !hookBlocked(s)(a) : subs ? !subagentBlocked(a) : own(s, a));
     const reach = (a) => skills.filter((s) => can(s, a)).length;
     const count = (a) => skills.filter((s) => can(s, a) && s.agents?.includes(a.id)).length;
-    const itself = (a) => (servers || hooks ? 0 : skills.filter((s) => !own(s, a)).length);
+    const itself = (a) => (servers || hooks || subs ? 0 : skills.filter((s) => !own(s, a)).length);
     const full = all.filter((a) => reach(a) && count(a) === reach(a)).map((a) => a.id);
     // each agent is sent the names it can be given: a skill it reads
     // itself is left as it is, so a group's agents may go in more than one
@@ -3963,7 +3984,7 @@ magpie.plugin("library", (ctx) => {
       const by = new Map();
       for (const id of ids) {
         const a = all.find((x) => x.id === id);
-        const ns = servers || hooks || !a ? names : skills.filter((s) => own(s, a)).map((s) => s.name);
+        const ns = servers || hooks || subs || !a ? names : skills.filter((s) => own(s, a)).map((s) => s.name);
         const k = ns.join("\n");
         if (!by.has(k)) by.set(k, { names: ns, agents: [] });
         by.get(k).agents.push(id);
@@ -3991,14 +4012,16 @@ magpie.plugin("library", (ctx) => {
           : n === 1 ? (on.length ? t("{name} is on for {agents}", { name: names[0], agents: who(on) }) : t("{name} is off for {agents}", { name: names[0], agents: who(off) }))
           : servers ? (on.length ? t("{n} servers are on for {agents}", { n, agents: who(on) }) : t("{n} servers are off for {agents}", { n, agents: who(off) }))
           : hooks ? (on.length ? t("{n} hooks are on for {agents}", { n, agents: who(on) }) : t("{n} hooks are off for {agents}", { n, agents: who(off) }))
+          : subs ? (on.length ? t("{n} subagents are on for {agents}", { n, agents: who(on) }) : t("{n} subagents are off for {agents}", { n, agents: who(off) }))
           : on.length ? t("{n} skills are on for {agents}", { n, agents: who(on) }) : t("{n} skills are off for {agents}", { n, agents: who(off) })) + kept);
       } catch (e) {
         status(e.message, "err", 6000);
       }
       render();
     }, { all: true, blocked: servers ? (a) => (reach(a) ? "" : n === 1 ? sseBlocked(skills[0])(a) : t("{agent} can reach none of these servers", { agent: a.name }))
-      : hooks ? (a) => (reach(a) ? "" : n === 1 ? hookBlocked(skills[0])(a) : t("{agent} can run none of these hooks", { agent: a.name })) : null,
-    always: servers || hooks || !n ? null : (a) => (reach(a) ? "" : n === 1 ? alwaysFor(skills[0])(a)
+      : hooks ? (a) => (reach(a) ? "" : n === 1 ? hookBlocked(skills[0])(a) : t("{agent} can run none of these hooks", { agent: a.name }))
+      : subs ? (a) => (reach(a) ? "" : n === 1 ? subagentBlocked(a) : t("{agent} can take none of these subagents", { agent: a.name })) : null,
+    always: servers || hooks || subs || !n ? null : (a) => (reach(a) ? "" : n === 1 ? alwaysFor(skills[0])(a)
       : t("{agent} reads ~/.agents/skills itself, where all of these are kept — it has them whatever is ticked here", { agent: a.name })) });
     box.classList.add("lib-groupchips");
     for (const c of box.querySelectorAll(".lib-ag[data-agent]")) {
@@ -4009,6 +4032,10 @@ magpie.plugin("library", (ctx) => {
         ? (k === m ? t("{agent} has all of these hooks — click to take them away", { agent: a.name })
           : k ? t("{agent} has {n} of these hooks — click to give it the rest", { agent: a.name, n: k })
           : t("Give {agent} all of these hooks", { agent: a.name }))
+        : subs
+        ? (k === m ? t("{agent} has all of these subagents — click to take them away", { agent: a.name })
+          : k ? t("{agent} has {n} of these subagents — click to give it the rest", { agent: a.name, n: k })
+          : t("Give {agent} all of these subagents", { agent: a.name }))
         : servers
         ? (k === m ? t("{agent} has all of these servers — click to take them away", { agent: a.name })
           : k ? t("{agent} has {n} of these servers — click to give it the rest", { agent: a.name, n: k })
@@ -4021,8 +4048,8 @@ magpie.plugin("library", (ctx) => {
     }
     const every = box.querySelector(".lib-ag.all");
     if (every) every.title = every.classList.contains("on")
-      ? (servers ? t("Every agent has all of these servers — click to take them from every one") : hooks ? t("Every agent has all of these hooks — click to take them from every one") : t("Every agent has all of them — click to take them from every one"))
-      : servers ? t("Give all of these servers to every agent") : hooks ? t("Give all of these hooks to every agent") : t("Give all of them to every agent");
+      ? (servers ? t("Every agent has all of these servers — click to take them from every one") : hooks ? t("Every agent has all of these hooks — click to take them from every one") : subs ? t("Every agent has all of these subagents — click to take them from every one") : t("Every agent has all of them — click to take them from every one"))
+      : servers ? t("Give all of these servers to every agent") : hooks ? t("Give all of these hooks to every agent") : subs ? t("Give all of these subagents to every agent") : t("Give all of them to every agent");
     return box;
   }
 
@@ -4041,9 +4068,9 @@ magpie.plugin("library", (ctx) => {
       render();
     });
     b.dataset.alt = picking ? t("Select") : t("Done"); // as wide as the other, see library.css
-    const skills = kind === "skills", hooks = kind === "hooks";
-    b.title = picking ? (skills ? t("Stop picking skills") : hooks ? t("Stop picking hooks") : t("Stop picking servers"))
-      : skills ? t("Pick some skills and turn them on or off together") : hooks ? t("Pick some hooks and turn them on or off together") : t("Pick some servers and turn them on or off together");
+    const skills = kind === "skills", hooks = kind === "hooks", subs = kind === "subagents";
+    b.title = picking ? (skills ? t("Stop picking skills") : hooks ? t("Stop picking hooks") : subs ? t("Stop picking subagents") : t("Stop picking servers"))
+      : skills ? t("Pick some skills and turn them on or off together") : hooks ? t("Pick some hooks and turn them on or off together") : subs ? t("Pick some subagents and turn them on or off together") : t("Pick some servers and turn them on or off together");
     // one Select at a time, the found skills' Select's other side: ending
     // it from here would take its bar away, scrolling the page
     if (skills && pickFound && !picking) {
@@ -4122,16 +4149,16 @@ magpie.plugin("library", (ctx) => {
   // the servers' bar is the same, with no filter or groups (#1027)
   function pickBar(all) {
     const bar = el("div", "row lib-row lib-pickbar");
-    const servers = picking === "servers", hooks = picking === "hooks";
-    const own = servers ? lib.servers : hooks ? lib.hooks || [] : lib.skills;
-    const shown = servers || hooks ? own : shownSkills(), q = servers || hooks ? "" : skillQuery.trim();
+    const servers = picking === "servers", hooks = picking === "hooks", subs = picking === "subagents";
+    const own = servers ? lib.servers : hooks ? lib.hooks || [] : subs ? lib.subagents || [] : lib.skills;
+    const shown = servers || hooks || subs ? own : shownSkills(), q = servers || hooks || subs ? "" : skillQuery.trim();
     const every = el("label", "lib-pickall");
     every.append(pickAll(shown), el("span", "", q ? t("All {n} that match", { n: shown.length }) : t("All {n}", { n: shown.length })));
     every.onclick = (e) => e.stopPropagation();
     const skills = own.filter((s) => picked.has(s.name));
     const n = skills.length;
     bar.append(every, el("span", "lib-pickn" + (n ? "" : " none"), n ? t("{n} selected", { n })
-      : servers ? t("Pick servers to turn them on or off together") : hooks ? t("Pick hooks to turn them on or off together") : t("Pick skills to turn them on or off together")), el("span", "grow"));
+      : servers ? t("Pick servers to turn them on or off together") : hooks ? t("Pick hooks to turn them on or off together") : subs ? t("Pick subagents to turn them on or off together") : t("Pick skills to turn them on or off together")), el("span", "grow"));
     if (n && naming) return nameBar(bar, skills);
     if (n) {
       bar.append(groupChips(skills, all, null, picking || "skills"));
@@ -4154,8 +4181,8 @@ magpie.plugin("library", (ctx) => {
       // all asks, and each taken out as its own row's Remove would. Its
       // label holds still as the count changes (the count is beside it, and
       // in the sheet), so a pick never rewraps the bar under the pointer
-      const rm = button(t("Remove…"), "action danger lib-updall lib-pickrm", () => servers ? confirmRemoveEveryServer(skills) : hooks ? confirmRemoveEveryHook(skills) : confirmRemoveEverySkill(skills));
-      rm.title = servers ? t("Take the servers picked out of the library") : hooks ? t("Take the hooks picked out of the library") : t("Take the skills picked out of the library");
+      const rm = button(t("Remove…"), "action danger lib-updall lib-pickrm", () => servers ? confirmRemoveEveryServer(skills) : hooks ? confirmRemoveEveryHook(skills) : subs ? confirmRemoveEverySubagent(skills) : confirmRemoveEverySkill(skills));
+      rm.title = servers ? t("Take the servers picked out of the library") : hooks ? t("Take the hooks picked out of the library") : subs ? t("Take the subagents picked out of the library") : t("Take the skills picked out of the library");
       bar.append(rm);
       const c = button(t("Clear"), "lib-updall lib-pickclear", () => { picked.clear(); syncPicks(); });
       c.title = t("Unpick them all");
@@ -4970,10 +4997,11 @@ magpie.plugin("library", (ctx) => {
   // project magpie gave it to, its sign-in forgotten; the agents' servers
   // of their own stay. It asks first, in the page, saying who loses what.
   function removeEveryButton(kind) {
-    const skills = kind === "skills", hooks = kind === "hooks";
-    const b = button(t("Remove all"), "action danger lib-updall lib-everyrm", () => skills ? confirmRemoveEverySkill() : hooks ? confirmRemoveEveryHook() : confirmRemoveEveryServer());
+    const skills = kind === "skills", hooks = kind === "hooks", subs = kind === "subagents";
+    const b = button(t("Remove all"), "action danger lib-updall lib-everyrm", () => skills ? confirmRemoveEverySkill() : hooks ? confirmRemoveEveryHook() : subs ? confirmRemoveEverySubagent() : confirmRemoveEveryServer());
     b.title = skills ? t("Take all {n} skills out of the library", { n: lib.skills.length })
       : hooks ? t("Take all {n} hooks out of the library", { n: (lib.hooks || []).length })
+      : subs ? t("Take all {n} subagents out of the library", { n: (lib.subagents || []).length })
       : t("Take all {n} servers out of the library", { n: lib.servers.length });
     return b;
   }
@@ -5044,7 +5072,7 @@ magpie.plugin("library", (ctx) => {
         const gone = names.filter((x) => !pickErrs.has(x));
         for (const x of gone) picked.delete(x);
         const done = gone.length === 1 ? t("{name} removed", { name: gone[0] })
-          : kind === "skills" ? t("{n} skills removed", { n: gone.length }) : kind === "hooks" ? t("{n} hooks removed", { n: gone.length }) : t("{n} servers removed", { n: gone.length });
+          : kind === "skills" ? t("{n} skills removed", { n: gone.length }) : kind === "hooks" ? t("{n} hooks removed", { n: gone.length }) : kind === "subagents" ? t("{n} subagents removed", { n: gone.length }) : t("{n} servers removed", { n: gone.length });
         if (no.length) status((gone.length ? done + " · " : "") + t("{name} wasn't removed: {error}", { name: what(no[0]), error: no[0].error }) + (no.length > 1 ? " " + t("(and {n} more)", { n: no.length - 1 }) : ""), "warn", 10000);
         else report(res, done);
         render();
@@ -5053,7 +5081,7 @@ magpie.plugin("library", (ctx) => {
       if (no.length) {
         const p = no[0];
         status(t("{name} wasn't removed: {error}", { name: what(p), error: p.error }) + (no.length > 1 ? " " + t("(and {n} more)", { n: no.length - 1 }) : ""), "warn", 8000);
-      } else report(res, kind === "skills" ? t("{n} skills removed", { n: names.length }) : kind === "hooks" ? t("{n} hooks removed", { n: names.length }) : t("{n} servers removed", { n: names.length }));
+      } else report(res, kind === "skills" ? t("{n} skills removed", { n: names.length }) : kind === "hooks" ? t("{n} hooks removed", { n: names.length }) : kind === "subagents" ? t("{n} subagents removed", { n: names.length }) : t("{n} servers removed", { n: names.length }));
       render();
       return true;
     } catch (e) {

@@ -3,6 +3,7 @@ package library
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -201,5 +202,45 @@ func TestSubagentCheck(t *testing.T) {
 		if _, err := SaveSubagent("", s); err == nil {
 			t.Errorf("%+v saved", s)
 		}
+	}
+}
+
+// SomeSubagentsAgents gives several subagents to the agents, or takes them
+// from them, in one change: the page's Select bar does, as hooks' does.
+func TestSomeSubagentsAgents(t *testing.T) {
+	sandbox(t)
+	first := reviewer
+	first.Agents = []string{"claude"}
+	ok(t)(SaveSubagent("", first))
+	second := reviewer
+	second.Name, second.Agents = "critic", []string{"codex"}
+	ok(t)(SaveSubagent("", second))
+
+	agentsNow := func(name string) []string {
+		t.Helper()
+		var got []string
+		ok(t)(change(func(l *Library) error {
+			got = slices.Clone(l.subagent(name).Agents)
+			return nil
+		}))
+		return got
+	}
+	ok(t)(SomeSubagentsAgents([]string{"reviewer", "critic"}, []string{"claude", "codex"}, true))
+	for _, name := range []string{"reviewer", "critic"} {
+		if got := agentsNow(name); !slices.Equal(got, []string{"claude", "codex"}) {
+			t.Fatalf("%s is on for %v", name, got)
+		}
+	}
+	ok(t)(SomeSubagentsAgents([]string{"reviewer", "critic"}, []string{"claude"}, false))
+	for _, name := range []string{"reviewer", "critic"} {
+		if got := agentsNow(name); !slices.Equal(got, []string{"codex"}) {
+			t.Fatalf("%s is on for %v after claude was taken off", name, got)
+		}
+	}
+	if _, err := SomeSubagentsAgents([]string{"no-such-subagent"}, []string{"claude"}, true); err == nil {
+		t.Fatal("a subagent that isn't there was given an agent")
+	}
+	if _, err := SomeSubagentsAgents([]string{"reviewer"}, nil, true); err == nil {
+		t.Fatal("no agents was accepted")
 	}
 }

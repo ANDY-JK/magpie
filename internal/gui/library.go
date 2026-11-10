@@ -531,6 +531,10 @@ func libraryRoutes(mux *http.ServeMux, w Windows) {
 			res, err = library.SaveSubagent(in.Old, in.Subagent)
 		case "subagents/agents":
 			res, err = library.SubagentAgentsSet(in.Name, in.Agents)
+		case "subagents/agents-some":
+			res, err = library.SomeSubagentsAgents(in.Names, in.Agents, in.On)
+		case "subagents/remove-all":
+			res, err = library.RemoveSubagents(in.Names)
 		case "subagents/remove":
 			res, err = library.RemoveSubagents([]string{in.Name})
 		case "skills/install":
