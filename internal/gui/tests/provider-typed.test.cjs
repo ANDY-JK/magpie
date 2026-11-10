@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const relay = {
@@ -63,11 +64,22 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const calls = [];
       await page.route("**/*", serve(lang, calls));
       await page.goto("http://magpie.test/?view=providers");
-      const missing = await page.evaluate((w) => Object.values(w).filter((s) => /[a-z]/i.test(s) && !I18N.zh[s] && !["optional"].includes(s)), words.en);
+      const missing = Object.values(words.en).filter((s) => /[a-z]/i.test(s) && !allStrings().I18N.zh[s] && !["optional"].includes(s));
       if (lang === "en") assert.deepEqual(missing, [], "every string has its Chinese");
       await page.locator(".row.provider", { hasText: "Relay" }).click();
       const ed = page.locator(".editor");
-      const key = ed.locator('input[type="password"]').first();
+      // a provider with a key list has no key field of its own: Add another
+      // key opens one, and the key typed there is the form's key
+      await ed.getByRole("button", { name: w.addKey }).click();
+      const box = page.locator(".editor .acc.adding");
+      await box.waitFor();
+      await page.waitForTimeout(100);
+      assert.equal(await page.evaluate(() => document.activeElement?.type), "password", "the key is focused");
+      assert.ok(await box.locator('input[type="password"]').evaluate((e) => e === document.activeElement));
+      const name = box.locator('input:not([type="password"])').first();
+      assert.equal(await name.getAttribute("placeholder"), w.name);
+      assert.ok((await name.getAttribute("placeholder")).includes(w.optional));
+      const key = box.locator('input[type="password"]');
       await key.fill("sk-new-typed");
       const wait = async (n) => { for (let i = 0; i < 60 && calls.length < n; i++) await page.waitForTimeout(50); };
       const form = (b) => ({ typed: b.typed, key: b.key, chat: b.chat, headers: b.headers });
@@ -79,7 +91,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(form(calls[0][1]), want, "Fetch models asks with the form");
       await page.waitForTimeout(200);
       assert.ok(await ed.isVisible(), "the editor stays open");
-      assert.equal(await ed.locator('input[type="password"]').first().inputValue(), "sk-new-typed", "the key stays typed");
+      assert.equal(await key.inputValue(), "sk-new-typed", "the key stays typed");
 
       await ed.locator(".mfoot").getByRole("button", { name: w.all, exact: true }).click();
       await wait(2);
@@ -97,17 +109,6 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(form(calls[3][1]), want, "the endpoints' Test asks with the form");
       assert.deepEqual(calls.map((c) => c[0]), ["models", "test", "test", "test"], "nothing saved");
       assert.ok(await ed.isVisible());
-
-      // a provider's new key: the key is focused, the name is optional
-      await ed.getByRole("button", { name: w.addKey }).click();
-      const box = page.locator(".editor .acc.adding");
-      await box.waitFor();
-      await page.waitForTimeout(100);
-      assert.equal(await page.evaluate(() => document.activeElement?.type), "password", "the key is focused");
-      assert.ok(await box.locator('input[type="password"]').evaluate((e) => e === document.activeElement));
-      const name = box.locator('input:not([type="password"])').first();
-      assert.equal(await name.getAttribute("placeholder"), w.name);
-      assert.ok((await name.getAttribute("placeholder")).includes(w.optional));
       assert.deepEqual(errors, []);
     });
   }

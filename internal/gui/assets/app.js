@@ -7948,9 +7948,12 @@ function proxyDraft(p) {
 // tried, and nothing is saved by it. Outside the editor, nothing.
 function asTyped() {
   if (!draft) return {};
+  // a provider with a key list has no key of the form's own: a key being
+  // added, not yet saved, is the one Fetch and the Tests ask with
+  const typed = draft.key || (addingKey && addingKey.id === draft.id ? addingKey.key : "");
   // many keys pasted (361 on Discord) are asked about by the first
-  const keys = splitKeys(draft.key || "");
-  const body = { typed: true, key: keys.length > 1 ? keys[0] : (draft.key || "").trim(), chat: (draft.chat || "").trim(), responses: (draft.responses || "").trim(), anthropic: (draft.anthropic || "").trim(), gemini: (draft.gemini || "").trim(), modelsURL: (draft.modelsURL || "").trim() };
+  const keys = splitKeys(typed || "");
+  const body = { typed: true, key: keys.length > 1 ? keys[0] : (typed || "").trim(), chat: (draft.chat || "").trim(), responses: (draft.responses || "").trim(), anthropic: (draft.anthropic || "").trim(), gemini: (draft.gemini || "").trim(), modelsURL: (draft.modelsURL || "").trim() };
   Object.assign(body, movedURLs(draft));
   // a System One base is asked at POST …/systemone, not on the three APIs
   if (draft.api === "decide") body.decide = (draft.decide || "").trim();
