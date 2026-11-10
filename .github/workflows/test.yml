@@ -211,6 +211,15 @@ jobs:
           internal/gui/tests/usage-ledger.test.cjs
           internal/gui/tests/api-key-theme.test.cjs
           internal/gui/tests/settings-sections.test.cjs
+          internal/gui/tests/settings-allowance-tabs.test.cjs
+          internal/gui/tests/provider-editor-tabs.test.cjs
+          internal/gui/tests/provider-fetch-again.test.cjs
+          internal/gui/tests/routing-tabs.test.cjs
+          internal/gui/tests/library-list-filter.test.cjs
+          internal/gui/tests/library-export.test.cjs
+          internal/gui/tests/image-mcp.test.cjs
+          internal/gui/tests/balance-help-short.test.cjs
+          internal/gui/tests/doctor.test.cjs
           internal/gui/tests/add-sheet.test.cjs
           internal/gui/tests/plain-names.test.cjs
           internal/gui/tests/bare-ids.test.cjs
