@@ -7650,47 +7650,72 @@ function routingPage(part) {
     gsec.focus({ preventScroll: true });
   };
   // A tab for each part of the page (the owner, 11-10): with dozens of
-  // requests the groups, pools and history sit screens below. A tab brings
-  // its part to the top of the view, as the head's Routing groups does; the
-  // page itself is unchanged, and a part that isn't there has no tab.
+  // requests the groups, pools and history sit screens below. A tab shows
+  // its part alone; All, the default, shows the page as it was, and the pick
+  // is remembered for the next visit. A part that isn't there has no tab.
   {
     const tabs = el("div", "segs rt-tabs");
-    const parts = [
-      ["live", () => $("#view-routing"), "Live"],
-      ["groups", () => gsec, "Groups"],
-      ["pools", () => box.querySelector(".rt-pools"), "Pools"],
-      ["history", () => dayBar, "History"],
-    ];
-    for (const [key, , label] of parts) {
-      const b = el("button", "opt" + (key === "live" ? " on" : ""), t(label));
-      b.dataset.jump = key;
-      b.onclick = (ev) => {
-        // a click no reader made moves nothing, as the head's does
-        if (!window.scrollOnPurpose?.(ev)) return;
-        const at = parts.find(([k]) => k === key)?.[1]();
-        if (!at) return;
-        for (const x of tabs.children) x.classList.toggle("on", x === b);
-        // at once: a jump that a redraw of the trace could pull back mid-way
-        if (key === "live") $("#view-routing").scrollTo({ top: 0, behavior: "auto" });
-        else at.scrollIntoView({ block: "start", behavior: "auto" });
-      };
-      tabs.append(b);
-    }
-    const has = (key) => key === "live" || (key === "groups" ? !!gsec.querySelector(".rt-group")
-      : key === "pools" ? !!box.querySelector(".rt-pools .rt-pool")
+    const groupKids = [gHead, gFound, gNames, gList, gOff], poolKids = [pHead, pList];
+    const live = [top, rbar, stage, foot, log, off];
+    const hideFor = {
+      all: [],
+      live: [gsec, hist],
+      groups: [...live, ...poolKids, hist],
+      pools: [...live, ...groupKids, hist],
+      history: [...live, gsec],
+    };
+    const labels = { all: "All", live: "Live", groups: "Groups", pools: "Pools", history: "History" };
+    const has = (key) => key === "all" || key === "live" || (key === "groups" ? !!gList.querySelector(".rt-group")
+      : key === "pools" ? !!pList.querySelector(".rt-pool")
       : !!dayBar.querySelector(".rt-day") && dayBar.getClientRects().length > 0);
+    let picked = "all";
+    try { const k = localStorage.getItem("magpie.routingTab"); if (hideFor[k]) picked = k; } catch {}
+    const hiddenBy = new Map();
+    const apply = () => {
+      for (const [n, d] of hiddenBy) { n.style.display = d; n.hidden = false; }
+      hiddenBy.clear();
+      if (picked === "all") return;
+      for (const n of hideFor[picked]) {
+        if (n.hidden || n.style.display === "none") continue;
+        // display:none inline, as well as hidden: a part with a display of
+        // its own (.rt-gsec's grid, a row-head's flex) outbids [hidden]
+        hiddenBy.set(n, n.style.display);
+        n.hidden = true;
+        n.style.display = "none";
+      }
+    };
     const sync = () => {
       let shown = 0;
       for (const b of tabs.children) {
-        const on = has(b.dataset.jump);
+        const on = has(b.dataset.view);
         b.hidden = !on;
         if (on) shown++;
+        b.classList.toggle("on", b.dataset.view === picked);
       }
       tabs.hidden = shown < 2;
+      apply();
     };
+    for (const key of ["all", "live", "groups", "pools", "history"]) {
+      const b = el("button", "opt", t(labels[key]));
+      b.dataset.view = key;
+      b.onclick = (ev) => {
+        // a click no reader made moves nothing, as the head's does
+        if (!window.scrollOnPurpose?.(ev)) return;
+        picked = key;
+        try { localStorage.setItem("magpie.routingTab", key); } catch {}
+        $("#view-routing").scrollTo({ top: 0, behavior: "auto" });
+        sync();
+      };
+      tabs.append(b);
+    }
     box.before(tabs);
     new MutationObserver(() => requestAnimationFrame(sync)).observe(box, { childList: true, subtree: true });
     sync();
+    // a pick whose part was removed since (no groups at all) goes back to
+    // All once the page has had its while to bring the part in
+    setTimeout(() => {
+      if (picked !== "all" && !has(picked)) { picked = "all"; sync(); }
+    }, 4000);
   }
   // fitGo: it takes only room the head has spare, so nothing else in the
   // head moves or wraps for it: named where its name fits, its arrow alone

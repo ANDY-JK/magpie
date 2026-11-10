@@ -1,9 +1,10 @@
 // Run with Node's test runner and Playwright on the module path; see README.md.
-// The owner (11-10): 拆分成多个 tab，避免滚动很久. The Routing page's requests,
-// groups and history sit one below another; a tab above them brings each part
-// to the top of the view — Live, Groups, Pools, History — and a part there
-// isn't has no tab. The page itself is unchanged. English and Chinese,
-// Chromium and WebKit; no backend, the API is faked.
+// The owner (11-10): 拆分成多个 tab，避免滚动很久. The Routing page's live
+// requests, groups and history sit one below another; a tab shows one part
+// alone — All (the default), Live, Groups, Pools, History — and the pick is
+// remembered for the next visit. A part there isn't has no tab, and a click
+// no reader made moves nothing. English and Chinese, Chromium and WebKit;
+// the API is faked.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -22,7 +23,7 @@ const routes = Array.from({ length: 60 }, (_, i) => ({
   id: "r" + i, seq: i + 1, at: new Date(now - i * 60000).toISOString(), agent: "claude", asked: "group/auto-m",
   model: "a/m", provider: "a", status: 200, ms: 900, ttft: 300, in: 100, out: 20, done: true,
 }));
-const L = { en: { live: "Live", groups: "Groups", history: "History" }, zh: { live: "实时", groups: "分组", history: "历史" } };
+const L = { en: { all: "All", live: "Live", groups: "Groups" }, zh: { all: "全部", live: "实时", groups: "分组" } };
 
 function serve(lang) {
   const state = { agents: [{ id: "claude", name: "Claude Code", path: "/test/claude", fields: [] }], profiles: [], settings: { lang, theme: "light" } };
@@ -50,7 +51,7 @@ function serve(lang) {
 for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
   for (const lang of ["en", "zh"]) {
     const w = L[lang];
-    test(`${engine} ${lang}: the Routing page's tabs bring each part to the top`, async (t) => {
+    test(`${engine} ${lang}: the Routing page's tabs show one part at a time`, async (t) => {
       const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
       const page = await (await browser.newContext({ viewport: { width: 1000, height: 600 }, reducedMotion: "reduce", locale: lang === "zh" ? "zh-CN" : "en-US" })).newPage();
       t.after(() => browser.close());
@@ -63,24 +64,38 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.locator(".rt-group", { hasText: "Model M" }).waitFor({ state: "attached" });
       const tabs = page.locator(".rt-tabs");
       await tabs.waitFor();
+      await tabs.locator('button[data-view="groups"]').waitFor();
       const names = await tabs.locator("button:not([hidden])").allTextContents();
-      assert.deepEqual(names.map((x) => x.trim()), [w.live, w.groups], "Live and Groups; no Pools or History without them");
-      const view = page.locator("#view-routing");
-      const top = () => view.evaluate((v) => v.scrollTop);
-      // Groups: the view moves down (the head's own Routing groups does the
-      // exact landing; here the tab is wired to the same section)
-      const jump = (key) => tabs.locator(`button[data-jump="${key}"]`).click();
-      // a click no reader made moves nothing
-      await tabs.locator('button[data-jump="groups"]').evaluate((b) => b.click());
+      assert.deepEqual(names.map((x) => x.trim()), [w.all, w.live, w.groups], "All, Live and Groups; no Pools or History without them");
+      const shown = (sel) => page.locator(sel).evaluate((e) => !e.hidden && e.getClientRects().length > 0);
+      assert.equal(await shown(".rt-log"), true, "All shows the live requests");
+      assert.equal(await shown(".rt-gsec"), true, "and the groups");
+      // Live alone: the groups go, though their grid would outbid [hidden]
+      await tabs.locator('button[data-view="live"]').click();
+      await page.waitForTimeout(400);
+      assert.equal(await shown(".rt-log"), true, "Live shows the requests");
+      assert.equal(await shown(".rt-gsec"), false, "and not the groups");
+      await tabs.locator('button[data-view="all"]').click();
+      await page.waitForTimeout(400);
+      // a click no reader made changes nothing
+      await tabs.locator('button[data-view="groups"]').evaluate((b) => b.click());
       await page.waitForTimeout(200);
-      assert.equal(await top(), 0, "an untrusted click doesn't move the page");
-      await jump("groups");
-      await page.waitForTimeout(400);
-      assert((await top()) > 0, "the groups' tab takes the view down");
-      // Live: back to the top
-      await jump("live");
-      await page.waitForTimeout(400);
-      assert.equal(await top(), 0);
+      assert.equal(await shown(".rt-log"), true, "an untrusted click doesn't switch");
+      await tabs.locator('button[data-view="groups"]').click();
+      await page.waitForTimeout(500);
+      assert.equal(await page.locator(".rt-log").evaluate((e) => e.hidden), true, "the requests are out of the way");
+      assert.equal(await shown(".rt-gsec"), true, "Groups alone");
+      // remembered for the next visit
+      await page.reload();
+      await page.locator(".rt-group", { hasText: "Model M" }).waitFor({ state: "attached" });
+      await page.waitForTimeout(500);
+      assert.equal(await page.locator(".rt-log").evaluate((e) => e.hidden), true, "Groups is still the pick");
+      assert.equal(await shown(".rt-gsec"), true);
+      // All brings everything back
+      await page.locator('.rt-tabs button[data-view="all"]').click();
+      await page.waitForTimeout(500);
+      assert.equal(await page.locator(".rt-log").evaluate((e) => e.hidden), false, "All brings the requests back");
+      assert.equal(await shown(".rt-gsec"), true);
       assert.deepEqual(errors, []);
       await page.context().close();
     });
