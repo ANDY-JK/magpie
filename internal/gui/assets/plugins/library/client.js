@@ -819,7 +819,22 @@ magpie.plugin("library", (ctx) => {
     back.setAttribute("aria-label", t("Backups"));
     if (lib) back.title = t("magpie keeps a copy of every file before it writes it.") + "\n" + tilde(lib.backups);
     else back.disabled = true;
-    acts.append(more, back);
+    // the library as files, to read and copy, beside the folder and backups
+    const exp = button("", "lib-export", async () => {
+      exp.disabled = true;
+      try {
+        const v = await api("library/export", {});
+        status(t("{n} entries written to {dir}", { n: v.files, dir: tilde(v.dir) }), "ok", 6000);
+        reveal(v.dir);
+      } catch (e) {
+        status(e.message, "err");
+      }
+      exp.disabled = false;
+    });
+    exp.append(glyph(GLYPH.doc, "lib-mini"), el("span", "", t("Save as files")));
+    exp.setAttribute("aria-label", t("Save as files"));
+    exp.title = t("Write the servers, hooks and subagents as files under the library's export folder, to read and copy");
+    acts.append(more, back, exp);
     head.append(acts);
     return head;
   }
