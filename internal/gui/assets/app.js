@@ -11347,8 +11347,10 @@ function renderModels(p) {
     for (const m of p.models) {
       const on = draft.chosen.includes(m.id);
       if (f && !m.id.toLowerCase().includes(f) && !(m.name || "").toLowerCase().includes(f) && !(m.default || "").toLowerCase().includes(f)) continue;
-      // past the first 80 only the picked are drawn, till the rest are asked for (#685)
-      if (picksOnly && !on) { unpicked++; continue; }
+      // past the first 80 only the picked are drawn, till the rest are asked
+      // for (#685); a remote's decision models are drawn anyway, its list
+      // naming them apart
+      if (picksOnly && !on && !decidesModel(p, m.id)) { unpicked++; continue; }
       if (shown >= 80 && !f && !showAll && !on) { hidden++; continue; }
       const c = el("button", "mchip pick" + (on ? " on" : served.has(m.id) ? " auto" : "") + (noAPI(m) ? " noapi" : ""));
       c.append(el("span", "", m.name && m.name !== m.id ? m.name : m.id));
