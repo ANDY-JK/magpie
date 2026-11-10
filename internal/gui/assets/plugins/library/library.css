@@ -138,6 +138,8 @@ button.row.lib-hubfolded:hover { background: var(--pill); }
 @media (max-width: 560px) {
   .lib-hubsheet .lib-list .row { flex-wrap: nowrap; }
   .lib-hubtag { display: none; }
+  /* the file buttons go icon-only, so the sticky head keeps its height */
+  .lib-headacts .lib-more span, .lib-headacts .lib-backups span, .lib-headacts .lib-export span, .lib-headacts .lib-import span { display: none; }
 }
 
 /* the glyph at the front of a row: drawn, in the text colour */
