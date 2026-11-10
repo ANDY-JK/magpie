@@ -21840,14 +21840,21 @@ function renderImages(s, keep) {
   const mcpRow = (id, path, name, sub, more) => {
     const url = mcpAddress(s, path), r = el("div", "row pref"), who = el("div", "who"), val = el("div", "val");
     who.append(el("div", "name", name), el("div", "sub", sub));
-    if (more) { const d = el("details", "mcp-more", el("summary", "", t("Tools and keys"))); d.append(t(more)); who.append(d); }
+    if (more) { const d = el("details", "mcp-more", el("summary", "", t("Tools and keys"))); for (const line of [].concat(more)) d.append(el("p", "", t(line))); who.append(d); }
     val.append(el("code", "", url), copyBtn(url, t("Address")));
     r.append(who, val);
     r.id = id;
     box.append(r);
   };
-  mcpRow("visionMcpRow", "/mcp/magpie/vision", t("Image recognition MCP server"), t("Agents can add image recognition as an MCP server (Streamable HTTP), reading an image with the Image recognition model."), "one analyze_image tool, from a file path, a URL or a data URL; from another computer, a gateway key as Authorization: Bearer <key> and the image as a URL or data URL.");
-  mcpRow("imageMcpRow", "/mcp/magpie/image", t("Image generation MCP server"), t("Agents can add image generation as an MCP server (Streamable HTTP), drawing with the Image generation model."), "generate_image, generate_video and generation_result; an image comes back in the answer and at a URL kept for an hour, a video at a URL, nothing saved in the agent's project; from another computer, a gateway key as Authorization: Bearer <key>.");
+  mcpRow("visionMcpRow", "/mcp/magpie/vision", t("Image recognition MCP server"), t("Agents can add image recognition as an MCP server (Streamable HTTP), reading an image with the Image recognition model."), [
+    "Tool: analyze_image, from a file path, a URL or a data URL.",
+    "From another computer: a gateway key as Authorization: Bearer <key>; the image as a URL or data URL.",
+  ]);
+  mcpRow("imageMcpRow", "/mcp/magpie/image", t("Image generation MCP server"), t("Agents can add image generation as an MCP server (Streamable HTTP), drawing with the Image generation model."), [
+    "Tools: generate_image, generate_video and generation_result.",
+    "An image comes back in the answer and at a URL kept for an hour; a video at a URL. Nothing is saved in the agent's project.",
+    "From another computer: a gateway key as Authorization: Bearer <key>.",
+  ]);
 }
 
 // libWay: a row's way to give agents magpie's own server name in the
