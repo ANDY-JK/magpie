@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [
@@ -113,10 +114,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(sent.body.members, ["oa/gpt-6.1-sol:xhigh", "an/claude-opus-5-5", "rl/glm-5"]);
       assert.deepEqual(sent.body.off, ["oa/gpt-6.1-sol:xhigh"]);
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "off", "Off: kept in its place, sent nothing. Click to switch it on",
         "On: requests may go to it. Click to switch it off and keep its place",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

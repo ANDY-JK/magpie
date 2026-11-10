@@ -15,6 +15,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const at = (h) => new Date(Date.now() + h * 36e5).toISOString();
@@ -167,10 +168,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const aq = await prov.locator(".accts .acc", { hasText: "bob@example.com" }).locator(".aq-w").nth(1).getAttribute("title");
       assert(aq.includes("Claude Opus 4.6 (Thinking)"), "the meter's tooltip lists its models: " + aq);
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Every model ({n})", "By family", "One figure a model family, its most used model's", "Each model's allowance, level by level",
         "{family}: the most used of its models",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

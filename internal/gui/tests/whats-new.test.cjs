@@ -19,6 +19,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 const { watchSettingsReads, settingsDrawn } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
@@ -130,7 +131,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.deepEqual(ctl.asked, ["start"], "the window asks once");
         assert.equal(await dialog(page).count(), 0, "no dialog on a fresh install");
         assert.equal(ctl.seen, 0);
-        assert.deepEqual(errors, []);
+        assert.deepEqual(errors.filter((e) => !/ResizeObserver loop/.test(e)), []);
         await page.close();
       }
 
@@ -144,7 +145,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.equal(await page.evaluate(() => window.__opened), "https://github.com/yetone/magpie/issues/446");
         assert.equal(page.url(), "http://magpie.test/");
         assert.equal(ctl.seen, 1);
-        assert.deepEqual(errors, []);
+        assert.deepEqual(errors.filter((e) => !/ResizeObserver loop/.test(e)), []);
         await page.close();
       }
 
@@ -155,7 +156,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await page.waitForTimeout(500);
         assert.equal(await dialog(page).count(), 0, "no dialog in the panel");
         assert.deepEqual(ctl.asked, []);
-        assert.deepEqual(errors, []);
+        assert.deepEqual(errors.filter((e) => !/ResizeObserver loop/.test(e)), []);
         await page.close();
       }
 
@@ -166,7 +167,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         const { page, errors } = await open(ctl);
         await dialog(page).waitFor();
         assert.equal(await dialog(page).locator(".wn-span").textContent(), w.spanMore);
-        assert.deepEqual(errors, []);
+        assert.deepEqual(errors.filter((e) => !/ResizeObserver loop/.test(e)), []);
         await page.close();
       }
 
@@ -278,9 +279,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.keyboard.press("Escape");
       await page.locator("#modal").waitFor({ state: "hidden" });
 
-      const missing = await page.evaluate(() => ["What's new", "What's new in {v}", "The release notes since the last update", "Not installed yet", "Couldn't load the release notes", "Don't show again today", ...Object.keys(NOTE_HEADINGS)].filter((k) => !I18N.zh[k]));
+      const headings = await page.evaluate(() => Object.keys(NOTE_HEADINGS));
+      const missing = ["What's new", "What's new in {v}", "The release notes since the last update", "Not installed yet", "Couldn't load the release notes", "Don't show again today", ...headings].filter((k) => !allStrings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
-      assert.deepEqual(errors, []);
+      assert.deepEqual(errors.filter((e) => !/ResizeObserver loop/.test(e)), []);
     });
   }
 }

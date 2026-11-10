@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [
@@ -143,11 +144,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.waitForFunction((m) => document.querySelector("#status").textContent.includes(m), w.back);
       assert.equal(await at(), before, "no click moved the page");
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "1 found group removed", "{n} found groups removed", "magpie doesn't make them again. Click to bring one back.",
         "Pick several groups to remove together", "Select every group", "Pick the groups to remove", "These routing groups will no longer be available to agents.", "{n} groups removed",
         "Select", "Done", "{n} selected", "Bring it back",
-      ].filter((k) => !I18N.zh[k] || !I18N.ja[k] || !I18N.de[k]));
+      ].filter((k) => !allStrings().I18N.zh[k] || !allStrings().I18N.ja[k] || !allStrings().I18N.de[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese, Japanese and German");
       assert.deepEqual(errors, []);
     });
