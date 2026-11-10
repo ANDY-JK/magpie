@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const list = { input: 1.25, output: 10, cache_read: 0.125, cache_write: 0 };
@@ -135,8 +136,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         "model-2": { ownPrice: true },
         "model-3": { price: { input: 3, output: 15, cache_read: 0, cache_write: 0 } },
       });
-      const missing = await page.evaluate(() => ["Price, $ / 1M tokens", "{id} has no list price: give its input and output prices", "A price is a number of dollars, 0 or more"]
-        .filter((k) => !I18N.zh[k] || !I18N.ja[k] || !I18N.de[k]));
+      const missing = (() => ["Price, $ / 1M tokens", "{id} has no list price: give its input and output prices", "A price is a number of dollars, 0 or more"]
+        .filter((k) => !allStrings().I18N.zh[k] || !allStrings().I18N.ja[k] || !allStrings().I18N.de[k]))();
       assert.deepEqual(missing, []);
       assert.deepEqual(errors, []);
     });

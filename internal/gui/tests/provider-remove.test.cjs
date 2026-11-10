@@ -13,6 +13,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const prov = (id, name) => ({
@@ -126,7 +127,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.deepEqual(errors, []);
       });
 
-      const missing = await pages[0].evaluate(() => ["{agent} is still on {model}, which magpie no longer serves: {error}"].filter((k) => !I18N.zh[k]));
+      const missing = ["{agent} is still on {model}, which magpie no longer serves: {error}"].filter((k) => !allStrings().I18N.zh[k]);
       assert.deepEqual(missing, []);
     });
   }

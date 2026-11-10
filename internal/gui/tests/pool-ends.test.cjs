@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const codex = ({ capped = true, capStop = false, capCareful = false } = {}) => ({
@@ -94,7 +95,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
             "On: once every account in use is at its cap, requests get 429 instead of going to the fallbacks.",
             "On: an account within 5 points of its cap has its usage read again if older than 15s (any account: 5m) before a request, waiting up to 10s; one whose usage can't be read is held."];
           assert.deepEqual(strings, keys.slice(3));
-          const missing = await page.evaluate((ks) => ["zh", "zh-TW", "ja", "de"].flatMap((l) => ks.filter((k) => !I18N[l][k]).map((k) => `${l}: ${k}`)), keys);
+          const missing = ["zh", "zh-TW", "ja", "de"].flatMap((l) => keys.filter((k) => !allStrings().I18N[l][k]).map((k) => `${l}: ${k}`));
           assert.deepEqual(missing, [], "every string has its translations");
         }
         await ticks.nth(1).scrollIntoViewIfNeeded();

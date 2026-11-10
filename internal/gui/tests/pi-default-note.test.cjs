@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const piOptions = [
@@ -70,7 +71,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.route("**/*", server(lang));
       await page.goto("http://magpie.test/?view=agents");
       await page.locator(row("pi")).waitFor();
-      assert.ok(await page.evaluate(() => !!I18N.zh["clears the default model; {agent} picks one on its own"]), "the string has its Chinese");
+      assert.ok(allStrings().I18N.zh["clears the default model; {agent} picks one on its own"], "the string has its Chinese");
 
       const open = async (id) => {
         await page.locator(`${row(id)} .field[data-key="model"]`).click();

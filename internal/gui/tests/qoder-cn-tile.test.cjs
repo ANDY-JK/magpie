@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 
@@ -101,10 +102,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       for (let i = 0; i < 50 && !asked.length; i++) await page.waitForTimeout(50);
       assert.deepEqual(asked, [{ agent: "qoder-cn" }]);
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Qoder (international)", "Qoder CN", "For accounts on qoder.com, the international site.",
         "For accounts on qoder.cn: signed in with an Alibaba Cloud account or a phone number.",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

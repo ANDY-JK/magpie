@@ -16,6 +16,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const codex = ({ keepLogin = false, keepLoginAs = "", switchOnly = false, routing = "", spare = true } = {}) => ({
@@ -92,7 +93,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.ok(await keep.getAttribute("title"), "it says what it does");
       assert.equal(await keep.locator("input").isChecked(), false);
       assert.match(await page.locator(".editor").textContent(), w.moves);
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Keep {agent} signed in to",
         "the first account",
         "Account to stay signed in to",
@@ -106,7 +107,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         "magpie moves {agent} to an account with room again",
         "Routing picks the account for each request through magpie; {agent} on its own stays signed in to the first account, whatever it has left.",
         "Routing picks the account for each request through magpie; {agent} on its own uses the one it is signed in to, which magpie moves to the next ticked account with room once it is used up, and back to the first once that has room again.",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       const top = await page.evaluate(() => document.scrollingElement.scrollTop);
       await keep.locator("input").click();
@@ -192,7 +193,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.doesNotMatch(text, w.kept);
         assert.doesNotMatch(text, w.keptAs);
         assert.match(text, w.magpieMoves);
-        assert.equal(await page.evaluate(() => I18N.zh["{agent} signs in to the first. Tick more and magpie moves on to the next when the one before it is out of quota. Sessions already running keep theirs until restarted."] ? "" : "missing"), "");
+        assert.ok(allStrings().I18N.zh["{agent} signs in to the first. Tick more and magpie moves on to the next when the one before it is out of quota. Sessions already running keep theirs until restarted."]);
         assert.deepEqual(errors, []);
       });
     }

@@ -13,6 +13,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const fetched = new Date(Date.now() - 3600e3).toISOString();
@@ -134,7 +135,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert(saved, "nothing saved");
       assert.deepEqual([...saved.body.models].sort(), FREE);
 
-      const missing = await page.evaluate(() => ["Free only", "Pick only the free models (those the filter shows), unpicking the others"].filter((k) => !I18N.zh[k]));
+      const missing = ["Free only", "Pick only the free models (those the filter shows), unpicking the others"].filter((k) => !allStrings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });
