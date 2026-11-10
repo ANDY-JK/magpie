@@ -796,6 +796,7 @@ magpie.strings({
     "No subagent matches “{q}”.": "Kein Unteragent passt zu „{q}“.",
     "Save as files": "Als Dateien speichern",
     "Write the servers, hooks and subagents as files under the library's export folder, to read and copy": "Die Server, Hooks und Unteragenten als Dateien im export-Ordner der Bibliothek ablegen, zum Lesen und Kopieren",
+    "{n} entries written to {dir}; {changed} files edited by hand were written over": "{n} Einträge nach {dir} geschrieben; {changed} von Hand geänderte Dateien wurden überschrieben",
     "{n} entries written to {dir}": "{n} Einträge nach {dir} geschrieben",
     "Pick some subagents and turn them on or off together": "Unteragenten auswählen und zusammen ein- oder ausschalten",
     "Stop picking subagents": "Auswahl der Unteragenten beenden",

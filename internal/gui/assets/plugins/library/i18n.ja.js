@@ -796,6 +796,7 @@ magpie.strings({
     "No subagent matches “{q}”.": "「{q}」に一致するサブエージェントはありません。",
     "Save as files": "ファイルとして保存",
     "Write the servers, hooks and subagents as files under the library's export folder, to read and copy": "サーバー、フック、サブエージェントをライブラリの export フォルダーにファイルとして書き出し、閲覧とコピーのために残します",
+    "{n} entries written to {dir}; {changed} files edited by hand were written over": "{n} 件を {dir} に書き出しました。手で編集された {changed} 件のファイルは上書きされました",
     "{n} entries written to {dir}": "{n} 件を {dir} に書き出しました",
     "Pick some subagents and turn them on or off together": "サブエージェントを選んでまとめてオン・オフ",
     "Stop picking subagents": "サブエージェントの選択を終了",

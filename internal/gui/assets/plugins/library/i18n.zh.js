@@ -796,6 +796,7 @@ magpie.strings({
     "No subagent matches “{q}”.": "没有匹配「{q}」的子代理。",
     "Save as files": "另存为文件",
     "Write the servers, hooks and subagents as files under the library's export folder, to read and copy": "把服务器、钩子和子代理写成资源库 export 目录下的文件，便于查看和复制",
+    "{n} entries written to {dir}; {changed} files edited by hand were written over": "已把 {n} 项写入 {dir}；有 {changed} 个手工改过的文件被覆盖",
     "{n} entries written to {dir}": "已把 {n} 项写入 {dir}",
     "Pick some subagents and turn them on or off together": "选择一些子代理，一起打开或关闭",
     "Stop picking subagents": "停止选择子代理",

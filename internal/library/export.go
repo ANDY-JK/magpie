@@ -1,6 +1,7 @@
 package library
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,11 +13,12 @@ import (
 // one JSON for each MCP server, hook and subagent, and a README saying where
 // they come from. They are a mirror of library.json, written to be read and
 // copied — magpie never reads them back, so editing one changes nothing. It
-// answers the folder and how many entries it wrote.
-func ExportFiles() (string, int, error) {
+// answers the folder, how many entries it wrote, and how many files it wrote
+// over that had been changed by hand since the last export.
+func ExportFiles() (string, int, int, error) {
 	l, err := load()
 	if err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
 	return writeExport(l)
 }
@@ -28,47 +30,47 @@ func syncExport(l *Library) {
 	if _, err := os.Stat(filepath.Join(Dir(), "export")); err != nil {
 		return
 	}
-	_, _, _ = writeExport(l)
+	_, _, _, _ = writeExport(l)
 }
 
 // writeExport is ExportFiles for a library already read.
-func writeExport(l *Library) (string, int, error) {
+func writeExport(l *Library) (string, int, int, error) {
 	root := filepath.Join(Dir(), "export")
 	kinds := []struct {
 		dir string
-		do  func(string) error
+		do  func(string) (int, int, error)
 	}{
-		{"mcp", func(dir string) error { return exportEach(dir, l.MCP) }},
-		{"hooks", func(dir string) error { return exportEach(dir, l.Hooks) }},
-		{"subagents", func(dir string) error { return exportEach(dir, l.Subagents) }},
+		{"mcp", func(dir string) (int, int, error) { return exportEach(dir, l.MCP) }},
+		{"hooks", func(dir string) (int, int, error) { return exportEach(dir, l.Hooks) }},
+		{"subagents", func(dir string) (int, int, error) { return exportEach(dir, l.Subagents) }},
 	}
-	n := 0
+	n, changed := 0, 0
 	for _, k := range kinds {
 		dir := filepath.Join(root, k.dir)
-		// a mirror, not a collection: what the library no longer has goes
-		if err := os.RemoveAll(dir); err != nil {
-			return "", 0, err
-		}
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return "", 0, err
+			return "", 0, 0, err
 		}
-		if err := k.do(dir); err != nil {
-			return "", 0, err
+		w, c, err := k.do(dir)
+		if err != nil {
+			return "", 0, 0, err
 		}
-		n += count(dir)
+		n, changed = n+w, changed+c
 	}
 	readme := "These files are a mirror of magpie's library.json, written for reading and copying.\n" +
 		"magpie never reads them back: editing one changes nothing. Use the Library page instead.\n"
 	if err := os.WriteFile(filepath.Join(root, "README.txt"), []byte(readme), 0o644); err != nil {
-		return "", 0, err
+		return "", 0, 0, err
 	}
-	return root, n, nil
+	return root, n, changed, nil
 }
 
 // exportEach writes one JSON file for each named entry, under a name a file
-// can take: two names that come to the same file are kept apart.
-func exportEach[T any](dir string, items []*T) error {
+// can take: two names that come to the same file are kept apart. It answers
+// how many it wrote and how many it wrote over that had been changed by hand;
+// a file the library no longer has is removed.
+func exportEach[T any](dir string, items []*T) (int, int, error) {
 	used := map[string]bool{}
+	n, changed := 0, 0
 	for _, it := range items {
 		name, body := nameAndJSON(it)
 		if name == "" {
@@ -78,12 +80,28 @@ func exportEach[T any](dir string, items []*T) error {
 		for i := 2; used[base]; i++ {
 			base = fmt.Sprintf("%s~%d", exportName(name), i)
 		}
-		used[base] = true
-		if err := os.WriteFile(filepath.Join(dir, base+".json"), body, 0o644); err != nil {
-			return err
+		used[base+".json"] = true
+		p := filepath.Join(dir, base+".json")
+		if old, err := os.ReadFile(p); err == nil && !bytes.Equal(old, body) {
+			changed++
+		}
+		if err := os.WriteFile(p, body, 0o644); err != nil {
+			return n, changed, err
+		}
+		n++
+	}
+	es, err := os.ReadDir(dir)
+	if err != nil {
+		return n, changed, err
+	}
+	for _, e := range es {
+		if !e.IsDir() && !used[e.Name()] {
+			if err := os.Remove(filepath.Join(dir, e.Name())); err != nil {
+				return n, changed, err
+			}
 		}
 	}
-	return nil
+	return n, changed, nil
 }
 
 // nameAndJSON is an entry's name and its JSON, indented.
@@ -115,19 +133,4 @@ func exportName(name string) string {
 		s = "unnamed"
 	}
 	return s
-}
-
-// count is how many files dir holds.
-func count(dir string) int {
-	es, err := os.ReadDir(dir)
-	if err != nil {
-		return 0
-	}
-	n := 0
-	for _, e := range es {
-		if !e.IsDir() {
-			n++
-		}
-	}
-	return n
 }

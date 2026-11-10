@@ -330,12 +330,12 @@ func libraryRoutes(mux *http.ServeMux, w Windows) {
 	})
 	mux.HandleFunc("POST /api/library/export", func(rw http.ResponseWriter, r *http.Request) {
 		// the library as files, to read and copy: a mirror of library.json
-		dir, n, err := library.ExportFiles()
+		dir, n, changed, err := library.ExportFiles()
 		if err != nil {
 			fail(rw, err)
 			return
 		}
-		writeJSON(rw, map[string]any{"dir": dir, "files": n})
+		writeJSON(rw, map[string]any{"dir": dir, "files": n, "changed": changed})
 	})
 	mux.HandleFunc("POST /api/library/reveal", func(rw http.ResponseWriter, r *http.Request) {
 		var in struct{ Path string }

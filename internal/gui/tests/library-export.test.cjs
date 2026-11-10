@@ -33,7 +33,9 @@ function server(lang, posts) {
     if (url.pathname === "/api/library") return json(lib);
     if (url.pathname === "/api/library/export" && req.method() === "POST") {
       posts.push("export");
-      return json({ dir: `${HOME}/.magpie/library/export`, files: 3 });
+      // the second export finds one file edited by hand
+      const changed = posts.filter((x) => x === "export").length > 1 ? 1 : 0;
+      return json({ dir: `${HOME}/.magpie/library/export`, files: 3, changed });
     }
     if (url.pathname === "/api/library/reveal" && req.method() === "POST") {
       posts.push("reveal");
@@ -46,8 +48,8 @@ function server(lang, posts) {
   };
 }
 const L = {
-  en: { btn: "Save as files", said: "3 entries written to ~/.magpie/library/export" },
-  zh: { btn: "另存为文件", said: "已把 3 项写入 ~/.magpie/library/export" },
+  en: { btn: "Save as files", said: "3 entries written to ~/.magpie/library/export", over: "3 entries written to ~/.magpie/library/export; 1 files edited by hand were written over" },
+  zh: { btn: "另存为文件", said: "已把 3 项写入 ~/.magpie/library/export", over: "已把 3 项写入 ~/.magpie/library/export；有 1 个手工改过的文件被覆盖" },
 };
 const KEYS = ["Save as files", "Write the servers, hooks and subagents as files under the library's export folder, to read and copy", "{n} entries written to {dir}"];
 
@@ -72,6 +74,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await save.click();
       await page.waitForFunction((said) => document.querySelector("#status")?.textContent === said, w.said);
       assert.deepEqual(posts, ["export", "reveal"], "written, then opened");
+      // a second export says what it wrote over
+      await save.click();
+      await page.waitForFunction((said) => document.querySelector("#status")?.textContent === said, w.over);
+      assert.deepEqual(posts, ["export", "reveal", "export", "reveal"]);
       const missing = KEYS.filter((k) => !strings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every word has its Chinese");
       assert.deepEqual(errors, []);

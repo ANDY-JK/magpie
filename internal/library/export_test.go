@@ -24,7 +24,7 @@ func TestExportFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dir, n, err := ExportFiles()
+	dir, n, _, err := ExportFiles()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestExportFiles(t *testing.T) {
 	if _, err := RemoveServer("github"); err != nil {
 		t.Fatal(err)
 	}
-	dir, n, err = ExportFiles()
+	dir, n, _, err = ExportFiles()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestExportStaysCurrent(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(Dir(), "export")); !os.IsNotExist(err) {
 		t.Fatalf("an export folder appeared without being asked for: %v", err)
 	}
-	dir, _, err := ExportFiles()
+	dir, _, _, err := ExportFiles()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,5 +105,35 @@ func TestExportStaysCurrent(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "mcp", "one.json")); !os.IsNotExist(err) {
 		t.Fatalf("the removed server stayed: %v", err)
+	}
+}
+
+// An export says how many files it wrote over that had been changed by hand,
+// and writes the library's JSON over them.
+func TestExportSaysWhatItOverwrote(t *testing.T) {
+	sandbox(t)
+	if _, err := SaveServer("", Server{Name: "one", Transport: "http", URL: "https://example.com/mcp", Agents: []string{"claude"}}); err != nil {
+		t.Fatal(err)
+	}
+	dir, _, changed, err := ExportFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed != 0 {
+		t.Fatalf("a first export wrote over %d files", changed)
+	}
+	p := filepath.Join(dir, "mcp", "one.json")
+	if err := os.WriteFile(p, []byte("edited by hand\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, changed, err = ExportFiles(); err != nil {
+		t.Fatal(err)
+	}
+	if changed != 1 {
+		t.Fatalf("%d files written over, want 1", changed)
+	}
+	b, err := os.ReadFile(p)
+	if err != nil || !strings.Contains(string(b), "\"name\": \"one\"") {
+		t.Fatalf("the mirror wasn't written back: %v %q", err, b)
 	}
 }

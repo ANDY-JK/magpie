@@ -824,7 +824,9 @@ magpie.plugin("library", (ctx) => {
       exp.disabled = true;
       try {
         const v = await api("library/export", {});
-        status(t("{n} entries written to {dir}", { n: v.files, dir: tilde(v.dir) }), "ok", 6000);
+        const dir = tilde(v.dir);
+        if (v.changed) status(t("{n} entries written to {dir}; {changed} files edited by hand were written over", { n: v.files, dir, changed: v.changed }), "warn", 8000);
+        else status(t("{n} entries written to {dir}", { n: v.files, dir }), "ok", 6000);
         reveal(v.dir);
       } catch (e) {
         status(e.message, "err");
