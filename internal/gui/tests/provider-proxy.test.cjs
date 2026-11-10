@@ -10,6 +10,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 // the editor folds what few need under Advanced, this field among them:
@@ -137,12 +138,12 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       saved = await save(page, posts);
       assert.equal(saved.body.proxy, "");
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Proxy", "Global proxy", "Direct", "Custom", "Follows the proxy in Settings",
         "Requests to it go direct, whatever the proxy in Settings",
         "Requests to it go through this proxy: http://, https:// or socks5://",
         "Proxy: type its address, like http://127.0.0.1:7890",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

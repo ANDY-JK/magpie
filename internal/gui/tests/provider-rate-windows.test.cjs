@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 // the editor folds what few need under Advanced, this field among them:
@@ -97,16 +98,17 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
 
     test(`${engine} ${lang} ${width}: rate windows are added, saved and refused when wrong`, async (t) => {
       const { page, errors, posts } = await open(t, "Relay");
-      const zh = await page.evaluate(() => ({
-        label: I18N.zh["Rate windows"], add: I18N.zh["Add a window"],
-        hint: I18N.zh["Inside a window a call costs the official price times its rate, on top of the price rate; outside every window the price rate alone counts. The first window that holds a call wins. Times are on the clock of the computer magpie runs on, and 22:00–6:00 crosses midnight. No day ticked is every day. A price you set for a model is scaled by the window too. Changing the windows prices the calls already counted again, as a changed price rate does."],
-        bad: I18N.zh["Rate windows: every window is days, a time like 09:00, another time for it to end, and a rate from 0 to 1000 with at most three decimals"],
-      }));
+      const I = allStrings().I18N;
+      const zh = ({
+        label: I.zh["Rate windows"], add: I.zh["Add a window"],
+        hint: I.zh["Inside a window a call costs the official price times its rate, on top of the price rate; outside every window the price rate alone counts. The first window that holds a call wins. Times are on the clock of the computer magpie runs on, and 22:00–6:00 crosses midnight. No day ticked is every day. A price you set for a model is scaled by the window too. Changing the windows prices the calls already counted again, as a changed price rate does."],
+        bad: I.zh["Rate windows: every window is days, a time like 09:00, another time for it to end, and a rate from 0 to 1000 with at most three decimals"],
+      });
       assert(zh.label && zh.add && zh.hint && zh.bad, "every string has its Chinese");
       // the vendors whose list price has its peak already are named under
       // the windows, in the page's own language
       const peak = "DeepSeek's own API, Command Code, OpenCode Go and Ollama Cloud already count their DeepSeek models' peak hours at double: don't add those hours as a window, or they count twice.";
-      const peakText = await page.evaluate(([lang, k]) => lang === "en" ? k : I18N[lang]?.[k], [lang, peak]);
+      const peakText = lang === "en" ? peak : I[lang]?.[peak];
       assert(peakText, "the peak note has its " + lang);
       assert((await page.locator(".editor .rate-windows + .hint").innerText()).includes(peakText.trim()), "the peak note is shown");
       assert.equal(await page.locator(".editor .rate-win").count(), 0, "none set");

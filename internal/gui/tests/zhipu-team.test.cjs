@@ -10,6 +10,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const zhipu = {
@@ -137,11 +138,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       saved = await press(page, posts, w.save);
       assert.deepEqual(saved.body.zhipuTeam, {});
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Team org ID", "Team project ID", "optional · only for a team plan",
         "Only for a key on a team's GLM Coding Plan: both are in {p}'s console, under the team's organization and project. With them the Usage page shows the team's 5-hour and weekly windows.",
         "Team plan: give both the organization ID and the project ID",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       const border = await page.evaluate(() => [...document.querySelectorAll(".editor, .editor *")].map((e) => getComputedStyle(e).borderLeftWidth).filter((b) => parseFloat(b) > 1));
       assert.deepEqual(border, [], "no border stripes");
@@ -172,7 +173,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // the sheet is still open under it
       await sheet.locator('.tile[data-pick="Z.ai"]').click();
       await org(page).waitFor();
-      await page.locator(".editor.new input[type=password]").fill("zk-1");
+      await page.locator(".editor.new input[type=password]:not(.proxy-credential)").fill("zk-1");
       await click(page, org(page));
       await org(page).fill("org-9");
       await proj(page).fill(" proj-9 ");

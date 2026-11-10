@@ -10,6 +10,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 // the editor folds what few need under Advanced, this field among them:
@@ -138,12 +139,12 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert(Object.hasOwn(saved.body, "maxConcurrency"), "an empty field is saved as none, not left out");
       assert.equal(saved.body.maxConcurrency, null);
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Concurrency", "No limit", "{n}, as its plugin says",
         "Over it, requests queue and go out in order; 0 or empty is no limit",
         "Over it, requests queue and go out in order; empty takes the plugin's {n}, 0 is no limit",
         "Concurrency: a whole number from 0 to 1000",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       // a left border thicker or another colour than the right one is a stripe
       const stripes = await page.evaluate(() => [...document.querySelectorAll(".editor input.concurrency, .editor input.concurrency ~ *")].map((e) => getComputedStyle(e)).filter((s) => parseFloat(s.borderLeftWidth) > parseFloat(s.borderRightWidth) || (parseFloat(s.borderLeftWidth) > 0 && s.borderLeftColor !== s.borderRightColor)).length);

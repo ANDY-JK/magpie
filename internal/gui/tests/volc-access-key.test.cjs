@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const ark = {
@@ -136,7 +137,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(saved.body.clearAccessKey, true);
       assert(!("secretAccessKey" in saved.body));
 
-      const missing = await page.evaluate((keys) => Object.fromEntries(["zh", "zh-TW", "ja", "de"].map((l) => [l, keys.filter((k) => !I18N[l][k])])), strings);
+      const I = allStrings().I18N;
+      const missing = Object.fromEntries(["zh", "zh-TW", "ja", "de"].map((l) => [l, strings.filter((k) => !I[l][k])]));
       assert.deepEqual(missing, { zh: [], "zh-TW": [], ja: [], de: [] }, "every string in every language");
       const border = await page.evaluate(() => [...document.querySelectorAll(".editor, .editor *")].map((e) => getComputedStyle(e).borderLeftWidth).filter((b) => parseFloat(b) > 1));
       assert.deepEqual(border, [], "no border stripes");
