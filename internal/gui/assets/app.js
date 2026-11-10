@@ -5295,6 +5295,24 @@ function contextTag(n, name) {
   return tag;
 }
 
+// modelFacts is what is known of a provider's model besides its name, for
+// the hover of its chip in the editor: the window agents are told, the reply
+// limit, where Codex and Claude Code compact on it, whether it sees images
+// and the reasoning levels it has (the owner, 11-10). The window and the
+// limit are the ones agents get, the user's setting over its vendor's.
+function modelFacts(p, m) {
+  const size = (n) => contextsText({ "*": n }).toUpperCase();
+  const out = [];
+  if (m.context) out.push(t("Context: {n} tokens", { n: m.context.toLocaleString(intlLang()) }));
+  if (m.output) out.push(t("Output: up to {n} tokens", { n: m.output.toLocaleString(intlLang()) }));
+  const compact = p.compacts?.[m.id] ?? p.compacts?.["*"] ?? (state.settings?.compactAt || 0);
+  out.push(compact ? t("Compact at {n}", { n: size(compact) }) : t("Compact at: follows Long conversations"));
+  out.push(t(m.images ? "Accepts images" : "Text only"));
+  const levels = m.efforts || [];
+  out.push(levels.length ? t("Reasoning: {levels}", { levels: levels.map((l) => t(l)).join(", ") }) : t("Reasoning levels: none known"));
+  return out;
+}
+
 // pathTag: magpie or the vendor direct, by a picker's model (#834)
 function pathTag(o) {
   if (!pick?.agent || o.custom || o.run) return null;
@@ -11231,6 +11249,11 @@ function renderModels(p) {
       if (load) c.append(load);
       const ctx = contextTag(m.context, m.name);
       if (ctx) c.append(ctx);
+      // what else is known of it — its reply limit, where it compacts, images
+      // and reasoning — in the chip's hover, one line each (the owner, 11-10:
+      // 上下文、最大输出、压缩阈值、并发上限等等能获取到的信息)
+      const facts = modelFacts(p, m);
+      if (facts.length) c.title = (c.title || m.id) + "\n" + facts.join("\n");
       // the number Claude Desktop's menu says beside this model (#2578)
       if (m.desktop) {
         const d = el("span", "badge ctx", m.desktop);

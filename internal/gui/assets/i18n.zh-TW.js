@@ -1179,6 +1179,7 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "Codex in WSL": "WSL 裡的 Codex",
     "Codex, Claude Code and Grok Build compact at 272K (non-Claude [1m] too) or the size typed, on magpie's models only; a subscription's own models keep their own window and compaction; full window: slower, costlier": "Codex、Claude Code 和 Grok Build 在 272K（非 Claude 的 [1m] 模型也是）或這裡填的大小時壓縮，只作用於 magpie 的模型；訂閱自帶的模型保留自己的視窗和壓縮行為；完整視窗每輪更慢更貴",
     "Compact at {n}": "{n} 時壓縮",
+    "Compact at: follows Long conversations": "壓縮閾值：跟隨「長對話」設定",
     "Codex thread titles": "Codex 會話標題",
     "as Codex sends them when the session is on Codex’s own model": "工作階段在 Codex 自帶模型上時按 Codex 原樣傳送",
     "Codex auto-review model": "Codex 自動審批模型",

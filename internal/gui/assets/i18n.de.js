@@ -1166,6 +1166,7 @@ I18N.de = Object.assign(I18N.de || {}, {
     "Codex in WSL": "Codex in WSL",
     "Codex, Claude Code and Grok Build compact at 272K (non-Claude [1m] too) or the size typed, on magpie's models only; a subscription's own models keep their own window and compaction; full window: slower, costlier": "Codex/Claude Code/Grok Build komprimieren bei 272K (auch [1m] außer Claude) oder hier, nur für magpie-Modelle; Modelle eines Abos behalten ihr eigenes Fenster und ihre eigene Komprimierung; volles Fenster: teurer",
     "Compact at {n}": "Bei {n} komprimieren",
+    "Compact at: follows Long conversations": "Komprimieren ab: folgt „Lange Gespräche“",
     "Codex thread titles": "Codex-Thread-Titel",
     "Codex thread descriptions": "Codex-Thread-Beschreibungen",
     "Codex composer predictions": "Codex-Eingabevorhersagen",
