@@ -63,7 +63,6 @@ magpie.strings({
     "{name}: {routing}": "{name}：{routing}",
     "How {name} routes: click to change it": "{name} 的路由方式：点击更改",
     "{n} available": "{n} 个可用",
-    "{n} resting": "{n} 个休息中",
     "{n} held": "{n} 个暂不使用",
     "Show each key": "展开每个密钥",
     "Fold these keys into one row": "把这些密钥合并成一行",

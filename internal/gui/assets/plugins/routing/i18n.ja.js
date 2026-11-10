@@ -61,7 +61,6 @@ magpie.strings({
     "{name}: {routing}": "{name}：{routing}",
     "How {name} routes: click to change it": "{name} のルーティング方法：クリックで変更",
     "{n} available": "{n} 個が利用可能",
-    "{n} resting": "{n} 個が休止中",
     "{n} held": "{n} 個が停止中",
     "Show each key": "キーを個別に表示",
     "Fold these keys into one row": "これらのキーを 1 行にまとめる",

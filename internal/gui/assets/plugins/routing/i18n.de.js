@@ -61,7 +61,6 @@ magpie.strings({
     "{name}: {routing}": "{name}: {routing}",
     "How {name} routes: click to change it": "Wie {name} weiterleitet: zum Ändern klicken",
     "{n} available": "{n} verfügbar",
-    "{n} resting": "{n} pausiert",
     "{n} held": "{n} angehalten",
     "Show each key": "Jeden Schlüssel zeigen",
     "Fold these keys into one row": "Diese Schlüssel in einer Zeile zusammenfassen",

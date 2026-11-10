@@ -73,7 +73,6 @@ magpie.strings({
     "{name}: {routing}": "{name}：{routing}",
     "How {name} routes: click to change it": "{name} 的路由方式：點擊更改",
     "{n} available": "{n} 個可用",
-    "{n} resting": "{n} 個休息中",
     "{n} held": "{n} 個暫不使用",
     "Show each key": "展開每個金鑰",
     "Fold these keys into one row": "把這些金鑰合併成一列",
