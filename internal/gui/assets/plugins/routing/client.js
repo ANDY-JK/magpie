@@ -3379,12 +3379,12 @@ function routingPage(part) {
     if (purposeOf(tagKind(r)) === "kind:collab_spawn") return r.group
       ? t("{agent} requested a subagent; magpie selects its model within this routing group.", { agent })
       : t("{agent} requested a subagent on {model}.", { agent, model: r.model });
-    if (purposeOf(r.kind) === "kind:ambient_suggestions") return t("{agent} drafted the suggested prompts on its home page by itself, in the background. Codex's Settings › Configuration › Suggested prompts turns it off.", { agent }) + notTurn;
-    if (purposeOf(r.kind) === "kind:composer_predictions") return t("{agent} guessed your next message for its composer by itself. Codex composer predictions picks its model under Settings in Codex's row on the Agents page; Codex's Settings › General › Show predictions turns it off.", { agent }) + notTurn;
+    if (purposeOf(r.kind) === "kind:ambient_suggestions") return t("{agent} drafted its home page's suggested prompts in the background. Turn it off in Codex's Settings › Configuration › Suggested prompts.", { agent }) + notTurn;
+    if (purposeOf(r.kind) === "kind:composer_predictions") return t("{agent} guessed your next message for its composer. Its model is Codex composer predictions on the Agents page; turn predictions off in Codex's Settings › General.", { agent }) + notTurn;
     // Claude Desktop's check that magpie answers names its model itself
     // (cybercaius on Discord: "Desktop requested deepseek-flash" while
     // the chat was on another model)
-    if (r.kind === "connection_check") return t("{agent} checked that magpie answers. It names this check's model itself, from the names in its model list ({model}), not the model chosen in the conversation; magpie sends it to the model chosen in {agent}'s model menu, or to its first listed one when none is.", { agent, model: r.model }) + notTurn;
+    if (r.kind === "connection_check") return t("{agent} checked that magpie answers, naming this check's model from its list ({model}); magpie sends it to the model chosen in {agent}'s menu, or its first.", { agent, model: r.model }) + notTurn;
     if (r.kind === "luna_reserve") return t("{agent} sent this turn on Luna Reserve, which it turns to once the plan's own allowance is used up; it picks the model itself.", { agent });
     // the searcher asked first failed or found nothing, and this one
     // searched in its place: say which and why, not just who searched
