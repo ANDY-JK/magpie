@@ -3019,9 +3019,18 @@ magpie.plugin("library", (ctx) => {
         rh.append(removeEveryButton("hooks"));
         body.append(rh);
       }
+      // a filter, as the skills have, once the list is long enough to need one
       const list = el("div", "list lib-list");
-      list.append(...[...hooks].sort((a, b) => a.name.localeCompare(b.name)).map((h) => hookRow(h, all)));
+      const drawHooks = () => {
+        const q = hookQuery.trim().toLowerCase();
+        const rows = [...hooks].sort((a, b) => a.name.localeCompare(b.name))
+          .filter((h) => !q || (h.name + " " + h.description + " " + hookLine(h)).toLowerCase().includes(q));
+        list.replaceChildren(...rows.map((h) => hookRow(h, all)));
+        if (!rows.length && q) list.append(el("div", "list lib-none", t("No hook matches “{q}”.", { q: hookQuery.trim() })));
+      };
+      if (hooks.length > 6) body.append(listFilter(t("Filter {n} hooks…", { n: hooks.length }), hookQuery, (v) => { hookQuery = v; drawHooks(); }));
       body.append(list);
+      drawHooks();
       if (picking) body.append(pickBar(all));
       const after = el("div", "after-list");
       after.append(button(t("＋ Add hook"), "", () => editHook(null)));
@@ -3233,9 +3242,18 @@ magpie.plugin("library", (ctx) => {
         rh.append(removeEveryButton("subagents"));
         body.append(rh);
       }
+      // a filter, as the skills have, once the list is long enough to need one
       const list = el("div", "list lib-list");
-      list.append(...[...subs].sort((a, b) => a.name.localeCompare(b.name)).map((s) => subagentRow(s, all)));
+      const drawSubs = () => {
+        const q = subQuery.trim().toLowerCase();
+        const rows = [...subs].sort((a, b) => a.name.localeCompare(b.name))
+          .filter((s) => !q || (s.name + " " + s.description + " " + subagentLine(s)).toLowerCase().includes(q));
+        list.replaceChildren(...rows.map((s) => subagentRow(s, all)));
+        if (!rows.length && q) list.append(el("div", "list lib-none", t("No subagent matches “{q}”.", { q: subQuery.trim() })));
+      };
+      if (subs.length > 6) body.append(listFilter(t("Filter {n} subagents…", { n: subs.length }), subQuery, (v) => { subQuery = v; drawSubs(); }));
       body.append(list);
+      drawSubs();
       if (picking) body.append(pickBar(all));
       const after = el("div", "after-list");
       after.append(button(t("＋ Add subagent"), "", () => editSubagent(null)));
@@ -3573,6 +3591,8 @@ magpie.plugin("library", (ctx) => {
   const foundPicked = new Set();
   const foundErrs = new Map();
   let skillQuery = "";         // what the filter over the skills holds
+  let hookQuery = "";          // and over the hooks, once there are many
+  let subQuery = "";           // and over the subagents
   let skillTimer = 0;          // the filter's redraw, waiting for typing to pause
   const unfiltered = new Set(); // groups folded while filtering, till the filter changes
   let folds = {};              // group → true when folded, false when opened by hand
@@ -3734,8 +3754,24 @@ magpie.plugin("library", (ctx) => {
     return parts.length > 1 ? parts.sort(order) : null;
   }
 
-  function skillFilter(box, all) {
-    const f = el("input", "lib-filter lib-skillq");
+  // one filter input for a list of rows: what is typed is handed to apply,
+  // Escape clears it, and typing never reaches the page's own keys
+  function listFilter(placeholder, value, apply) {
+    const f = el("input", "lib-filter");
+    f.type = "search";
+    f.placeholder = placeholder;
+    f.value = value;
+    f.spellcheck = false;
+    f.autocomplete = "off";
+    f.oninput = () => apply(f.value);
+    f.onkeydown = (e) => {
+      e.stopPropagation();
+      if (e.key === "Escape" && f.value) { e.preventDefault(); f.value = ""; apply(""); }
+    };
+    return f;
+  }
+
+  function skillFilter(box, all) {    const f = el("input", "lib-filter lib-skillq");
     f.type = "search";
     f.dataset.lib = "skillq";
     f.placeholder = t("Filter {n} skills…", { n: lib.skills.length });
