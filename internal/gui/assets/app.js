@@ -5069,7 +5069,11 @@ function filter(keep) {
   let source = pick.options;
   if (pick.modelPicker && pick.groupFilter === "favorites") source = source.filter((o) => isFavorite(o));
   else if (pick.modelPicker && pick.groupFilter !== "all") source = source.filter((o) => (o.group || o.home) === pick.groupFilter || o.reset);
-  const scored = source.map((o) => ({ o, i: pick.options.indexOf(o), s: score(q, o) })).filter((x) => x.s > 0);
+  // where each option stands, once: indexOf per option was O(n²) on every
+  // keystroke of a long model list
+  let order = pick.order;
+  if (!order || order.size !== pick.options.length) order = pick.order = new Map(pick.options.map((o, i) => [o, i]));
+  const scored = source.map((o) => ({ o, i: order.get(o) ?? 0, s: score(q, o) })).filter((x) => x.s > 0);
   // with a query, best matches first; without, catalog order keeps the groups together
   // (and a model several providers serve, found by its name, fastest
   // first: modelSpeeds, axuhere on X)
