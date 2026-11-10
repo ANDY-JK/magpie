@@ -337,6 +337,19 @@ func libraryRoutes(mux *http.ServeMux, w Windows) {
 		}
 		writeJSON(rw, map[string]any{"dir": dir, "files": n, "changed": changed})
 	})
+	mux.HandleFunc("POST /api/library/import", func(rw http.ResponseWriter, r *http.Request) {
+		// the export folder read back: a dry run says what would change
+		var in struct {
+			Apply bool `json:"apply"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		rep, err := library.ImportFiles(in.Apply)
+		if err != nil {
+			fail(rw, err)
+			return
+		}
+		writeJSON(rw, rep)
+	})
 	mux.HandleFunc("POST /api/library/reveal", func(rw http.ResponseWriter, r *http.Request) {
 		var in struct{ Path string }
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil || in.Path == "" {

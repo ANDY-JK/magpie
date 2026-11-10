@@ -836,7 +836,29 @@ magpie.plugin("library", (ctx) => {
     exp.append(glyph(GLYPH.doc, "lib-mini"), el("span", "", t("Save as files")));
     exp.setAttribute("aria-label", t("Save as files"));
     exp.title = t("Write the servers, hooks and subagents as files under the library's export folder, to read and copy");
-    acts.append(more, back, exp);
+    // the export folder read back: what was edited by hand updates its entry
+    const imp = button("", "lib-import", async () => {
+      imp.disabled = true;
+      try {
+        const rep = await api("library/import", { apply: false });
+        if (rep.problems?.length) { status(t("Not loaded: {why}", { why: rep.problems[0] }), "err", 8000); return; }
+        if (!rep.adds && !rep.updates) { status(t("The files match the library"), "ok", 4000); return; }
+        if (!(await confirmAction(t("Load the files into the library?"),
+          t("{adds} added, {updates} updated from the export folder.", { adds: rep.adds, updates: rep.updates }), t("Load")))) return;
+        const done = await api("library/import", { apply: true });
+        if (done.problems?.length) { status(t("Not loaded: {why}", { why: done.problems[0] }), "err", 8000); return; }
+        take(await api("library"));
+        render();
+        status(t("{adds} added, {updates} updated", { adds: done.adds, updates: done.updates }), "ok", 6000);
+      } catch (e) {
+        status(e.message, "err");
+      }
+      imp.disabled = false;
+    });
+    imp.append(glyph(GLYPH.up, "lib-mini"), el("span", "", t("Load from files")));
+    imp.setAttribute("aria-label", t("Load from files"));
+    imp.title = t("Read the export folder back into the library: files changed by hand update their entries, new ones are added; nothing in the library is removed");
+    acts.append(more, back, exp, imp);
     head.append(acts);
     return head;
   }
