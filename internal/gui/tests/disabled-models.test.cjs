@@ -16,7 +16,7 @@ const { watchSettingsReads, settingsDrawn, reach } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const words = {
-  en: { head: "Disabled models", name: "Disable a model", add: "Disable…", enable: "Enable", scope: "Only requests through magpie are covered", hits: "Matches 1: anthropic/claude-fable-5" },
+  en: { head: "Disabled models", name: "Disable a model", add: "Disable…", enable: "Enable", scope: "Only magpie's requests are covered", hits: "Matches 1: anthropic/claude-fable-5" },
   zh: { head: "已停用的模型", name: "停用模型", add: "停用…", enable: "启用", scope: "只管经过 magpie 的请求", hits: "匹配 1 个：anthropic/claude-fable-5" },
   ja: { head: "無効にしたモデル", name: "モデルを無効にする", add: "無効にする…", enable: "有効にする", scope: "対象は magpie を通るリクエストだけです", hits: "1 件に一致：anthropic/claude-fable-5" },
   de: { head: "Deaktivierte Modelle", name: "Modell deaktivieren", add: "Deaktivieren …", enable: "Aktivieren", scope: "Nur Anfragen über magpie sind abgedeckt", hits: "Passt auf 1: anthropic/claude-fable-5" },

@@ -22066,7 +22066,7 @@ function renderDisabledModels(s) {
   add.id = "disabledAddRow";
   const who = el("div", "who");
   who.append(el("div", "name", t("Disable a model")),
-    el("div", "sub wraps", t("A disabled model is refused on every route through magpie (a request, a session, a routing group, a fallback, a sub-agent, a decision model) and left out of magpie's lists and agents' pickers. Only requests through magpie are covered. Type a pattern such as *fable* to disable every model it matches")));
+    el("div", "sub wraps", t("A disabled model is refused on every route through magpie and left out of its lists and agents' pickers. Only magpie's requests are covered. Type a pattern such as *fable* to disable every match")));
   const val = el("div", "val");
   const b = el("button", "text action", t("Disable…"));
   b.type = "button";

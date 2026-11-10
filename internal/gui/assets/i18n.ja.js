@@ -367,7 +367,7 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "Never ask again": "聞き直さない",
     "Disabled models": "無効にしたモデル",
     "Disable a model": "モデルを無効にする",
-    "A disabled model is refused on every route through magpie (a request, a session, a routing group, a fallback, a sub-agent, a decision model) and left out of magpie's lists and agents' pickers. Only requests through magpie are covered. Type a pattern such as *fable* to disable every model it matches": "無効にしたモデルは magpie を通るすべての経路（直接のリクエスト、セッション、ルーティンググループ、フォールバック、サブエージェント、判定モデル）で拒否され、magpie の一覧やエージェントのモデル選択にも出ません。対象は magpie を通るリクエストだけです。*fable* のようなパターンを入力すると、一致するすべてのモデルを無効にできます",
+    "A disabled model is refused on every route through magpie and left out of its lists and agents' pickers. Only magpie's requests are covered. Type a pattern such as *fable* to disable every match": "無効にしたモデルは magpie を通るすべての経路（直接のリクエスト、セッション、ルーティンググループ、フォールバック、サブエージェント、判定モデル）で拒否され、magpie の一覧やエージェントのモデル選択にも出ません。対象は magpie を通るリクエストだけです。*fable* のようなパターンを入力すると、一致するすべてのモデルを無効にできます",
     "Disable…": "無効にする…",
     "Matches {n}: {list}": "{n} 件に一致：{list}",
     "Matches no model now; it is refused if one appears": "今は一致するモデルがありません。現れたときも拒否されます",

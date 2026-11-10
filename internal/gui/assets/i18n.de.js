@@ -367,7 +367,7 @@ I18N.de = Object.assign(I18N.de || {}, {
     "Never ask again": "Nie",
     "Disabled models": "Deaktivierte Modelle",
     "Disable a model": "Modell deaktivieren",
-    "A disabled model is refused on every route through magpie (a request, a session, a routing group, a fallback, a sub-agent, a decision model) and left out of magpie's lists and agents' pickers. Only requests through magpie are covered. Type a pattern such as *fable* to disable every model it matches": "Ein deaktiviertes Modell wird auf jedem Weg durch magpie abgelehnt (Anfrage, Sitzung, Routing-Gruppe, Fallback, Sub-Agent, Entscheidungsmodell) und fehlt in magpies Listen und den Modellauswahlen der Agenten. Nur Anfragen über magpie sind abgedeckt. Ein Muster wie *fable* deaktiviert jedes passende Modell",
+    "A disabled model is refused on every route through magpie and left out of its lists and agents' pickers. Only magpie's requests are covered. Type a pattern such as *fable* to disable every match": "Ein deaktiviertes Modell wird auf jedem Weg durch magpie abgelehnt (Anfrage, Sitzung, Routing-Gruppe, Fallback, Sub-Agent, Entscheidungsmodell) und fehlt in magpies Listen und den Modellauswahlen der Agenten. Nur Anfragen über magpie sind abgedeckt. Ein Muster wie *fable* deaktiviert jedes passende Modell",
     "Disable…": "Deaktivieren …",
     "Matches {n}: {list}": "Passt auf {n}: {list}",
     "Matches no model now; it is refused if one appears": "Passt gerade auf kein Modell; taucht eines auf, wird es abgelehnt",

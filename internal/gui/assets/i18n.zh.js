@@ -367,7 +367,7 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "Never ask again": "不再问",
     "Disabled models": "已停用的模型",
     "Disable a model": "停用模型",
-    "A disabled model is refused on every route through magpie (a request, a session, a routing group, a fallback, a sub-agent, a decision model) and left out of magpie's lists and agents' pickers. Only requests through magpie are covered. Type a pattern such as *fable* to disable every model it matches": "停用的模型在经过 magpie 的每条路径上都会被拒绝（直接请求、会话、路由组、回退、子 Agent、决策模型），也不会出现在 magpie 的列表和 Agent 的模型选择里。只管经过 magpie 的请求。输入 *fable* 这样的通配符可停用它匹配的所有模型",
+    "A disabled model is refused on every route through magpie and left out of its lists and agents' pickers. Only magpie's requests are covered. Type a pattern such as *fable* to disable every match": "停用的模型在经过 magpie 的每条路径上都会被拒绝（直接请求、会话、路由组、回退、子 Agent、决策模型），也不会出现在 magpie 的列表和 Agent 的模型选择里。只管经过 magpie 的请求。输入 *fable* 这样的通配符可停用它匹配的所有模型",
     "Disable…": "停用…",
     "Matches {n}: {list}": "匹配 {n} 个：{list}",
     "Matches no model now; it is refused if one appears": "目前没有匹配的模型；出现时也会被拒绝",
