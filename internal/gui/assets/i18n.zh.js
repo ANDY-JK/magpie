@@ -1180,6 +1180,8 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "Codex in WSL": "WSL 里的 Codex",
     "Codex, Claude Code and Grok Build compact at 272K (non-Claude [1m] too) or the size typed, on magpie's models only; a subscription's own models keep their own window and compaction; full window: slower, costlier": "Codex、Claude Code 和 Grok Build 在 272K（非 Claude 的 [1m] 模型也是）或这里填的大小时压缩，只作用于 magpie 的模型；订阅自带的模型保留自己的窗口和压缩行为；完整窗口每轮更慢更贵",
     "Compact at {n}": "{n} 时压缩",
+    "Concurrency: {n} at once": "并发：同时 {n} 个请求",
+    "Concurrency: no limit set": "并发：不限",
     "Compact at: follows Long conversations": "压缩阈值：跟随「长对话」设置",
     "Codex thread titles": "Codex 会话标题",
     "Codex thread descriptions": "Codex 会话描述",

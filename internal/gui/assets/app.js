@@ -5311,6 +5311,8 @@ function modelFacts(p, m) {
   if (m.output) out.push(t("Output: up to {n} tokens", { n: m.output.toLocaleString(intlLang()) }));
   const compact = p.compacts?.[m.id] ?? p.compacts?.["*"] ?? (state.settings?.compactAt || 0);
   out.push(compact ? t("Compact at {n}", { n: size(compact) }) : t("Compact at: follows Long conversations"));
+  // how many of its requests may be out at once: the provider's own limit
+  out.push(p.maxConcurrency ? t("Concurrency: {n} at once", { n: p.maxConcurrency }) : t("Concurrency: no limit set"));
   out.push(t(m.images ? "Accepts images" : "Text only"));
   const levels = m.efforts || [];
   out.push(levels.length ? t("Reasoning: {levels}", { levels: levels.map((l) => t(l)).join(", ") }) : t("Reasoning levels: none known"));

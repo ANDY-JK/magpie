@@ -21,7 +21,7 @@ const base = {
   models: [], agents: [], fallback: [], headers: {}, balanceToken: { takes: false, set: false }, proxy: "", searches: false,
   key: { set: true, masked: "sk-…aaa" }, keyList: [],
 };
-const own = { ...base, id: "own", name: "Own Threshold", models: [model("glm-5")], compacts: { "glm-5": 128000 } };
+const own = { ...base, id: "own", name: "Own Threshold", maxConcurrency: 4, models: [model("glm-5")], compacts: { "glm-5": 128000 } };
 const follows = { ...base, id: "follows", name: "Follows Long conversations", models: [model("glm-5")] };
 
 let I18N;
@@ -89,11 +89,13 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert(title.includes(w("Context: {n} tokens", { n: num(200000) })), `context: ${title}`);
         assert(title.includes(w("Output: up to {n} tokens", { n: num(64000) })), `output: ${title}`);
         assert(title.includes(w("Compact at {n}", { n: "128K" })), `its own threshold: ${title}`);
+        assert(title.includes(w("Concurrency: {n} at once", { n: 4 })), `concurrency: ${title}`);
         assert(title.includes(w("Accepts images")), `images: ${title}`);
         assert(title.includes(w("Reasoning: {levels}", { levels: w("low") + ", " + w("high") })), `levels: ${title}`);
         // no threshold of its own: follows Long conversations
         const other = await facts("Follows Long conversations");
         assert(other.includes(w("Compact at: follows Long conversations")), `follows: ${other}`);
+        assert(other.includes(w("Concurrency: no limit set")), `no limit: ${other}`);
         assert.deepEqual(errors, []);
         await ctx.close();
       });

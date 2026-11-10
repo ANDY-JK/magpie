@@ -1158,6 +1158,8 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "Codex in WSL": "WSL の Codex",
     "Codex, Claude Code and Grok Build compact at 272K (non-Claude [1m] too) or the size typed, on magpie's models only; a subscription's own models keep their own window and compaction; full window: slower, costlier": "Codex、Claude Code、Grok Build は 272K（Claude 以外の [1m] モデルも）か入力したサイズで圧縮。対象は magpie のモデルのみで、サブスクリプション自身のモデルはそれぞれのウィンドウと圧縮に従う。ウィンドウ全体は遅く高価",
     "Compact at {n}": "{n} で圧縮",
+    "Concurrency: {n} at once": "同時実行: {n} 件",
+    "Concurrency: no limit set": "同時実行: 制限なし",
     "Compact at: follows Long conversations": "圧縮しきい値:「長い会話」の設定に従う",
     "Codex thread titles": "Codex のスレッドタイトル",
     "Codex thread descriptions": "Codex のスレッド説明",
