@@ -16,6 +16,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 // the editor folds what few need under Advanced, this field among them:
@@ -145,11 +146,12 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.equal(saved.action, "save");
         assert.equal(saved.body.id, "local");
         assert.equal(saved.body.unredacted, true);
-        const missing = await page.evaluate(() => [
+        const I = allStrings().I18N;
+        const missing = [
           "Redaction", "Send requests unmasked",
           "For a model running on this computer or your local network: secrets, personal data and your masked words go to it as written. Leave it off for a local relay or proxy that passes requests on to a vendor.",
           "{host} isn't on this computer or your local network: turned on, requests go to it unmasked.",
-        ].filter((k) => !I18N.zh[k]));
+        ].filter((k) => !I.zh[k]);
         assert.deepEqual(missing, [], "every string has its Chinese");
         assert.deepEqual(errors, []);
       });

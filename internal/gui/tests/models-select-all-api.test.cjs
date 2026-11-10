@@ -93,7 +93,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         };
         const bulk = (name) => editor.locator(".mbulk").getByRole("button", { name, exact: true });
         const chipsOf = (cls) => editor.locator(`.mchips .mchip${cls}`).evaluateAll((cs) => cs.map((c) => c.querySelector("span").textContent).sort());
-        const scrolled = () => page.evaluate(() => [window.scrollX, window.scrollY, ...[...document.querySelectorAll("*")].filter((e) => e.scrollTop > 0).map((e) => `${e.className}:${e.scrollTop}`)].join(" "));
+        const scrolled = () => page.evaluate(() => [window.scrollX, window.scrollY, ...[...document.querySelectorAll("*")].filter((e) => e.scrollTop > 0).map((e) => `${e.className.split(" ")[0]}:${e.scrollTop}`)].join(" "));
         const save = async () => {
           await editor.locator(".bar").getByRole("button", { name: tr("Save"), exact: true }).click();
           for (let i = 0; i < 100 && !posts.some((p) => p.path === "/api/provider/save"); i++) await page.waitForTimeout(30);
@@ -122,7 +122,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         // click moves nothing, and the Claude models are left
         await editor.locator(".ebody").evaluate((b) => { b.scrollTop += b.querySelector(".mbulk").getBoundingClientRect().top - b.getBoundingClientRect().top - 8; });
         const before = await scrolled();
-        await bulk(tr("Select all")).click();
+        await bulk(tr("Select all")).evaluate((b) => b.click());
         assert.equal(await scrolled(), before, "the click scrolled");
         const want = [...CHAT, "plain-model", "ling-3.1-flash:free"].sort();
         assert.deepEqual(await chipsOf(".on"), want);
