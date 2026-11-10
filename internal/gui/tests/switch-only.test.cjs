@@ -60,7 +60,7 @@ const label = {
 };
 const strings = [
   "Only switch {agent}'s sign-in",
-  "magpie signs {agent} in to the next account with room when the one it is on is used up, and keeps it there till that one is used up too, by writing {agent}'s own sign-in. A {agent} app or session already open stays on its account until it is opened again.",
+  "magpie moves {agent}'s sign-in to the next account with room when the one it is on is spent, by writing {agent}'s own sign-in; an app or session already open stays on its own until opened again.",
   "magpie only switches {agent}'s sign-in; its requests go straight to OpenAI",
   "{agent}'s requests go through magpie to fail over to your other accounts again",
 ];
