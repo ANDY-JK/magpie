@@ -11341,7 +11341,7 @@ function renderModels(p) {
     const f = (q?.value || "").trim().toLowerCase();
     let shown = 0, hidden = 0, unpicked = 0;
     // Picked only, unfiltered: the picks alone (unpickedShown)
-    const picksOnly = draft.chosen.length && !f && unpickedShown !== p.id && !decideOnly(p);
+    const picksOnly = draft.chosen.length && !f && !draft.refetched && unpickedShown !== p.id && !decideOnly(p);
     // none picked: what the vendor's list serves is drawn as served (#614,
     // #1818), none after Select none
     const served = draft.chosen.length || draft.picking || decideOnly(p) || draft.none ? new Set() : new Set(dashed());
@@ -11955,6 +11955,9 @@ function renderModels(p) {
       status(t("{p}: {n} models", { p: p.name, n: r.count }), "ok");
       // picks the vendor dropped leave this editor's draft too, or Save put them back
       if (r.dropped?.length && editing === p.id && draft) draft.chosen = draft.chosen.filter((x) => !r.dropped.includes(x));
+      // the vendor's new list is shown whole, not only the picks it kept:
+      // the others are there to pick from
+      if (editing === p.id && draft) draft.refetched = true;
       // the redraw keeps the draft and its picks (#464)
       await loadProviders(true);
     } catch (e) { statusErr(e); refresh.classList.remove("busy"); }
