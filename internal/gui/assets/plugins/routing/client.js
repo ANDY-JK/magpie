@@ -3379,8 +3379,8 @@ function routingPage(part) {
     if (purposeOf(tagKind(r)) === "kind:collab_spawn") return r.group
       ? t("{agent} requested a subagent; magpie selects its model within this routing group.", { agent })
       : t("{agent} requested a subagent on {model}.", { agent, model: r.model });
-    if (purposeOf(r.kind) === "kind:ambient_suggestions") return t("{agent} drafted its home page's suggested prompts in the background. Turn it off in Codex's Settings › Configuration › Suggested prompts.", { agent }) + notTurn;
-    if (purposeOf(r.kind) === "kind:composer_predictions") return t("{agent} guessed your next message for its composer. Its model is Codex composer predictions on the Agents page; turn predictions off in Codex's Settings › General.", { agent }) + notTurn;
+    if (purposeOf(r.kind) === "kind:ambient_suggestions") return t("{agent} drafted its home page's suggested prompts in the background; Codex checked them for safety. Turn it off in Codex's Settings › Configuration › Suggested prompts.", { agent }) + notTurn;
+    if (purposeOf(r.kind) === "kind:composer_predictions") return t("{agent} guessed your next message for its composer. Its model is Codex composer predictions, under Settings in Codex's row on the Agents page; turn predictions off in Codex's Settings › General › Show predictions.", { agent }) + notTurn;
     // Claude Desktop's check that magpie answers names its model itself
     // (cybercaius on Discord: "Desktop requested deepseek-flash" while
     // the chat was on another model)
