@@ -506,6 +506,8 @@ I18N.de = Object.assign(I18N.de || {}, {
     "Providers": "Anbieter",
     "Gateway": "Zugangspunkt",
     "Usage": "Nutzung",
+    "Doctor": "Doktor",
+    "Who is resting, why, and what failed lately": "Wer pausiert, warum, und was zuletzt fehlschlug",
     "Library": "Bibliothek",
     "Settings": "Einstellungen",
     "Hide sidebar": "Seitenleiste ausblenden",

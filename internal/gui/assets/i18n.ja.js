@@ -506,6 +506,8 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "Providers": "プロバイダ",
     "Gateway": "ゲートウェイ",
     "Usage": "使用量",
+    "Doctor": "ドクター",
+    "Who is resting, why, and what failed lately": "休止中のキーと理由、最近の失敗",
     "Library": "ライブラリ",
     "Settings": "設定",
     "Hide sidebar": "サイドバーを非表示",

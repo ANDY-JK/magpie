@@ -515,6 +515,8 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "Providers": "供应商",
     "Gateway": "网关",
     "Usage": "用量",
+    "Doctor": "医生",
+    "Who is resting, why, and what failed lately": "谁在休息、为什么，以及最近哪些请求失败",
     "Library": "资源库",
     "Settings": "设置",
     "Hide sidebar": "隐藏侧边栏",

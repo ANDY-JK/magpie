@@ -15170,7 +15170,7 @@ function keyPill(p) {
 // name, and each one's words on hover (the owner, 11-10)
 function restingOf(p) {
   const now = Date.now(), out = [];
-  for (const k of p.keyList || []) if (k.rest && new Date(k.rest.until) > now) out.push({ name: k.name || k.masked || t("key"), rest: k.rest });
+  for (const k of p.keyList || []) if (k.rest && new Date(k.rest.until) > now) out.push({ name: k.name || k.masked || t("Key"), rest: k.rest });
   for (const l of p.account?.logins || []) if (l.rest && new Date(l.rest.until) > now) out.push({ name: l.alias || l.user || t("account"), rest: l.rest });
   return out;
 }

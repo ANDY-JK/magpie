@@ -522,6 +522,8 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "Providers": "供應商",
     "Gateway": "閘道",
     "Usage": "用量",
+    "Doctor": "醫生",
+    "Who is resting, why, and what failed lately": "誰在休息、為什麼，以及最近哪些請求失敗",
     "Library": "資源庫",
     "Settings": "設定",
     "Hide sidebar": "隱藏側邊欄",
