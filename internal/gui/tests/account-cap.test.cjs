@@ -91,7 +91,7 @@ function serve(lang, posts, use = usage, alone = false) {
 }
 
 const words = {
-  en: { direct: "At its cap · Codex still uses it", directWhy: /refused with a usage-cap error until it renews.*\nCodex signs in to this account and asks its vendor itself/s, opus: "Opus week at its cap · back in 3h", opusWhy: /^Opus week is at 90%, past this account's 70% cap, so magpie sends the requests it counts to the other accounts until it renews; other models still use this account/, none: "No cap", cap: (n) => `Cap ${n}%`, held: "At its cap · back in 3h", other: "Other…", menu: "Usage cap" },
+  en: { direct: "At its cap · Codex still uses it", directWhy: /refused until it renews.*\nCodex signs in to this account and asks its vendor itself/s, opus: "Opus week at its cap · back in 3h", opusWhy: /^Opus week is at 90%, past this account's 70% cap; magpie sends the requests it counts to the other accounts until it renews, and other models still use this account/, none: "No cap", cap: (n) => `Cap ${n}%`, held: "At its cap · back in 3h", other: "Other…", menu: "Usage cap" },
   zh: { direct: "已达上限 · Codex 仍在使用", directWhy: /经 magpie 的请求会返回.*\nCodex 登录此账号并直接向厂商发请求/s, opus: "Opus week已达上限 · 3 小时后恢复", opusWhy: /^Opus week已用 90%，超过该账号的 70% 上限.*其他模型仍用此账号/, none: "不设上限", cap: (n) => `上限 ${n}%`, held: "已达上限 · 3 小时后恢复", other: "其他…", menu: "用量上限" },
 };
 
@@ -192,8 +192,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const missing = await page.evaluate(() => [
         "No cap", "Cap {n}%", "Usage cap", "Usage cap {n}%", "Usage cap, in percent", "Use each window to 100%", "Other…",
         "A share of your own, 1–99%", "A cap is a share from 1% to 99%", "At its cap", "At its cap · back {in}",
-        "A usage window is at {n}%, past this account's {cap}% cap, so magpie counts it as used up and sends requests to the other accounts until that window renews",
-        "With no other account on, requests are refused with a usage-cap error until then",
+        "A window is at {n}%, past this account's {cap}% cap; magpie counts it as used up and sends requests to the other accounts until it renews",
+        "With no other account on, requests are refused until then",
         "Once magpie reads a usage window at {n}% or past, the account counts as used up and gets nothing until it renews; a turn under way can go past {n}%",
         "Its windows run to 100%; a cap moves magpie to the other accounts sooner",
         "A window's meter below can hold its own cap",
@@ -222,7 +222,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await allWords(page); // the other languages are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "At its cap · {agent} still uses it",
-        "A usage window is at {n}%, past this account's {cap}% cap: requests through magpie are refused with a usage-cap error until it renews",
+        "A window is at {n}%, past this account's {cap}% cap: requests through magpie are refused until it renews",
         "{agent} signs in to this account and asks its vendor itself, so the cap can't stop it: add another account or pick {agent}'s models via magpie",
       ].filter((k) => !I18N.zh[k]));
       assert.deepEqual(missing, [], "every string has its Chinese");
@@ -243,8 +243,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await allWords(page); // the other languages are files of their own (i18n.js, plugins/<id>/i18n.js)
       const missing = await page.evaluate(() => [
         "{names} at its cap", "{names} at its cap · back {in}",
-        "{names} is at {n}%, past this account's {cap}% cap, so magpie sends the requests it counts to the other accounts until it renews; other models still use this account",
-        "With no other account on, those requests are refused with a usage-cap error until then",
+        "{names} is at {n}%, past this account's {cap}% cap; magpie sends the requests it counts to the other accounts until it renews, and other models still use this account",
+        "With no other account on, those requests are refused until then",
       ].filter((k) => !I18N.zh[k]));
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
