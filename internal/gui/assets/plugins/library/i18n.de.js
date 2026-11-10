@@ -767,5 +767,13 @@ magpie.strings({
     "{agents} can be changed once it runs.": "{agents} lässt sich ändern, sobald sie läuft.",
     "Sync to your other computers": "Mit deinen anderen Computern synchronisieren",
     "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "Aus bleibt er nur auf diesem Computer: Die Synchronisierung bringt ihn nicht auf deine anderen Computer, und eine Synchronisierung von dort entfernt ihn weder noch ersetzt sie ihn durch ihren gleichnamigen Server",
+    "Chinese description": "Chinesische Beschreibung",
+    "e.g. Split a PDF into pages and read out its text": "z. B. Ein PDF in Seiten teilen und seinen Text auslesen",
+    "Kept in magpie's library on this computer; the skill's SKILL.md is not changed.": "Nur in magpies Bibliothek auf diesem Computer gespeichert; die SKILL.md des Skills bleibt unverändert.",
+    "Its own description, from SKILL.md": "Seine eigene Beschreibung aus SKILL.md",
+    "Save description": "Beschreibung speichern",
+    "The Chinese description is saved": "Die chinesische Beschreibung ist gespeichert",
+    "Chinese": "Chinesisch",
+    "A Chinese description you saved for this skill, shown in place of its own": "Eine von Ihnen gespeicherte chinesische Beschreibung, die anstelle der eigenen angezeigt wird",
   },
 });

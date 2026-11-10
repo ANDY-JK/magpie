@@ -552,6 +552,10 @@ func libraryRoutes(mux *http.ServeMux, w Windows) {
 			res, err = library.SkillAgents(in.Name, in.Agents)
 		case "skills/here":
 			res, err = library.SkillHere(in.Name, in.On)
+		case "skills/note":
+			// a Chinese description kept in magpie's library, its SKILL.md
+			// untouched (the owner, 11-10)
+			res, err = library.SetSkillNote(in.Name, in.Note)
 		case "skills/agents-all":
 			res, err = library.EverySkillAgents(in.Agents, in.On)
 		case "skills/agents-some":

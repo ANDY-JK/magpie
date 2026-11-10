@@ -767,5 +767,13 @@ magpie.strings({
     "{agents} can be changed once it runs.": "{agents} は起動後に変更できます。",
     "Sync to your other computers": "ほかのコンピュータと同期",
     "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "オフにするとこのコンピュータだけに残ります。同期でほかのコンピュータには送られず、ほかのコンピュータからの同期で削除されたり、同じ名前のサーバーに置き換えられたりすることもありません",
+    "Chinese description": "中国語の説明",
+    "e.g. Split a PDF into pages and read out its text": "例:PDF をページに分けて文字を読み取る",
+    "Kept in magpie's library on this computer; the skill's SKILL.md is not changed.": "このコンピューターの magpie ライブラリにだけ保存され、スキルの SKILL.md は変更されません。",
+    "Its own description, from SKILL.md": "SKILL.md にある元の説明",
+    "Save description": "説明を保存",
+    "The Chinese description is saved": "中国語の説明を保存しました",
+    "Chinese": "中国語",
+    "A Chinese description you saved for this skill, shown in place of its own": "このスキルに保存した中国語の説明。元の説明の代わりに表示されます",
   },
 });

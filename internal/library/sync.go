@@ -440,17 +440,21 @@ type ServerView struct {
 
 // SkillView is a library skill as the page shows it.
 type SkillView struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Source      string            `json:"source,omitempty"`
-	Kind        string            `json:"kind"`             // github, git, folder, or "" for one kept in the library
-	Origin      string            `json:"origin,omitempty"` // on GitHub, as CC Switch installed it: it can be updated from there
-	Repo        string            `json:"repo,omitempty"`   // the repository it came from, however it came in, for the page to group by
-	Icon        string            `json:"icon,omitempty"`
-	Agents      []string          `json:"agents"`
-	Missing     bool              `json:"missing,omitempty"` // its folder is gone
-	Problems    map[string]string `json:"problems,omitempty"`
-	Check       *SkillCheck       `json:"check,omitempty"` // what the last check for updates found
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Note is the Chinese description the user saved for it in magpie's
+	// library (skill_notes.go), shown under its name in place of
+	// Description, whose SKILL.md is left as it is
+	Note     string            `json:"note,omitempty"`
+	Source   string            `json:"source,omitempty"`
+	Kind     string            `json:"kind"`             // github, git, folder, or "" for one kept in the library
+	Origin   string            `json:"origin,omitempty"` // on GitHub, as CC Switch installed it: it can be updated from there
+	Repo     string            `json:"repo,omitempty"`   // the repository it came from, however it came in, for the page to group by
+	Icon     string            `json:"icon,omitempty"`
+	Agents   []string          `json:"agents"`
+	Missing  bool              `json:"missing,omitempty"` // its folder is gone
+	Problems map[string]string `json:"problems,omitempty"`
+	Check    *SkillCheck       `json:"check,omitempty"` // what the last check for updates found
 	// Always are the agents that have it whatever the library gives them:
 	// it is kept in ~/.agents/skills, which they read themselves (#595)
 	Always []string `json:"always,omitempty"`
@@ -706,6 +710,7 @@ func readView(problems []Problem, glance bool) (*View, error) {
 		} else {
 			sv.Missing = true
 		}
+		sv.Note = noteOf(s.Name)
 		sv.Check = lastCheck(s.Name)
 		sv.Edited, _ = l.editState(s, targets)
 		sv.Gone = s.Gone

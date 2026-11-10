@@ -767,5 +767,13 @@ magpie.strings({
     "{agents} can be changed once it runs.": "{agents} 要等它執行後才能修改。",
     "Sync to your other computers": "同步到其他電腦",
     "Off keeps it on this computer: sync never carries it to your other computers, and a sync from them neither removes it nor puts theirs in its place": "關閉後只留在這台電腦：同步不會把它帶到你的其他電腦；其他電腦同步過來時，既不會刪掉它，也不會用它們的同名伺服器取代它",
+    "Chinese description": "中文說明",
+    "e.g. Split a PDF into pages and read out its text": "例如：把 PDF 拆成頁並讀出文字",
+    "Kept in magpie's library on this computer; the skill's SKILL.md is not changed.": "只保存在這台電腦的 magpie 資源庫裡；技能自己的 SKILL.md 不會被改動。",
+    "Its own description, from SKILL.md": "它自己的說明，來自 SKILL.md",
+    "Save description": "儲存說明",
+    "The Chinese description is saved": "中文說明已儲存",
+    "Chinese": "中文",
+    "A Chinese description you saved for this skill, shown in place of its own": "你為這個技能儲存的中文說明，顯示在它自己的說明之前",
   },
 });

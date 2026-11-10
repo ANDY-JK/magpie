@@ -479,6 +479,13 @@ input.lib-setname:focus { border-color: var(--accent); box-shadow: 0 0 0 3px col
 .lib-skillhow .note { font-size: 11px; color: var(--faint); line-height: 1.45; min-width: 0; flex: 1 0 100%; margin-top: -4px; }
 .lib-how-row .segs { flex: none; align-self: center; }
 .lib-reader { grid-template-columns: minmax(0, 1fr); }
+/* the Chinese description kept in magpie's library, above the SKILL.md's own
+   text: a name, its note, and where the note is kept */
+.lib-notewrap { display: grid; gap: 5px; margin: 2px 0 10px; }
+.lib-notelabel { font-size: 12px; font-weight: 600; color: var(--fg); }
+.lib-notein { width: 100%; box-sizing: border-box; min-height: 44px; resize: vertical; font: inherit; font-size: 12.5px; line-height: 1.5; padding: 6px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--card-2); color: var(--fg); }
+.lib-noteorig { font-size: 12px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+.lib-notezh { flex: none; background: var(--accent-soft); color: var(--accent); }
 .lib-md { margin: 0; max-height: min(60vh, 520px); overflow: auto; font: var(--code-style, normal) var(--code-weight, 400) 12px/1.6 var(--code-font, var(--code)); font-stretch: var(--code-stretch, 100%); color: var(--fg-2); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--card-2); border-radius: 8px; padding: 12px 14px; user-select: text; -webkit-user-select: text; }
 .lib-reader .bar .lib-path { max-width: 70%; }
 .editor .editor-error:empty { display: none; }

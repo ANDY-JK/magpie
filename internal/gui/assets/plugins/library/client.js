@@ -5328,9 +5328,12 @@ magpie.plugin("library", (ctx) => {
       hereLine.append(b);
     }
     who.append(nm);
+    if (s.note) nm.append(tag(t("Chinese"), "lib-notezh", t("A Chinese description you saved for this skill, shown in place of its own")));
     if (hereLine) who.append(hereLine);
-    const sub = el("div", "sub", s.missing ? t("Its folder is gone from the library") : s.description || "");
-    sub.title = s.description || "";
+    const sub = el("div", "sub", s.missing ? t("Its folder is gone from the library") : s.note || s.description || "");
+    // the note is magpie's, the description the SKILL.md's: the hover keeps
+    // both, the note first (skill_notes.go)
+    sub.title = s.note ? s.note + (s.description ? "\n" + s.description : "") : s.description || "";
     who.append(sub);
     if (s.source) {
       const src = el("div", "lib-src");
@@ -5577,13 +5580,39 @@ magpie.plugin("library", (ctx) => {
     const ed = el("div", "editor lib-editor lib-reader");
     const head = el("div", "ehead");
     head.append(mark(s.icon, GLYPH.skill), el("b", "", s.name), el("span", "grow"));
+    // the Chinese description the user writes for it, kept in magpie's
+    // library and shown under its name: its SKILL.md stays as it is (the
+    // owner, 11-10)
+    const noteWrap = el("div", "lib-notewrap");
+    const note = el("textarea", "lib-notein");
+    note.value = s.note || "";
+    note.maxLength = 500;
+    note.rows = 2;
+    note.placeholder = t("e.g. Split a PDF into pages and read out its text");
+    note.setAttribute("aria-label", t("Chinese description"));
+    const noteSaid = el("div", "hint", t("Kept in magpie's library on this computer; the skill's SKILL.md is not changed."));
+    const orig = el("div", "lib-noteorig", s.description || "");
+    orig.title = t("Its own description, from SKILL.md");
+    noteWrap.append(el("div", "lib-notelabel", t("Chinese description")), note, noteSaid, orig);
     const pre = el("pre", "lib-md", "…");
-    ed.append(head, pre);
+    ed.append(head, noteWrap, pre);
     const bar = el("div", "bar");
     const where = el("span", "note");
-    bar.append(where, el("span", "grow"), button(t("Close"), "", closeLibModal));
+    const save = button(t("Save description"), "primary", async () => {
+      save.disabled = true;
+      try {
+        await api("library/skills/note", { name: s.name, note: note.value });
+        s.note = note.value.trim().replace(/\s+/g, " ");
+        status(t("The Chinese description is saved"), "ok");
+        await load(true);
+        closeLibModal(true);
+      } catch (e) { statusErr(e); save.disabled = false; }
+    });
+    save.disabled = true;
+    note.oninput = () => { save.disabled = note.value.trim() === (s.note || "").trim(); };
+    bar.append(where, el("span", "grow"), button(t("Close"), "", closeLibModal), save);
     ed.append(bar);
-    modal = {};
+    modal = { save: () => save.click(), dirty: () => note.value.trim() !== (s.note || "").trim() };
     openLib(ed);
     try {
       const r = await api("library/skill?name=" + encodeURIComponent(s.name));
