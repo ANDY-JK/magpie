@@ -105,7 +105,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const other = page.locator(".editor .mchips .mchip", { hasText: "model-p" });
       await other.waitFor();
       await rightClick(other);
-      assert.equal(await menu.getByRole("menuitem").count(), 2, "Test this model and Copy model ID alone");
+      assert.equal(await menu.getByRole("menuitem").count(), 3, "Test this model, Test its capabilities and Copy model ID");
       assert.deepEqual(errors, []);
     });
   }

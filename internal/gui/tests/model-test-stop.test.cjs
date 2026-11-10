@@ -73,7 +73,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.goto("http://magpie.test/?view=providers");
       await page.locator(".row.provider", { hasText: "Relay" }).click();
       await page.locator(".editor .mchips .mchip").first().waitFor();
-      const all = page.locator(".editor .mfoot button[data-tests]");
+      const all = page.locator(".editor .mfoot button[data-tests]").first();
       const ep = page.locator(".editor .eps button[data-tests]");
       const until = async (cond, what) => { for (let i = 0; i < 100; i++) { if (await cond()) return; await page.waitForTimeout(50); } assert.fail(what); };
       const reads = async (b, text) => until(async () => (await b.textContent()) === text, `the button never read ${text}`);

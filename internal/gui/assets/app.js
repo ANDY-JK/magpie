@@ -10993,6 +10993,23 @@ function modelTestWhy(p) {
 // modelTests: each provider's Test models answers by id, null while asked
 const modelTests = {};
 
+// capWord: what a capability's letter is, in words, for its hover: tools,
+// vision or stream, as the endpoint answered yes or no (renderModels)
+function capWord(k, yes) {
+  return t({
+    tools: ["Tools: it called the tool it was asked to", "Tools: it didn't call a tool"],
+    vision: ["Vision: it took an image", "Vision: it turned an image down"],
+    stream: ["Streaming: it answered as a stream", "Streaming: it didn't stream"],
+  }[k][yes ? 0 : 1]);
+}
+
+// capLine: what a capability test said of one model, short: T tools, V
+// vision, S streaming, ✓ yes and ✗ no; a capability the answer didn't
+// settle has no letter
+function capLine(caps) {
+  return [["tools", "T"], ["vision", "V"], ["stream", "S"]].map(([k, l]) => caps?.[k] ? l + (caps[k] === "yes" ? "✓" : "✗") : "").filter(Boolean).join(" ");
+}
+
 // testsOn: a provider's tests under way, by run; Stop ends them on the server too (RIck)
 const testsOn = {};
 async function provTest(id, body) {
@@ -11075,7 +11092,20 @@ function renderModels(p) {
     // the API it was asked on said, where the answer says (01huadalang:
     // 右键选择测试只能测试出是不是通的，不能说什么协议是通的)
     const via = x?.protocol ? apiLabel(x.protocol) : "";
-    c.title = !x ? t("Testing…") : x.ok ? (via ? t("Answered via {api} in {took}", { api: via, took: ledTook(x.ms) }) : t("Answered in {took}", { took: ledTook(x.ms) })) : (via ? via + " · " : "") + (x.status ? x.status + " · " : "") + x.error;
+    const said = !x ? t("Testing…") : x.ok ? (via ? t("Answered via {api} in {took}", { api: via, took: ledTook(x.ms) }) : t("Answered in {took}", { took: ledTook(x.ms) })) : (via ? via + " · " : "") + (x.status ? x.status + " · " : "") + x.error;
+    // how it answered first, as the hover has always said it, then what is
+    // known of the model (modelFacts) after it
+    c.title = c.title ? said + "\n" + c.title : said;
+    // what it can do besides answer, when a capability test asked: a letter
+    // each, ticked when the endpoint said yes, crossed when it said no, and
+    // nothing where it didn't say (capWords has the long words)
+    for (const [k, letter] of [["tools", "T"], ["vision", "V"], ["stream", "S"]]) {
+      const v = x?.caps?.[k];
+      if (!v) continue;
+      const b = el("span", "badge cap " + (v === "yes" ? "ok" : "bad"), letter);
+      b.title = capWord(k, v === "yes");
+      c.append(b);
+    }
   };
   // a chip's right-click (or the menu key) tests that model alone: Test models
   // asks every one, and a list of many takes a while (yonghe, Discord). A
@@ -11149,6 +11179,9 @@ function renderModels(p) {
       if (again) return;
       const acts = [noTest ? { name: "Test this model", icon: "M5.5 3.75v8.5L12.25 8z", off: true, why: noTest, run() {} }
         : { name: "Test this model", icon: "M5.5 3.75v8.5L12.25 8z", run: () => testOne(id) }];
+      // what it can do besides answer: a tool call, a picture, a stream; a
+      // model reached through its own API or a sign-in has none to ask
+      if (!noTest) acts.push({ name: "Test its capabilities", icon: "M5.5 3.75v8.5L12.25 8z", run: () => testOne(id, undefined, true) });
       // asked as Codex or Claude Code asks, for a relay that serves only
       // them (耍赖天都爱 on Discord); Claude Code's once it has come
       // through magpie, its headers being the ones it came with
@@ -11312,6 +11345,7 @@ function renderModels(p) {
       : t(draft.chosen.length ? "Agents see the models picked." : "Vendor's list: agents see up to {n} of its models (dashed), and those it lists later. Click a model to pick just it.", { n: 24 });
     drawLost();
     drawHiders();
+    capsLegend.hidden = !Object.values(modelTests[p.id] || {}).some((x) => x?.caps && Object.keys(x.caps).length);
   };
   // agents whose own list (the Agents page) leaves a model out
   const hiders = (id) => (p.agents || []).filter((a) => a.hides?.includes(id)).map((a) => a.name);
@@ -11854,17 +11888,35 @@ function renderModels(p) {
     } catch (e) { delete modelTests[p.id]; testErr(e); }
     draw();
   });
+  // what each model can do besides answer: one tool call, one picture and
+  // one streamed answer more per model, so it is its own press rather than
+  // part of Test models (the owner, 11-10)
+  const testCaps = testButton(p, t("Test capabilities"), t("Ask each model to call a tool, take a picture and stream its answer, beside whether it answers") + byKey, async () => {
+    const ids = servedIds(p).filter((id) => p.decideTest || !decidesModel(p, id));
+    if (!ids.length) { status(t("Pick a model first."), "err"); return; }
+    const got = modelTests[p.id] = {};
+    for (const id of ids) got[id] = null;
+    draw();
+    try {
+      const r = await provTest(p.id, { ...asTyped(), test: ids, caps: true });
+      r.results.forEach((x, i) => { got[ids[i]] = x; });
+      const yes = (k) => r.results.filter((x) => x.caps?.[k] === "yes").length;
+      status(t("Tools: {t} of {n} · vision: {v} · streaming: {s}", { t: yes("tools"), v: yes("vision"), s: yes("stream"), n: ids.length }), "ok");
+    } catch (e) { delete modelTests[p.id]; testErr(e); }
+    draw();
+  });
   // one model, the others' results kept
-  const testOne = async (id, as) => {
+  const testOne = async (id, as, caps) => {
     const got = modelTests[p.id] = modelTests[p.id] || {};
     got[id] = null;
     draw();
     try {
-      const r = await provTest(p.id, { ...asTyped(), test: [id], ...(as ? { as } : {}) });
+      const r = await provTest(p.id, { ...asTyped(), test: [id], ...(as ? { as } : {}), ...(caps ? { caps: true } : {}) });
       const x = got[id] = r.results[0];
       const via = x.protocol ? apiLabel(x.protocol) : "";
       const error = (x.status ? x.status + " · " : "") + x.error;
-      status(x.ok ? (via ? t("{model} answered via {api} in {took}", { model: id, api: via, took: ledTook(x.ms) }) : t("{model} answered in {took}", { model: id, took: ledTook(x.ms) }))
+      const did = caps && x.caps ? " · " + capLine(x.caps) : "";
+      status(x.ok ? (via ? t("{model} answered via {api} in {took}", { model: id, api: via, took: ledTook(x.ms) }) : t("{model} answered in {took}", { model: id, took: ledTook(x.ms) })) + did
         : via ? t("{model} didn't answer via {api}: {error}", { model: id, api: via, error }) : t("{model} didn't answer: {error}", { model: id, error }), x.ok ? "ok" : "err");
     } catch (e) { delete got[id]; testErr(e); }
     draw();
@@ -11873,8 +11925,8 @@ function renderModels(p) {
   rename.title = t("Rename the models agents see, or offer fewer of their reasoning levels");
   rename.onclick = () => { naming = naming === p.id ? null : p.id; rename.classList.toggle("on", naming === p.id); drawNames(); };
   foot.append(add, addOne, refresh);
-  if (noTest) { testAll.disabled = true; testAll.title = testAll.dataset.tip = noTest; }
-  foot.append(testAll);
+  if (noTest) for (const b of [testAll, testCaps]) { b.disabled = true; b.title = b.dataset.tip = noTest; }
+  foot.append(testAll, testCaps);
   foot.append(rename);
   // a plugin's list that failed is its defaults, not the vendor's
   if (p.fetched && !p.listError) foot.append(el("span", "hint", t("vendor list · {when}", { when: ago(p.fetched) })));
@@ -11896,6 +11948,7 @@ function renderModels(p) {
   // why, rather than a short list that looks like the account's
   if (p.listError) box.append(el("div", "hint model-hint warn list-error", t("{p} couldn't list its models: {error}", { p: p.name, error: p.listError })));
   const why = el("div", "hint");
+  const capsLegend = el("div", "hint cap-legend", t("T tools · V vision · S streaming — ✓ it answered, ✗ it refused"));
   const [tk, cb] = tick(t("Only through routing groups"), !!draft.unlisted);
   cb.onchange = () => { draft.unlisted = cb.checked; draw(); };
   tk.title = t("Its models leave the list agents pick from; the routing groups they are in still use them");
@@ -11904,7 +11957,7 @@ function renderModels(p) {
   if (!decideOnly(p)) box.append(tk);
   const lost = el("div", "hint model-hint warn");
   const hid = el("div", "hint model-hint agent-hides");
-  box.append(why, lost, hid);
+  box.append(why, capsLegend, lost, hid);
   draw();
   return box;
 }

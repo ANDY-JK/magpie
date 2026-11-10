@@ -1456,6 +1456,10 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			// Run, for test and teststop: the window's name for one
 			// test, which its Stop ends (testRuns)
 			Run string `json:"run"`
+			// Caps, for test: whether each model's capabilities (a tool
+			// call, a picture, a streamed answer) are probed too, beside
+			// whether it answers (provider.TestModelsWith)
+			Caps bool `json:"caps"`
 			// DetectModels, for detect: models to ask on each API, each
 			// answered on its own, in place of Model
 			DetectModels []string `json:"detectModels"`
@@ -2201,7 +2205,7 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 				// an image model's test draws a picture, which takes longer
 				ctx, cancel := context.WithTimeout(provider.TestAs(ctx, req.As), 3*time.Minute)
 				defer cancel()
-				writeJSON(rw, map[string]any{"results": p.TestModels(ctx, req.Test)})
+				writeJSON(rw, map[string]any{"results": p.TestModelsWith(ctx, req.Test, req.Caps)})
 				return
 			}
 			ctx, cancel := context.WithTimeout(provider.TestAs(ctx, req.As), 25*time.Second)

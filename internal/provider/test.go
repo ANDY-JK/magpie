@@ -34,6 +34,10 @@ type Result struct {
 	Millis   int64    `json:"ms"`
 	Model    string   `json:"model,omitempty"`
 	Error    string   `json:"error,omitempty"`
+	// Caps is what the model can do besides answer, when a test asked for
+	// it (TestModelsWith): "tools", "vision" and "stream", each "yes" or
+	// "no". A capability the endpoint's answer didn't settle has no key.
+	Caps map[string]string `json:"caps,omitempty"`
 	// otherAPI: the vendor said the model isn't served on the API asked
 	// (catalog.WrongEndpoint), so another may be asked instead
 	otherAPI bool
@@ -113,8 +117,16 @@ func (p Provider) Test(ctx context.Context) []Result {
 // to a backend that only streams.
 func tiny(q Provider, proto Protocol, model string) (url, body string) {
 	url, body = tinyBody(q, proto, model)
-	if q.Account != nil && q.Account.Stream && body != "" {
-		body = strings.TrimSuffix(body, "}") + `,"stream":true}`
+	return tinyShape(q, proto, model, url, body)
+}
+
+// tinyShape is url and body for a probe of model as the backend takes it:
+// streamed for a backend that serves only streamed answers, in OpenCode's
+// free shape for one of Zen's free models, and in Cline's for Cline, whose
+// free models reason before they answer.
+func tinyShape(q Provider, proto Protocol, model, url, body string) (string, string) {
+	if q.Account != nil && q.Account.Stream {
+		body = asStream(body)
 	}
 	if q.OpenCodeFree(model) && body != "" {
 		url, body = OpenCodeFreeURL(url, proto), zenFreeProbe(proto, body)
@@ -123,6 +135,14 @@ func tiny(q Provider, proto Protocol, model string) (url, body string) {
 		body = clineProbe(body)
 	}
 	return url, body
+}
+
+// asStream is body asking for its answer streamed, when it doesn't already.
+func asStream(body string) string {
+	if body == "" || streams([]byte(body)) || !strings.HasSuffix(body, "}") {
+		return body
+	}
+	return strings.TrimSuffix(body, "}") + `,"stream":true}`
 }
 
 // clineProbe is the smallest request asked as Cline's own clients ask:
@@ -327,6 +347,13 @@ func tinyDrawing(q Provider, model string) (url, body string) {
 // on the endpoint it's served on and with a key that sees it: whether each
 // answers, not only whether the vendor does. Results are in models' order.
 func (p Provider) TestModels(ctx context.Context, models []string) []Result {
+	return p.TestModelsWith(ctx, models, false)
+}
+
+// TestModelsWith is TestModels, with what each answering model can do
+// besides answer when caps is asked: call a tool, read a picture and
+// stream its answer (capsOn). caps false asks nothing more than TestModels.
+func (p Provider) TestModelsWith(ctx context.Context, models []string, caps bool) []Result {
 	ctx = withUnreached(p.ownRequests(p.Via(ctx), probelog.KindTest))
 	out := make([]Result, len(models))
 	sem := make(chan struct{}, 4)
@@ -342,14 +369,14 @@ func (p Provider) TestModels(ctx context.Context, models []string) []Result {
 				out[i] = Result{Model: model, Error: "not asked: " + err.Error()}
 				return
 			}
-			out[i] = p.testOne(ctx, model)
+			out[i] = p.testOne(ctx, model, caps)
 		}()
 	}
 	wg.Wait()
 	return out
 }
 
-func (p Provider) testOne(ctx context.Context, model string) Result {
+func (p Provider) testOne(ctx context.Context, model string, caps bool) Result {
 	if pat, off := ModelDisabled(p.ID, model); off {
 		// the user disabled it (#1867): not even a test reaches it
 		return Result{Model: model, Error: fmt.Sprintf("model %s/%s is disabled in magpie (it matches %q in Settings › Models › Disabled models)", p.ID, model, pat)}
@@ -370,6 +397,12 @@ func (p Provider) testOne(ctx context.Context, model string) Result {
 		return r
 	}
 	client := testClient(ctx)
+	if client != "" {
+		// Test as Codex or Claude Code asks whether the endpoint takes that
+		// client's request; what a model can do besides answer is the plain
+		// endpoint's, and three more requests per model aren't it
+		caps = false
+	}
 	if why := p.TestsAs(client); why != "" {
 		return Result{Protocol: clientProto(client, p.Speaks()), Model: model, Error: why}
 	}
@@ -429,7 +462,8 @@ func (p Provider) testOne(ctx context.Context, model string) Result {
 		}
 		return r
 	}
-	r := q.testOn(ctx, client, proto, model, UpstreamName(p, model))
+	upstream := UpstreamName(p, model)
+	r := q.testOn(ctx, client, proto, model, upstream)
 	if !r.OK && client == "" && proto == Chat && r.Status == 400 && catalog.DrawsID(model) && catalog.PointsToImagesAPI(r.Error) {
 		// an image model its name doesn't place on the images API
 		// (agnes-image-2.5-flash, #1837), which the vendor turns away in
@@ -458,12 +492,12 @@ func (p Provider) testOne(ctx context.Context, model string) Result {
 			if !ok {
 				continue
 			}
-			if n := q.testOn(ctx, client, next, model, UpstreamName(p, model)); n.OK || !n.otherAPI {
-				return n
+			if n := q.testOn(ctx, client, next, model, upstream); n.OK || !n.otherAPI {
+				return q.withCaps(ctx, n, next, upstream, client, caps)
 			}
 		}
 	}
-	return r
+	return q.withCaps(ctx, r, proto, upstream, client, caps)
 }
 
 // keySeeing is p with the key a test of model on proto goes with: one made
@@ -644,6 +678,36 @@ func probe(ctx context.Context, p Provider, proto Protocol, url string, body []b
 	return r
 }
 
+// probeHeaders puts a probe's headers and sign-in on req: the content
+// type, the version Anthropic wants, the client an agent's own requests go
+// as, and the key or token Sign gives it. Every request a test sends goes
+// out this way, a capability probe's included, so it is the path a real
+// request takes.
+func probeHeaders(ctx context.Context, p Provider, proto Protocol, url string, req *http.Request, body []byte) error {
+	req.Header.Set("Content-Type", "application/json")
+	if proto == Anthropic {
+		req.Header.Set("anthropic-version", "2023-06-01")
+	}
+	if OpenCodeURL(url) {
+		OpenCodeClient(req.Header, "", "") // a session of the probe's own, from the home folder
+	}
+	if p.IsCline() {
+		ClineClient(req.Header)
+	}
+	if p.IsKilo() {
+		KiloClient(req.Header, p.Key, "")
+	}
+	if client := testClient(ctx); client != "" {
+		clientHeaders(client, req.Header)
+	}
+	if p.IsPlugin() {
+		// a model its vendor has queued is said so at once, not waited
+		// out for minutes as an agent's turn is (Qoder's free models)
+		req.Header.Set(FallbackHeader, "1")
+	}
+	return p.Sign(ctx, req, proto, body)
+}
+
 func probeOnce(ctx context.Context, p Provider, proto Protocol, url string, body []byte, model string, wait time.Duration) (r Result) {
 	r = Result{Protocol: proto, Model: model}
 	if model == "" {
@@ -685,28 +749,7 @@ func probeOnce(ctx context.Context, p Provider, proto Protocol, url string, body
 			return r
 		}
 	}
-	req.Header.Set("Content-Type", "application/json")
-	if proto == Anthropic {
-		req.Header.Set("anthropic-version", "2023-06-01")
-	}
-	if OpenCodeURL(url) {
-		OpenCodeClient(req.Header, "", "") // a session of the probe's own, from the home folder
-	}
-	if p.IsCline() {
-		ClineClient(req.Header)
-	}
-	if p.IsKilo() {
-		KiloClient(req.Header, p.Key, "")
-	}
-	if client := testClient(ctx); client != "" {
-		clientHeaders(client, req.Header)
-	}
-	if p.IsPlugin() {
-		// a model its vendor has queued is said so at once, not waited
-		// out for minutes as an agent's turn is (Qoder's free models)
-		req.Header.Set(FallbackHeader, "1")
-	}
-	if err := p.Sign(ctx, req, proto, body); err != nil {
+	if err := probeHeaders(ctx, p, proto, url, req, body); err != nil {
 		r.Error = err.Error()
 		return r
 	}

@@ -13,6 +13,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const IDS = ["gpt-5.1", "anthropic/claude-opus-4.5", "model-c"];
@@ -120,14 +121,14 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       let sent = await tryOne("anthropic/claude-opus-4.5");
       assert.deepEqual(sent, { id: "relay", test: ["anthropic/claude-opus-4.5"] }, "just that model is sent");
       await chip("anthropic/claude-opus-4.5").locator(".tdot.bad").waitFor();
-      assert((await chip("anthropic/claude-opus-4.5").getAttribute("title")).startsWith("404 · no such model"));
+      assert((await chip("anthropic/claude-opus-4.5").getAttribute("title")).includes("404 · no such model"));
       assert.equal(await page.locator(".editor .mchips .tdot").count(), 1, "the others weren't asked");
       assert.equal(await page.locator("#status").textContent(), w.bad);
 
       sent = await tryOne("gpt-5.1");
       assert.deepEqual(sent, { id: "relay", test: ["gpt-5.1"] });
       await chip("gpt-5.1").locator(".tdot.ok").waitFor();
-      assert((await chip("gpt-5.1").getAttribute("title")).startsWith(w.okTitle));
+      assert((await chip("gpt-5.1").getAttribute("title")).includes(w.okTitle));
       assert.equal(await chip("anthropic/claude-opus-4.5").locator(".tdot.bad").count(), 1, "the first model's result is kept");
       assert.equal(await page.locator("#status").textContent(), w.ok);
 
@@ -135,7 +136,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       sent = await tryOne("model-c");
       assert.deepEqual(sent, { id: "relay", test: ["model-c"] });
       await chip("model-c").locator(".tdot.ok").waitFor();
-      assert((await chip("model-c").getAttribute("title")).startsWith(w.okSecondsTitle));
+      assert((await chip("model-c").getAttribute("title")).includes(w.okSecondsTitle));
       assert.equal(await page.locator("#status").textContent(), w.okSeconds);
 
       // Esc closes the menu, nothing sent
@@ -156,11 +157,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // Discord: "没有响应", the error only in a dot's tooltip)
       await page.waitForFunction((want) => document.querySelector("#status")?.textContent === want, w.allBad);
 
-      const missing = await page.evaluate(() => [
+      const missing = [
         "Test this model", "Right-click to test just this model", "Right-click a model to test just it",
         "{model} answered in {took}", "{model} didn't answer: {error}", "Answered in {took}",
         "{n} of {all} models didn't answer; {model}: {error}",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !strings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });
