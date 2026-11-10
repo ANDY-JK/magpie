@@ -119,7 +119,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const w = words[lang];
       const ed = page.locator(".editor");
       const baseURL = ed.locator(".base-url");
-      const key = ed.locator(".pair input[type=password]").first();
+      const key = ed.locator(".pair input[type=password]:not(.proxy-credential)").first();
       const models = ed.locator(".add-models .detect-row input").first();
       const note = ed.locator(".editor-error.note");
       const on = () => ed.locator(".base-apis .opt.on").getAttribute("data-api");
@@ -144,7 +144,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await baseURL.inputValue(), "https://api.moonshot.cn/v1");
       assert.equal(await on(), "openai");
       assert.equal(await key.inputValue(), "", "a placeholder is no key");
-      assert.ok(await key.evaluate((i) => document.activeElement === i), "the key's box is where to paste one");
+      await page.waitForFunction(() => { const a = document.activeElement; return !!a && a.tagName === "INPUT" && a.type === "password" && !a.classList.contains("proxy-credential"); }, null, { timeout: 2000 });
       assert.equal(await models.inputValue(), "kimi-k3");
       assert.equal((await note.textContent()).trim(), w.kimi);
 

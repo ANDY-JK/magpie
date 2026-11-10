@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const fetched = new Date(Date.now() - 3600e3).toISOString();
@@ -135,7 +136,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal((await fold.textContent()).trim(), w.open);
       await close();
 
-      const missing = await page.evaluate(() => ["Expand the list", "Collapse the list", "Show every model at once, not in a small box to scroll", "Hold the models to a few lines again"].filter((k) => !I18N.zh[k] || !I18N.ja[k] || !I18N.de[k]));
+      const I = allStrings().I18N;
+      const missing = ["Expand the list", "Collapse the list", "Show every model at once, not in a small box to scroll", "Hold the models to a few lines again"].filter((k) => !I.zh[k] || !I.ja[k] || !I.de[k]);
       assert.deepEqual(missing, [], "every string has its zh, ja and de");
       assert.deepEqual(errors, []);
     });
