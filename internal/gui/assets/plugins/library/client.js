@@ -1576,7 +1576,7 @@ magpie.plugin("library", (ctx) => {
   // address stays under it, muted, as before.
   function descriptionEl(s) {
     if (!s.description) return [];
-    const d = el("div", "lib-srvdesc", s.description);
+    const d = el("div", "lib-srvdesc lib-desc", s.description);
     d.title = s.description;
     return [d];
   }
@@ -3048,7 +3048,7 @@ magpie.plugin("library", (ctx) => {
     const who = el("div", "who");
     who.append(el("div", "name mono", h.name));
     // what it is for, in the user's own words (#2011)
-    if (h.description) who.append(el("div", "lib-hookdesc", h.description));
+    if (h.description) who.append(el("div", "lib-hookdesc lib-desc", h.description));
     who.append(el("div", "sub lib-hookev", hookLine(h)));
     const cmd = el("div", "sub mono lib-hookcmd", h.command);
     cmd.title = h.command;
@@ -3238,7 +3238,7 @@ magpie.plugin("library", (ctx) => {
     const row = el("div", "row lib-row click lib-subagent");
     const who = el("div", "who");
     who.append(el("div", "name mono", s.name));
-    who.append(el("div", "lib-subagentdesc", s.description));
+    who.append(el("div", "lib-subagentdesc lib-desc", s.description));
     const line = subagentLine(s);
     if (line) who.append(el("div", "sub lib-subagentuses", line));
     row.append(glyph(GLYPH.subagent), who,
@@ -5330,7 +5330,7 @@ magpie.plugin("library", (ctx) => {
     who.append(nm);
     if (s.note) nm.append(tag(t("Chinese"), "lib-notezh", t("A Chinese description you saved for this skill, shown in place of its own")));
     if (hereLine) who.append(hereLine);
-    const sub = el("div", "sub", s.missing ? t("Its folder is gone from the library") : s.note || s.description || "");
+    const sub = el("div", "sub lib-desc", s.missing ? t("Its folder is gone from the library") : s.note || s.description || "");
     // the note is magpie's, the description the SKILL.md's: the hover keeps
     // both, the note first (skill_notes.go)
     sub.title = s.note ? s.note + (s.description ? "\n" + s.description : "") : s.description || "";
