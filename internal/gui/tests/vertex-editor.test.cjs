@@ -170,7 +170,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
 
       // its four fields where the key would be, in order, each labelled,
       // with its example and what it is for
-      assert.equal(await ed.locator("input[type=password]").count(), 0, "no key to paste");
+      assert.equal(await ed.locator("input[type=password]:not(.proxy-credential)").count(), 0, "no key to paste");
       const labels = await ed.locator("label").allTextContents();
       assert(!labels.includes(w.key), labels.join(" | "));
       const placeholders = ["my-project-123", "global", "~/.config/gcloud/application_default_credentials.json", w.account];
@@ -227,7 +227,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.locator("#addProvider").click();
       await page.locator('#addSheet .tile[data-pick="Google Gemini"]').click();
       await ed.locator(".ehead b", { hasText: "Google Gemini" }).waitFor();
-      assert.equal(await ed.locator("input[type=password]").count(), 1);
+      assert.equal(await ed.locator("input[type=password]:not(.proxy-credential)").count(), 1);
       assert.equal(await ed.locator(FIELDS.map((c) => "input." + c).join(", ")).count(), 0);
 
       for (const l of ["zh", "ja", "de"]) {
@@ -246,7 +246,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     test(`${engine} ${lang}: a saved Vertex AI provider's project is shown, tested and saved`, async (t) => {
       const { page, errors, posts } = await start(t, lang, "edit", [saved, adc, relay], presets(true));
       let ed = await edit(page, "google-vertex");
-      assert.equal(await ed.locator("input[type=password]").count(), 0);
+      // the Proxy row's password is the editor's own; a key field's is not
+      assert.equal(await ed.locator("input[type=password]:not(.proxy-credential)").count(), 0);
       assert.deepEqual(await values(ed), ["my-project-123", "us", "~/keys/vertex-sa.json", SA]);
       assert.deepEqual(await endpointsOf(ed), [["Gemini", "https://aiplatform.us.rep.googleapis.com/v1/projects/my-project-123/locations/us"]]);
       assert.equal(await ed.locator(".eps .ep .pl").getAttribute("title"), w.gemini);
