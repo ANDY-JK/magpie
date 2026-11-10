@@ -51,22 +51,22 @@ const words = {
 };
 const helpWords = {
   en: {
-    help: "When a model can't search the web directly, the selected provider searches for it and returns the results. Searches may use the service's quota or incur charges. If a search fails, the providers added after it are tried in their order, then other available sources and your Search APIs.",
+    help: "When a model can't search directly, the picked provider searches for it. Searches may cost quota or money; if one fails, the next providers are tried, then other sources and your Search APIs.",
     relays: "These relays must be selected manually and are not used for automatic selection or fallback: MyRelay.",
     left: "These providers can't be selected to search for other models with the current configuration: MiniMax, Kimi For Coding. Their models can still get search results through other available search providers or configured search APIs.",
   },
   zh: {
-    help: "当模型无法直接联网搜索时，由所选供应商代为搜索并返回结果。代搜可能消耗所用服务的额度或产生费用。搜索失败时，先按顺序换用你在它后面添加的供应商，再尝试其他可用来源，最后改用你配置的搜索 API。",
+    help: "模型自己不能联网时，由选中的供应商代搜。搜索可能消耗套餐额度或产生费用；失败时会依次尝试后面的供应商，再试其他来源和你的搜索 API。",
     relays: "以下中转服务需手动指定，不参与自动选择或自动回退：MyRelay。",
     left: "以下供应商在当前配置下不可选为代搜供应商：MiniMax, Kimi For Coding。它们的模型仍可通过其他可用的代搜供应商或已配置的搜索 API 获取搜索结果。",
   },
   ja: {
-    help: "モデルが直接ウェブ検索できない場合、選択したプロバイダが代わりに検索し、結果を返します。検索にはサービスの利用枠を消費したり、料金が発生したりする場合があります。検索に失敗すると、その後ろに追加したプロバイダを順に試し、他の利用可能な検索元、最後に設定済みの検索 API を使います。",
+    help: "モデルが直接検索できないときは、選んだプロバイダーが代わりに検索します。検索はプランの枠や料金を使うことがあり、失敗すると次のプロバイダー、ほかのソース、検索 API の順に試します。",
     relays: "次の中継サービスは手動で選択する必要があり、自動選択や自動フォールバックの対象にはなりません：MyRelay。",
     left: "次のプロバイダは現在の設定では他のモデルの検索用に選択できません：MiniMax, Kimi For Coding。これらのモデルも、他の利用可能な検索用プロバイダや設定済みの検索 API を通じて検索結果を取得できます。",
   },
   de: {
-    help: "Wenn ein Modell nicht direkt im Web suchen kann, übernimmt der ausgewählte Anbieter die Suche und liefert die Ergebnisse. Suchen können das Kontingent des Dienstes verbrauchen oder Kosten verursachen. Schlägt eine Suche fehl, werden zuerst die danach hinzugefügten Anbieter in ihrer Reihenfolge versucht, dann andere verfügbare Quellen und zuletzt Ihre Such-APIs.",
+    help: "Wenn ein Modell nicht selbst suchen kann, sucht der gewählte Anbieter dafür. Suchen können Kontingent oder Geld kosten; scheitert eine, werden die nächsten Anbieter versucht, dann andere Quellen und Ihre Such-APIs.",
     relays: "Diese Relays müssen manuell ausgewählt werden und werden weder automatisch noch als Fallback gewählt: MyRelay.",
     left: "Diese Anbieter können mit der aktuellen Konfiguration nicht für die Suche anderer Modelle ausgewählt werden: MiniMax, Kimi For Coding. Ihre Modelle können weiterhin über andere verfügbare Suchanbieter oder konfigurierte Such-APIs Suchergebnisse erhalten.",
   },
@@ -302,13 +302,17 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(posted.at(-1).searcher, "off");
       await page.reload();
       await row.waitFor();
-      await row.scrollIntoViewIfNeeded();
+      // the page draws once more as the settings come in: the row looked for
+      // here is the one after that, not the one replaced under the scroll
+      await page.waitForFunction(() => document.querySelector("#searchList .row.searcher-row")?.getBoundingClientRect().height > 0);
+      await page.waitForTimeout(200);
+      await page.locator("#searchList .row.searcher-row").scrollIntoViewIfNeeded();
       assert.equal(await row.locator("button.searcher-pick").innerText(), w.off);
       assert.equal(await row.locator(".searcher-own, .searcher-unused, .searcher-relays, .searcher-left-out").count(), 0);
       assert.equal(await page.locator("#searchFirstRow").count(), 0);
       assert.equal(await row.locator(".sub").innerText(), lang === "zh"
-        ? "关闭供应商代搜后，仅使用已配置的搜索 API；未配置时，Magpie 不添加搜索工具。供应商自带的联网搜索不受影响。"
-        : "When provider search is off, only configured Search APIs are used. Without a Search API, magpie does not add a search tool. Providers' native web search is unchanged.");
+        ? "已关闭供应商搜索：只用你配置的搜索 API；没有配置就不加搜索工具。供应商自带的联网搜索不受影响。"
+        : "Provider search is off: only your Search APIs are used. Without one, no search tool is added. Providers' native search is unchanged.");
 
       // back to Automatic
       const afterReload = await where();
