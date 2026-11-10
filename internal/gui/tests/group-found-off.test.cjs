@@ -13,6 +13,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [
@@ -120,12 +121,12 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.waitForFunction((m) => document.querySelector("#status").textContent.includes(m), w.back);
       assert.equal(await at(), before, "nor did the second");
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Find groups on their own", "Found groups are on", "Found groups are off: only yours are listed and served",
         "A model two or more of your providers serve becomes a group of them (auto/…). Switch it off to list and serve only the groups you made or changed.",
         "Off: only the groups you made or changed are listed and served. An agent set to a found group is moved to its model from one provider, and a request still naming one goes there too.",
         "No group yet. New group makes one of any models you like.",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

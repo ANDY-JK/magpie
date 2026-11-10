@@ -17,6 +17,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const words = {
@@ -167,11 +168,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await page.locator("#view-routing select").count(), 0);
       assert.equal(await set.evaluate((e) => getComputedStyle(e).borderLeftWidth), "0px");
       assert.equal(await row2.evaluate((e) => getComputedStyle(e).borderLeftWidth), "0px");
-      const missing = await page.evaluate(() => ["Agents’ lists show “{label}”", "In agents’ lists",
+      const missing = (() => ["Agents’ lists show “{label}”", "In agents’ lists",
         "“Provider in model names” is one setting for every provider", "Change in Settings", "Not on names I set", "Provider in model names",
         "Names in agents’ lists", "“· routing group” is set for every group above",
         "Whether “· routing group” follows a group’s name in the agents’ lists: one setting for every group, and for the provider after each model’s name, as on Settings."]
-        .filter((k) => !I18N.zh[k] || !I18N.ja[k] || !I18N.de[k]));
+        .filter((k) => !allStrings().I18N.zh[k] || !allStrings().I18N.ja[k] || !allStrings().I18N.de[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese, Japanese and German");
       assert.deepEqual(errors, []);
     });

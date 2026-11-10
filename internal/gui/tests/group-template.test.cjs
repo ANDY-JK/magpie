@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [
@@ -138,7 +139,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(posts.length, 1, "picking a template added it unseen");
 
       if (lang !== "en") {
-        const missing = await page.evaluate(([l, ks]) => ks.filter((k) => !I18N[l][k]), [lang, KEYS]);
+        const missing = KEYS.filter((k) => !allStrings().I18N[lang][k]);
         assert.deepEqual(missing, [], `every string has its ${lang}`);
       }
       assert.deepEqual(errors, []);

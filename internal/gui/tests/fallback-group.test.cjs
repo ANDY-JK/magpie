@@ -10,6 +10,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const base = { chat: "", responses: "", anthropic: "", catalog: "", agents: [], fallback: [], headers: {}, keyList: [], key: { set: true }, ready: true };
@@ -58,10 +59,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.route("**/*", serve(lang, posts));
       await page.goto("http://magpie.test/?view=providers");
       const W = words[lang];
-      const missing = await page.evaluate(() => {
-        const keys = ["add a model or routing group: filter, or type provider/model…", "No routing group {id} now; it is skipped", "No model or routing group matches", "routing group"];
-        return ["zh", "zh-TW", "ja", "de"].flatMap((l) => keys.filter((k) => !I18N[l]?.[k]).map((k) => l + ": " + k));
-      });
+      const keys = ["add a model or routing group: filter, or type provider/model…", "No routing group {id} now; it is skipped", "No model or routing group matches", "routing group"];
+      const missing = ["zh", "zh-TW", "ja", "de"].flatMap((l) => keys.filter((k) => !allStrings().I18N[l]?.[k]).map((k) => l + ": " + k));
       assert.deepEqual(missing, [], "every new string in every language");
       await page.locator(".row.provider", { hasText: "Acme" }).first().click();
       { const adv = page.locator(".editor details.advanced"); await adv.waitFor({ state: "attached" }); if (!(await adv.evaluate((d) => d.open))) await adv.locator(":scope > summary").click(); }

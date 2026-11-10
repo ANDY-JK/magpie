@@ -15,6 +15,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [
@@ -140,11 +141,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const sent = posts.find((p) => p.path === "/api/groups/save");
       assert.deepEqual(sent.body.members, ["a/one", "b/three"]);
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "in {groups}", "switched off", "{name} switched on", "{name} switched off",
         "Off: agents aren't offered {name} and a request to it is turned away. Click to switch it on",
         "On: agents may pick {name}. Click to switch it off and keep it as it is",
-      ].filter((k) => !I18N.zh[k] || !I18N.ja[k] || !I18N.de[k]));
+      ].filter((k) => !allStrings().I18N.zh[k] || !allStrings().I18N.ja[k] || !allStrings().I18N.de[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese, Japanese and German");
       assert.deepEqual(errors, []);
     });
