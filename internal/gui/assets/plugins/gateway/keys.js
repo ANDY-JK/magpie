@@ -105,6 +105,12 @@ function gatewayKeysTicks() {
   }, 15e3);
 }
 
+// the window coming back: the keys' used limits are read again, as the
+// timer does while the page is in sight (Young on Discord)
+window.addEventListener("focus", () => {
+  if (view === "gateway" && gatewayKeys && !$("#view-gateway")?.hidden) refreshGatewayKeys();
+});
+
 async function gatewayKeyAction(action, body) {
   if (gatewayKeysBusy) return null;
   gatewayKeysBusy = true;
