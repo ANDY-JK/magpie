@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const relay = {
@@ -97,11 +98,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(saved.body.balanceURL, relay.balanceURL);
       assert.equal(saved.body.balancePath, relay.balancePath);
       assert.equal(JSON.stringify(saved.body.headers).includes("acme"), true, JSON.stringify(saved.body.headers));
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Duplicate", "{name} copy", "Copy of {name}", "{masked} · {name}'s key, or paste another",
         "A new provider with {name}'s URLs, key, headers, models and balance settings, to change before adding",
         "Paused", "Pause: the gateway uses the other accounts, {agent} stays signed in to this one", "Resume: the gateway uses this account first again",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

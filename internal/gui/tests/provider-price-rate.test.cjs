@@ -9,6 +9,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 // the editor folds what few need under Advanced, this field among them:
@@ -87,11 +88,12 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
 
     test(`${engine} ${lang}: a provider's price rate is typed and saved`, async (t) => {
       const { page, errors, posts } = await open(t, "Relay");
-      const zh = await page.evaluate(() => ({
-        none: I18N.zh["1, the official price"], bad: I18N.zh["Price rate: a number from 0 to 1000, at most three decimals"],
-        hint: I18N.zh["Costs are counted at the official price times this, as a relay bills, like 0.8 or 1.5; a price you set for a model stays as set"],
-        label: I18N.zh["Price rate"],
-      }));
+      const I = allStrings().I18N.zh;
+      const zh = {
+        none: I["1, the official price"], bad: I["Price rate: a number from 0 to 1000, at most three decimals"],
+        hint: I["Costs are counted at the official price times this, as a relay bills, like 0.8 or 1.5; a price you set for a model stays as set"],
+        label: I["Price rate"],
+      };
       assert(zh.none && zh.bad && zh.hint && zh.label, "every string has its Chinese");
       if (lang === "zh") Object.assign(w, { none: zh.none, bad: zh.bad });
       assert.equal(await page.locator(".editor label", { hasText: w.label }).count(), 1);

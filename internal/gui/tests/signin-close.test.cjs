@@ -18,6 +18,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const LINK = "https://qoder.com/device/" + "a1b2c3d4e5".repeat(14) + "LprwDu";
@@ -164,7 +165,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.waitForTimeout(1000);
       assert.equal(await page.locator(".editor .accts .acc.add", { hasText: w.add }).count(), 1, "the editor stays open, with Add another");
 
-      const missing = await page.evaluate(() => ["Stop waiting for this sign-in"].filter((k) => !I18N.zh[k]));
+      const missing = ["Stop waiting for this sign-in"].filter((k) => !allStrings().I18N.zh[k]);
       assert.deepEqual(missing, []);
       // a Windows window tints its title bar to the page (6927bedfc), which changes nothing
       assert.deepEqual(ctl.other.filter((o) => o.startsWith("POST") && !o.includes("/api/open") && !o.includes("/api/window/titlebar")), [], "nothing else was changed");

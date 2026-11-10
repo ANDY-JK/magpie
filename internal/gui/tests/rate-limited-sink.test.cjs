@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const now = Date.now();
@@ -85,7 +86,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
   for (const lang of ["en", "zh"]) {
     const w = words[lang], zh = lang === "zh";
     const launch = () => engine === "webkit" ? webkit.launch() : chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || "chromium" });
-    const said = (page, s) => page.evaluate(([k, zh]) => zh ? I18N.zh[k] : k, [s, zh]);
+    const said = (page, s) => zh ? allStrings().I18N.zh[s] : s;
 
     test(`${engine} ${lang}: a provider's rate limited accounts go to the back, made with its Save`, async (t) => {
       const browser = await launch();
@@ -99,7 +100,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.goto("http://magpie.test/?view=providers");
       await page.locator(".row.provider", { hasText: sub.name }).first().click();
       await page.locator(".editor .accts").first().waitFor();
-      assert.deepEqual(await page.evaluate((keys) => keys.filter((k) => !I18N.zh[k]), KEYS), [], "every string has its Chinese");
+      assert.deepEqual(KEYS.filter((k) => !allStrings().I18N.zh[k]), [], "every string has its Chinese");
       const label = page.locator(".editor label", { hasText: new RegExp(`^${w.label}$`) });
       const field = label.locator("xpath=following-sibling::div[1]");
       const opt = (name) => field.locator(".segs .opt", { hasText: new RegExp(`^${name}$`) });

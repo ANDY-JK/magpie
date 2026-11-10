@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const options = [
@@ -168,12 +169,12 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       for (let i = 0; i < 40 && !posts.some((p) => p.path.startsWith("/api/window/main")); i++) await page.waitForTimeout(50);
       assert.equal(posts.find((p) => p.path.startsWith("/api/window/main"))?.path, "/api/window/main?view=routing&newgroup=hunyuan%2Fhy4");
 
-      const missing = await page.evaluate((ks) => ks.filter((k) => !I18N.zh[k]), [
+      const missing = [
         "In no routing group, so no agent can use them now: {models}.", "Once saved, make a group of them in Routing.",
         "Make a routing group of {model}", "Make a routing group of it", "Pick {group}",
         "{provider} is used only through routing groups: agents reach {model} by picking {group}.",
         "{provider} is used only through routing groups, and {model} is in none, so no agent can use it. Make a group of it, or untick “Only through routing groups” in {provider}'s models.",
-      ]);
+      ].filter((k) => !allStrings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });
