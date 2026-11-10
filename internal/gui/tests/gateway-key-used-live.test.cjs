@@ -65,6 +65,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // and, left alone in sight, the timer does
       spend(12.5, 80e6);
       await page.clock.runFor(16e3);
+      console.log("KL", JSON.stringify(await page.evaluate(() => ({ hidden: document.hidden, tick: typeof gatewayKeysTick === "undefined" ? "none" : gatewayKeysTick, view, used: gatewayKeys?.[0]?.usedAll?.[0]?.cost }))));
       const later = tr("{used} of {limit} estimated · {left} left", { used: "$12.50", limit: "$30.00", left: "$17.50" });
       await page.waitForFunction((s) => document.querySelector('#gatewayKeys .acc[data-key="pool"] .key-limit')?.textContent.includes(s), later);
 
