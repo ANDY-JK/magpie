@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 // gitCase is a folder and what git finds from there: whether it is in a
@@ -272,5 +273,41 @@ func TestGitOnDiskUnreadIsUnknown(t *testing.T) {
 		if got != "" {
 			t.Errorf("%s: %q, want unknown", c.name, got)
 		}
+	}
+}
+
+// GitOnDisk's answer is kept for a moment: the gateway asks on every request
+// whose agent names its folder but not whether it is in a repository, and
+// reading up the tree each time is syscalls on that request's way. A folder
+// made a repository meanwhile is seen within that moment, and a folder that
+// isn't there is unknown at once.
+func TestGitOnDiskKeepsItsAnswerBriefly(t *testing.T) {
+	dir := t.TempDir()
+	forgetGitOnDisk()
+	was := gitOnDiskFor
+	gitOnDiskFor = 80 * time.Millisecond
+	t.Cleanup(func() { gitOnDiskFor = was; forgetGitOnDisk() })
+
+	if got := GitOnDisk(dir); got != "no" {
+		t.Fatalf("a plain folder reads %q", got)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, ".git", "objects"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, ".git", "refs"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".git", "HEAD"), []byte("ref: refs/heads/main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := GitOnDisk(dir); got != "no" {
+		t.Fatalf("the kept answer changed at once: %q", got)
+	}
+	time.Sleep(120 * time.Millisecond)
+	if got := GitOnDisk(dir); got != "yes" {
+		t.Fatalf("a folder made a repository reads %q after the moment", got)
+	}
+	if got := GitOnDisk(filepath.Join(dir, "gone")); got != "" {
+		t.Fatalf("a folder that isn't there reads %q, want unknown", got)
 	}
 }

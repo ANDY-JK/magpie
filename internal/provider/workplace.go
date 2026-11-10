@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 )
 
 // gitSaidRe is whether the agent's folder is in a git repository, as the
@@ -33,6 +35,31 @@ func GitSaid(text string) string {
 	return "no"
 }
 
+// gitOnDiskFor is how long GitOnDisk keeps an answer: the gateway asks on
+// every request whose agent names its folder but not whether it is in a
+// repository, and reading up the tree is syscalls on that request's way
+// (a slow disk, a network folder). A folder made a repository meanwhile is
+// seen within it; a folder that can't be read is asked again at once.
+var gitOnDiskFor = 30 * time.Second
+
+var gitOnDiskCache = struct {
+	sync.Mutex
+	m map[string]gitOnDiskAnswer
+}{m: map[string]gitOnDiskAnswer{}}
+
+type gitOnDiskAnswer struct {
+	git string
+	at  time.Time
+}
+
+// forgetGitOnDisk drops what GitOnDisk remembers, for a test that makes a
+// folder a repository between two asks.
+func forgetGitOnDisk() {
+	gitOnDiskCache.Lock()
+	gitOnDiskCache.m = map[string]gitOnDiskAnswer{}
+	gitOnDiskCache.Unlock()
+}
+
 // GitOnDisk says whether dir, a folder on this computer, is in a git
 // repository as git finds one from there: the nearest .git in it or in a
 // folder above it that git takes (GitAt). A .git folder git doesn't take,
@@ -45,10 +72,38 @@ func GitOnDisk(dir string) string {
 	if !filepath.IsAbs(dir) {
 		return ""
 	}
+	dir = filepath.Clean(dir)
 	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
 		return ""
 	}
-	for d := filepath.Clean(dir); ; {
+	gitOnDiskCache.Lock()
+	if a, ok := gitOnDiskCache.m[dir]; ok && time.Since(a.at) < gitOnDiskFor {
+		gitOnDiskCache.Unlock()
+		return a.git
+	}
+	gitOnDiskCache.Unlock()
+	git := gitOnDiskRead(dir)
+	// an answer is kept only as long as it is asked for; the map is swept
+	// when it grows, so a session through many folders doesn't hold them
+	gitOnDiskCache.Lock()
+	if len(gitOnDiskCache.m) >= 512 {
+		for k, a := range gitOnDiskCache.m {
+			if time.Since(a.at) >= gitOnDiskFor {
+				delete(gitOnDiskCache.m, k)
+			}
+		}
+		if len(gitOnDiskCache.m) >= 1024 {
+			gitOnDiskCache.m = map[string]gitOnDiskAnswer{}
+		}
+	}
+	gitOnDiskCache.m[dir] = gitOnDiskAnswer{git: git, at: time.Now()}
+	gitOnDiskCache.Unlock()
+	return git
+}
+
+// gitOnDiskRead is GitOnDisk's walk up the folder, uncached.
+func gitOnDiskRead(dir string) string {
+	for d := dir; ; {
 		git, _, err := GitAt(filepath.Join(d, ".git"))
 		if err != nil {
 			return ""
