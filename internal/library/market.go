@@ -786,6 +786,9 @@ func InstallServer(id string, values map[string]string, agents []string) (*Resul
 		return nil, fmt.Errorf("the market has no server %s; search for it again", id)
 	}
 	s := m.server
+	// the market's own words for it, kept with the server and shown on its
+	// row; no agent is given them
+	s.Description = m.Description
 	s.Args = slices.Clone(s.Args)
 	s.Env, s.Headers = maps.Clone(s.Env), maps.Clone(s.Headers)
 	selfCommand(&s)

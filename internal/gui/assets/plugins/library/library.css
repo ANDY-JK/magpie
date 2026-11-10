@@ -750,6 +750,12 @@ input.lib-setname:focus { border-color: var(--accent); box-shadow: 0 0 0 3px col
 .lib-hook .lib-hookdesc { font-size: 12px; line-height: 1.45; color: var(--fg); white-space: normal; overflow-wrap: anywhere; margin-top: 1px; }
 .lib-hookedit .lib-hookdescin { width: 100%; box-sizing: border-box; resize: none; font: inherit; font-size: 12.5px; line-height: 1.45; }
 
+/* an MCP server's own words for what it is for (the owner, 11-10): under
+   its name as a hook's description is, wrapped, with its command or address
+   staying under that, muted */
+.lib-srvwho .lib-srvdesc { font-size: 12px; line-height: 1.45; color: var(--fg); white-space: normal; overflow-wrap: anywhere; margin-top: 1px; }
+.lib-editor .lib-srvdescin { width: 100%; box-sizing: border-box; }
+
 /* Subagents (#2283): the row says what it is for, wrapped, as a hook's
    description does; its skills and servers are menus as wide as the
    dialog lets them be, and the prompt a box that grows with it */

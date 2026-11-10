@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	toml "github.com/pelletier/go-toml/v2"
 	"github.com/tidwall/jsonc"
@@ -32,6 +33,9 @@ import (
 // reach.
 type Server struct {
 	Name string `json:"name"`
+	// Description says what the server is for, in any language: the
+	// library keeps it and no agent is given it (a hook's, #2011)
+	Description string `json:"description,omitempty"`
 	// Transport is stdio for a command, http (streamable) or sse for a URL.
 	Transport string            `json:"transport"`
 	Command   string            `json:"command,omitempty"`
@@ -114,6 +118,11 @@ func ServerOf(name string, cmd []string) (Server, error) {
 func (s *Server) check() error {
 	if err := checkName("server", s.Name); err != nil {
 		return err
+	}
+	// one paragraph, as a hook's description is kept
+	s.Description = strings.Join(strings.Fields(s.Description), " ")
+	if utf8.RuneCountInString(s.Description) > maxServerDescription {
+		return fmt.Errorf("%s: the description is at most %d characters", s.Name, maxServerDescription)
 	}
 	s.Command, s.URL = strings.TrimSpace(s.Command), strings.TrimSpace(s.URL)
 	switch s.Transport {
@@ -403,6 +412,10 @@ func selfTimeout(s *Server, def int) int {
 // maxStartupTimeout is the longest startup timeout a server is given: a
 // day, as a hook's timeout.
 const maxStartupTimeout = 86400
+
+// maxServerDescription is how long a server's description can be, in
+// characters: a hook's 200 (#2011), one line under its name.
+const maxServerDescription = 200
 
 // startupTheirs says whether old, a Codex entry, has a startup timeout
 // magpie didn't write: a startup_timeout_ms (magpie writes only _sec, and

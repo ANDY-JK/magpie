@@ -1571,6 +1571,15 @@ magpie.plugin("library", (ctx) => {
     if (s.transport === "stdio") return [s.command, ...(s.args || [])].map(quote).join(" ");
     return s.url;
   }
+  // A server's own words for what it is for, under its name as a hook's
+  // (#2011): the library keeps it and no agent is given it. The command or
+  // address stays under it, muted, as before.
+  function descriptionEl(s) {
+    if (!s.description) return [];
+    const d = el("div", "lib-srvdesc", s.description);
+    d.title = s.description;
+    return [d];
+  }
   // quote: an argument as this system's shell reads it, and words() reads
   // back. On Windows that is cmd's double quotes, and a \ is a path's, not an
   // escape: sh's 'C:\…\npx.cmd' read as quotes magpie had added to the
@@ -2051,7 +2060,7 @@ magpie.plugin("library", (ctx) => {
     who.append(nm, healthEl(s.name));
     const sub = el("div", "sub mono", serverLine(s));
     sub.title = serverLine(s);
-    who.append(sub, toolsEl(s.name));
+    who.append(...descriptionEl(s), sub, toolsEl(s.name));
     row.append(mark(s.icon, s.transport === "stdio" ? GLYPH.cmd : GLYPH.web), who, ...removeAct(() => confirmRemoveServer(s)),
       agentChips(withGone(all, s.agents), s.agents, chipsChange("servers/agents", s.name, "servers", (x) => serverRow(x, all)), { problems: s.problems, blocked: sseBlocked(s), all: true }));
     if (picking) return pickRow(row, s.name);
@@ -2693,7 +2702,8 @@ magpie.plugin("library", (ctx) => {
 
   function editServer(s, prefill) {
     const all = mcpAgents();
-    const d = prefill || (s ? structuredClone(s) : { name: "", transport: "stdio", command: "", args: [], env: {}, url: "", headers: {}, agents: all.map((a) => a.id) });
+    const d = prefill || (s ? structuredClone(s) : { name: "", description: "", transport: "stdio", command: "", args: [], env: {}, url: "", headers: {}, agents: all.map((a) => a.id) });
+    if (!d.description) d.description = "";
     if (!d.env) d.env = {};
     if (!d.headers) d.headers = {};
     d.local = !!d.local;
@@ -2749,6 +2759,11 @@ magpie.plugin("library", (ctx) => {
     const callback = () => t("Made with its vendor (GitHub's under Settings › Developer settings › OAuth Apps), with {url} as its callback URL", { url: "http://localhost" + (d.oauth?.callbackPort ? ":" + d.oauth.callbackPort : "") + "/callback" });
     const name = field2(d.name, t("e.g. github"), (v) => { d.name = v.trim(); signBox?.redraw(); });
     ed.append(...field(t("Name"), name, t("Letters, digits, - and _ — what the agents call it")));
+    // one line, as a hook's description: the row shows it under the name
+    const desc = field2(d.description, "", (v) => { d.description = v; });
+    desc.classList.add("lib-srvdescin");
+    desc.maxLength = 200;
+    ed.append(...field(t("Description"), desc, t("Optional: what it's for, in any language. Only the library keeps it")));
     const kindOf = () => segs([["stdio", t("Command")], ["http", "HTTP"], ["sse", "SSE"]], d.transport, (v) => { d.transport = v; draw(); });
     const kindBox = el("div");
     kindBox.append(kindOf());
@@ -2837,7 +2852,7 @@ magpie.plugin("library", (ctx) => {
     // send saves the form; s is then the server as saved, for a save after
     // a sign-in's to be of it
     const send = async () => {
-      const body = { old: s ? s.name : "", server: { name: d.name, transport: d.transport, agents: d.agents, startupTimeout: d.startupTimeout || 0, local: !!d.local, hub: d.hub || "" } };
+      const body = { old: s ? s.name : "", server: { name: d.name, description: d.description || "", transport: d.transport, agents: d.agents, startupTimeout: d.startupTimeout || 0, local: !!d.local, hub: d.hub || "" } };
       if (d.transport === "stdio") Object.assign(body.server, { command: d.command, args: d.args, env: d.env });
       else Object.assign(body.server, { url: d.url, headers: d.headers, oauth: d.transport === "http" && d.oauth?.clientId ? d.oauth : null });
       take(await api("library/servers/save", body));
