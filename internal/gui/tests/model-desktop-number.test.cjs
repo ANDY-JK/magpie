@@ -10,6 +10,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const fetched = new Date(Date.now() - 3600e3).toISOString();
@@ -88,7 +89,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // a model Desktop shows by its own id carries no number
       assert.equal(await editor.locator(".mchips .mchip", { hasText: "Sonnet 5" }).locator(".badge").count(), 0, "no number on its own id");
 
-      const missing = await page.evaluate(() => ["The number Claude Desktop's menu shows beside this model"].filter((k) => !I18N.zh[k]));
+      const missing = ["The number Claude Desktop's menu shows beside this model"].filter((k) => !strings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

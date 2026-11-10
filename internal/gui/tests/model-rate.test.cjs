@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const fetched = new Date(Date.now() - 3600e3).toISOString();
@@ -145,7 +146,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual([by["Qwen3.8-Max"], by["Qwen3.8-Flash"], by["Plain"]], [[false, "0.5×"], [true, "0.1×"], [false, null]]);
       assert.equal(await list.locator("li .badge.rate").first().getAttribute("title"), w.costs);
 
-      const missing = await page.evaluate(() => ["costs {rate} credits a request", "costs {rate} credits a request, {was} before the discount", "free now, {was} before the discount"].filter((k) => !I18N.zh[k]));
+      const missing = ["costs {rate} credits a request", "costs {rate} credits a request, {was} before the discount", "free now, {was} before the discount"].filter((k) => !strings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

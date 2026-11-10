@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const base = { icon: "generic", chat: "", responses: "", anthropic: "", catalog: "", agents: [], fallback: [], headers: {}, keyList: [], proxy: "" };
@@ -168,10 +169,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await all.getAttribute("title"), w.own);
       await page.waitForTimeout(150);
       assert.equal(tests.length, 0, "nothing was sent");
-      const missing = await page.evaluate(() => [
+      const missing = [
         "{name} is reached through its own API, which magpie translates each agent request for, so a test request can't be sent to it on its own. Ask the model from an agent to try it.",
         "A classifier's models aren't sent test requests: Test under Endpoints asks Jev's endpoint for them.",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !strings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

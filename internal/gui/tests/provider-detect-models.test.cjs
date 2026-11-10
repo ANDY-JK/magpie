@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const ROOT = "https://relay.example.com";
@@ -173,14 +174,14 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(save.body.anthropic || "", "", "Anthropic (404) isn't set");
       assert.deepEqual(save.body.modelPrefs, { "m-resp": { api: "responses" }, "m-chat": { api: "chat" } });
 
-      const missing = await page.evaluate(() => [
+      const missing = [
         "Each picked model", "Ask every model picked below on each API, to see which API serves which model (up to {n}, a few at a time)",
         "Pick models first, or type one and press Detect APIs", "Only the first {n} of {all} models were asked", "Model",
         "Set the URLs of the APIs that answered, and give each model that answered on one API only that API (staged in Names & levels, made with the Save)",
         "{n} models are asked on the one API that answered them once saved", "{model}: {api} only",
         "an image model: asked on the images API, not here", "not asked: out of time",
         "Answered via {api} in {took}", "{model} answered via {api} in {took}", "{model} didn't answer via {api}: {error}",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !strings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

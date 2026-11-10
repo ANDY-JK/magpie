@@ -19,8 +19,7 @@ const assets = path.resolve(__dirname, "../assets");
 const IDS = ["by-hand/model-x", "gpt-5.1", "zai/glm-5.3-flash", "cline-free/mimo-v2.6-flash"];
 const relay = {
   id: "relay", name: "Relay", icon: "generic", chat: "https://relay.example.com/v1", responses: "", anthropic: "", catalog: "",
-  models: IDS.map((id) => ({ id, name: id === "zai/glm-5.3-flash" ? "GLM 5.3 Flash" : id, on: id !== "gpt-5.1" })), agents: [], fallback: [], headers: {},
-  chosen: ["zai/glm-5.3-flash", "cline-free/mimo-v2.6-flash", "by-hand/model-x"],
+  models: IDS.map((id) => ({ id, name: id === "zai/glm-5.3-flash" ? "GLM 5.3 Flash" : id, on: true })), agents: [], fallback: [], headers: {},
   key: { set: true, masked: "sk-…one" }, keyList: [], balanceToken: { takes: false, set: false }, proxy: "",
 };
 // one reached through its own API: its models can't be tested, and can
