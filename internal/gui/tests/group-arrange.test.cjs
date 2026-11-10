@@ -13,6 +13,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [
@@ -182,10 +183,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await page.locator(".row-menu").count(), 0, "letting go opened the menu");
 
       assert.equal(await at(), before, "a click moved the page");
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Group order saved", "Move up", "Move down", "Arrange {agent}",
         "Drag to reorder — agents' model lists show the groups in this order · Alt+↑/↓ to move",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

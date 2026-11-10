@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [
@@ -127,7 +128,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await row.locator(".opt", { hasText: w.largest }).click();
       assert.equal((await save()).context, 0);
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Largest model's", "Smallest model's", "Custom", "e.g. 200k",
         "Agents are told the group takes {n} tokens; a longer conversation still goes on to a member with room for it.",
         "Agents are told {n} tokens, its smallest model's, so they compact before any member would turn the conversation away.",
@@ -136,7 +137,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         "Agents are told its largest model's window; a conversation too long for one member goes on to one with room for it.",
         "Agents are told {n} tokens, its largest model's; a conversation longer than {m} skips {who} for a member with room for it.",
         "{v} is not a length of tokens like 200k or 1m",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });
