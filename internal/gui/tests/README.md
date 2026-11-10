@@ -2669,3 +2669,13 @@ hasn't.
 ```sh
 node --test internal/gui/tests/nav-timeout.test.cjs
 ```
+
+## Smoke run
+
+`node scripts/gui-smoke.cjs` (or `npm run test:gui`) runs twelve fast files
+that cover this season's ground — the provider editor's tabs and a refetch,
+Allowances' and Routing's tabs, the Library's filters and export, the image
+MCP's words, the balance help, Vertex's editors, the doctor — on Chromium and
+WebKit with `--test-concurrency=1`, about three minutes. `BROWSER=chromium`
+runs one engine. It is a smoke run, not the whole suite; every file in it
+passed on both engines when it was added.
