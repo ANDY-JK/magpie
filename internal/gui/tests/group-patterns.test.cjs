@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [
@@ -130,7 +131,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(sent.body.match, ["nope/*", "*-free"]);
       assert.deepEqual(sent.body.off, ["zen/d-free"], "a matched model may be off");
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Patterns", "Add pattern", "by pattern", "matches nothing now", "e.g. openrouter/*:free or re:…",
         "Every model this pattern matches is in the group, as providers list them",
         "No model magpie serves matches this pattern now",
@@ -138,7 +139,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         "A pattern has a * in it, or starts with re:",
         "{pattern} is not a regular expression magpie can read",
         "Every model a pattern matches is in the group, now and as providers list new ones, after the models above: * is any run of characters in provider/model, re: starts a regular expression.",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

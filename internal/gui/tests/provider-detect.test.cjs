@@ -13,6 +13,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const ROOT = "https://relay.example.com";
@@ -144,7 +145,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(save.body.chat, ROOT + "/v1");
       assert.deepEqual(save.body.modelPrefs, { "m-mixed": { api: "anthropic" } });
 
-      const missing = await page.evaluate(() => [
+      const missing = (() => [
         "Detect APIs", "Send the smallest request to each API (OpenAI chat completions, Responses, Anthropic messages, Gemini generateContent) at this URL, to see which answer",
         "model to try · empty picks one from the vendor's list", "Type the base URL first", "Asking each API…", "model {model}",
         "None answered: check the URL and the key, or type a model the vendor serves", "Use these", "Set the URLs of the APIs that answered; one not found there is cleared",
@@ -152,7 +153,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         "no URL to ask", "no model to try: type one the vendor serves", "no key is on for this endpoint",
         "The API {id} is asked on. Auto: as the vendor's list says, else each URL the provider has; pick one when the vendor serves it on that one only",
         "Its own name, every reasoning level it has, whether it sees images, the API it is asked on, the model it is the same as, its own id, and its list price",
-      ].filter((k) => !I18N.zh[k]));
+      ].filter((k) => !allStrings().I18N.zh[k]))();
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });

@@ -12,6 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const astra = { input: 10, output: 50, cache_read: 1, cache_write: 12.5, tiers: [{ above: 272000, input: 20, output: 75, cache_read: 2, cache_write: 25 }] };
@@ -141,10 +142,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         "claude-opus-5-5": { price: { input: 5, output: 25, cache_read: 0.5, cache_write: 6.25, cache_write_1h: 7.5 } },
         "plain-1": { price: { input: 1, output: 4, cache_read: 0.1, cache_write: 0, tiers: [{ above: 200000, input: 2.5, output: 4, cache_read: 0.1, cache_write: 0 }] } },
       });
-      const missing = await page.evaluate(() => ["Cache write 1h", "Long-context price", "Long-context price, over", "Over input tokens",
+      const missing = (() => ["Cache write 1h", "Long-context price", "Long-context price, over", "Over input tokens",
         "A long-context price starts over a number of input tokens, like 272K", "A cache write kept for an hour, as Anthropic bills it; empty: 2× input",
         "What the whole request costs when its input — cached tokens and cache writes included — is over this many tokens, as OpenAI bills gpt-6-astra over 272K; empty: the list's",
-        "{m} for 5 minutes, {h} for an hour"].filter((k) => !I18N.zh[k] || !I18N.ja[k] || !I18N.de[k]));
+        "{m} for 5 minutes, {h} for an hour"].filter((k) => !allStrings().I18N.zh[k] || !allStrings().I18N.ja[k] || !allStrings().I18N.de[k]))();
       assert.deepEqual(missing, []);
       // no left-border accents on the new row
       assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll(".mtier, .mtier *")].filter((e) => parseFloat(getComputedStyle(e).borderLeftWidth) > 0 && getComputedStyle(e).borderLeftColor !== getComputedStyle(e).borderTopColor).length), 0);
