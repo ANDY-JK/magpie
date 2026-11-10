@@ -4479,5 +4479,7 @@ I18N.de = Object.assign(I18N.de || {}, {
     "in the site's personal settings": "in den persönlichen Einstellungen der Website",
     "A new-api relay also asks for your user ID with the token. It is in the site's personal settings.": "Ein new-api-Relay verlangt zum Token auch Ihre Benutzer-ID. Sie steht in den persönlichen Einstellungen der Website.",
     "Fill in your user ID (shown in the site's personal settings) under the provider's Account balance": "Tragen Sie Ihre Benutzer-ID (in den persönlichen Einstellungen der Website) beim Kontoguthaben des Anbieters ein",
+    "{n} resting": "{n} pausiert",
+    "{n} failed": "{n} fehlgeschlagen",
 });
 localeWordsHere.add("de");

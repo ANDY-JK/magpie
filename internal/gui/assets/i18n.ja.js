@@ -4479,5 +4479,7 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "in the site's personal settings": "サイトの個人設定に表示",
     "A new-api relay also asks for your user ID with the token. It is in the site's personal settings.": "new-api 中継サイトではトークンと一緒にユーザー ID も必要です。サイトの個人設定に表示されています。",
     "Fill in your user ID (shown in the site's personal settings) under the provider's Account balance": "プロバイダの「アカウント残高」にユーザー ID（サイトの個人設定に表示）を入力してください",
+    "{n} resting": "{n} 件休止中",
+    "{n} failed": "{n} 件失敗",
 });
 localeWordsHere.add("ja");

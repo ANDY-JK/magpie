@@ -4477,5 +4477,7 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "in the site's personal settings": "見站點個人設定",
     "A new-api relay also asks for your user ID with the token. It is in the site's personal settings.": "new-api 中轉站查餘額時還需要你的使用者 ID，在站點的個人設定裡可以看到。",
     "Fill in your user ID (shown in the site's personal settings) under the provider's Account balance": "請在供應商的「帳戶餘額」處填寫你的使用者 ID（見站點個人設定）",
+    "{n} resting": "{n} 個休息中",
+    "{n} failed": "{n} 個已失效",
 });
 localeWordsHere.add("zh-TW");

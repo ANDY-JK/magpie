@@ -6139,6 +6139,16 @@ function renderProviders(quiet) {
       const rate = "×" + (p.rateNow < 0.01 ? "<0.01" : +p.rateNow.toFixed(2));
       name.append(Object.assign(el("span", "badge rate-now", rate), { title: t("Bills at {rate} now: the price rate times this hour's window", { rate }) }));
     }
+    // the keys and accounts the gateway passes over, and why: the row says
+    // how many, so one key that stopped answering is found in a list of ten
+    // without opening the editor (the owner, 11-10)
+    const rests = restingOf(p);
+    if (rests.length) {
+      const failed = rests.filter((x) => x.rest.why === "auth" || x.rest.why === "credit").length;
+      const title = rests.map((x) => `${x.name} · ` + t("Resting · {why} · back at {time}", { why: (x.rest.status ? x.rest.status + " " : "") + keyRestWords(x.rest), time: restBack(x.rest.until) })).join("\n");
+      if (failed) name.append(Object.assign(el("span", "badge rest-now bad", t("{n} failed", { n: failed })), { title }));
+      if (rests.length > failed) name.append(Object.assign(el("span", "badge rest-now", t("{n} resting", { n: rests.length - failed })), { title }));
+    }
     // a provider that only draws images (Settings → Image generation) says so
     const models = n ? t(n === 1 ? "{n} model" : "{n} models", { n })
       : p.draws ? t(p.draws === 1 ? "{n} image model" : "{n} image models", { n: p.draws }) : t(p.noModels ? "usage only" : "no models exposed");
@@ -15077,6 +15087,16 @@ function keyPill(p) {
   const on = (p.keyList || []).filter((k) => k.on);
   if (on.length > 1) return t("{n} keys", { n: on.length });
   return on[0]?.name || p.key.masked;
+}
+
+// restingOf: the keys and accounts the gateway is passing over, with why and
+// until when, each as { name, rest }: its row says how many at the provider's
+// name, and each one's words on hover (the owner, 11-10)
+function restingOf(p) {
+  const now = Date.now(), out = [];
+  for (const k of p.keyList || []) if (k.rest && new Date(k.rest.until) > now) out.push({ name: k.name || k.masked || t("key"), rest: k.rest });
+  for (const l of p.account?.logins || []) if (l.rest && new Date(l.rest.until) > now) out.push({ name: l.alias || l.user || t("account"), rest: l.rest });
+  return out;
 }
 
 // keyFingerprint is the id the backend gives a key, to greet a new one.

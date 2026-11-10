@@ -2713,6 +2713,10 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
 .provider.off > .ic, .provider.off .who .sub, .provider.off .uses, .provider.off .key { opacity: .45; }
 .provider.off .name { color: var(--muted); }
 .badge.off { background: var(--pill); color: var(--muted); }
+/* the keys and accounts the gateway passes over (the owner, 11-10): at the
+   provider's name, the count; each one's name, why and back-at on hover */
+.provider .name .badge.rest-now { background: var(--amber-soft); color: var(--amber); }
+.provider .name .badge.rest-now.bad { background: var(--red-soft); color: var(--red); }
 .badge.free { background: var(--green-soft); color: var(--green); }
 /* a model's context, when it is a large one: grey, as it is a fact, not a warning */
 /* which way a model goes (#726): through magpie, or straight to its vendor */
