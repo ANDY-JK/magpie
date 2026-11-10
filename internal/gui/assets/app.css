@@ -3422,6 +3422,9 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
    filter was only reachable by dragging the page sideways, and Plugins'
    kinds on GitHub, wider than a 420px window in Japanese */
 .segs.regions, .connect .segs, .pm-ghbar .segs { max-width: 100%; overflow-x: auto; }
+/* a provider's regions scroll as one strip, never wrap: the editor's own
+   .segs wraps, which would leave the strip with nothing to scroll */
+.editor .segs.regions { flex-wrap: nowrap; }
 /* no scrollbar-width here: Chromium (WebView2) then drops every
    ::-webkit-scrollbar rule and draws Windows' classic bar, arrows and all,
    under the strip; the app's thin thumb instead, slimmer still */

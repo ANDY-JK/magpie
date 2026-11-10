@@ -14,6 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 
@@ -152,8 +153,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(saved.body.preset, "tencent-cloud");
       assert.deepEqual([saved.body.chat, saved.body.responses, saved.body.anthropic], [cn.chat, cn.responses, cn.anthropic]);
 
-      const missing = await page.evaluate(() => ["Plan · China", "Pay as you go · China", "Pay as you go · Global", "Enterprise plan · China", "Enterprise plan · Global", "Token Plan · pay as you go"]
-        .filter((k) => !I18N.zh[k] || !I18N["zh-TW"][k] || !I18N.ja[k] || !I18N.de[k]));
+      const I = allStrings().I18N;
+      const missing = ["Plan · China", "Pay as you go · China", "Pay as you go · Global", "Enterprise plan · China", "Enterprise plan · Global", "Token Plan · pay as you go"]
+        .filter((k) => !I.zh[k] || !I["zh-TW"][k] || !I.ja[k] || !I.de[k]);
       assert.deepEqual(missing, [], "every string has its Chinese");
       assert.deepEqual(errors, []);
     });
