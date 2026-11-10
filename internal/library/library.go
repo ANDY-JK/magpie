@@ -311,5 +311,10 @@ func changeLocked(f func(l *Library) error) (*Result, error) {
 		return nil, err
 	}
 	res := l.sync()
-	return res, l.save()
+	if err := l.save(); err != nil {
+		return res, err
+	}
+	// a mirror the reader asked for stays current; no folder, no writing
+	syncExport(l)
+	return res, nil
 }

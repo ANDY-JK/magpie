@@ -18,6 +18,21 @@ func ExportFiles() (string, int, error) {
 	if err != nil {
 		return "", 0, err
 	}
+	return writeExport(l)
+}
+
+// syncExport keeps a folder the reader asked for current after a change: a
+// library without one isn't given one, so nothing is written until Save as
+// files is used once. Errors are the reader's next export to show.
+func syncExport(l *Library) {
+	if _, err := os.Stat(filepath.Join(Dir(), "export")); err != nil {
+		return
+	}
+	_, _, _ = writeExport(l)
+}
+
+// writeExport is ExportFiles for a library already read.
+func writeExport(l *Library) (string, int, error) {
 	root := filepath.Join(Dir(), "export")
 	kinds := []struct {
 		dir string

@@ -79,3 +79,31 @@ func TestExportName(t *testing.T) {
 		}
 	}
 }
+
+// A folder the reader asked for stays current as the library changes; one
+// never asked for isn't written on every save.
+func TestExportStaysCurrent(t *testing.T) {
+	sandbox(t)
+	if _, err := SaveServer("", Server{Name: "one", Transport: "http", URL: "https://example.com/mcp", Agents: []string{"claude"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(Dir(), "export")); !os.IsNotExist(err) {
+		t.Fatalf("an export folder appeared without being asked for: %v", err)
+	}
+	dir, _, err := ExportFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SaveServer("", Server{Name: "two", Transport: "http", URL: "https://example.com/two", Agents: []string{"claude"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "mcp", "two.json")); err != nil {
+		t.Fatalf("the change didn't reach the mirror: %v", err)
+	}
+	if _, err := RemoveServer("one"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "mcp", "one.json")); !os.IsNotExist(err) {
+		t.Fatalf("the removed server stayed: %v", err)
+	}
+}
