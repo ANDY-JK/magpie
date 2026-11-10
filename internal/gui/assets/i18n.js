@@ -377,3 +377,9 @@ function translateStatic() {
   // they ran under the magpie and the window's buttons (kiwiflysky on X)
   window.fitTop?.();
 }
+
+// English, the language a page starts in, never changes locale, so
+// applyLocale's translateStatic never ran for it: the shell's own labels
+// (and their shortcuts, Settings' ⌘,) stayed as the markup had them.
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => translateStatic(), { once: true });
+else translateStatic();
