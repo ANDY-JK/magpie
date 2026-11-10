@@ -11,6 +11,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const codex = ({ switchOnly = false, spare = true } = {}) => ({
@@ -59,7 +60,7 @@ const label = {
 };
 const strings = [
   "Only switch {agent}'s sign-in",
-  "magpie signs {agent} in to the next account with room when the one it is on is used up, and keeps it there till that one is used up too, by writing {agent}'s own sign-in; {agent}'s requests go straight to OpenAI, never through magpie. A {agent} app or session already open stays on its account until it is opened again. Connected to magpie, {agent}'s requests go through it as before.",
+  "magpie signs {agent} in to the next account with room when the one it is on is used up, and keeps it there till that one is used up too, by writing {agent}'s own sign-in. A {agent} app or session already open stays on its account until it is opened again.",
   "magpie only switches {agent}'s sign-in; its requests go straight to OpenAI",
   "{agent}'s requests go through magpie to fail over to your other accounts again",
 ];
@@ -89,7 +90,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.ok(await only.getAttribute("title"), "it says what it does");
         assert.equal(await only.locator("input").isChecked(), false);
         if (lang === "en") {
-          const missing = await page.evaluate((ks) => ["zh", "zh-TW", "ja", "de"].flatMap((l) => ks.filter((k) => !I18N[l][k]).map((k) => `${l}: ${k}`)), strings);
+          // the words of every language are files of their own: read here,
+          // not in a page that loaded English alone
+          const I = allStrings().I18N;
+          const missing = ["zh", "zh-TW", "ja", "de"].flatMap((l) => strings.filter((k) => !I[l][k]).map((k) => `${l}: ${k}`));
           assert.deepEqual(missing, [], "every string has its translations");
         }
         await only.scrollIntoViewIfNeeded();
