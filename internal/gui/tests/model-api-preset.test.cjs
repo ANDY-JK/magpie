@@ -150,8 +150,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await open("Solo");
       await rclick(chip("solo-1"));
       await rowMenu.waitFor();
-      // its test and Copy model ID (81879b90), no API to pick
-      assert.equal(await rowMenu.getByRole("menuitem").count(), 2, "the test and the copy only");
+      // its test, what it can do besides answer (Test its capabilities,
+      // 3d45ba163), and Copy model ID (81879b90), no API to pick
+      assert.equal(await rowMenu.getByRole("menuitem").count(), 3, "the test, its capabilities and the copy only");
       assert.equal(await rowMenu.getByRole("menuitem", { name: /Asked on|协议/ }).count(), 0, "no API to pick");
       assert.deepEqual(errors, []);
     });
