@@ -1394,7 +1394,7 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "Their own": "ネイティブ検索",
     "magpie has nothing to search with: add a Search API above, or pick a provider under Searches for other models": "magpie が検索に使えるものがありません。上で検索 API を追加するか、「他のモデルの代わりに検索」でプロバイダを選んでください",
     "magpie's": "magpie の検索",
-    "Provider search is off: only your Search APIs are used, for every model. Without one, no search tool is added.": "プロバイダー検索はオフです。すべてのモデルで設定済みの検索 API だけを使い、なければ検索ツールを追加しません。",
+    "Provider search is off: only your Search APIs are used, for every model. Without one, no search tool is added.": "プロバイダー検索はオフです。どのモデルにも設定済みの検索 API だけを使い、なければ検索ツールを追加しません。",
     "Model search": "モデルによる代理検索",
     "No provider can search, so these are asked": "検索できるプロバイダがないため、これらを使います",
     "Provider search is off: only your Search APIs are used. Without one, no search tool is added. Providers' native search is unchanged.": "プロバイダー検索はオフです。設定済みの検索 API だけを使い、なければ検索ツールを追加しません。プロバイダー自身のウェブ検索は変わりません。",

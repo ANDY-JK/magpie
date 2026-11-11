@@ -1413,7 +1413,7 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "Their own": "內建搜尋",
     "magpie has nothing to search with: add a Search API above, or pick a provider under Searches for other models": "magpie 目前沒有可用的搜尋：請在上方新增搜尋 API，或在「代搜供應商」中選一個供應商",
     "magpie's": "magpie 代搜",
-    "Provider search is off: only your Search APIs are used, for every model. Without one, no search tool is added.": "已關閉供應商搜尋：每個模型都只用你設定的搜尋 API；沒有設定就不加搜尋工具。",
+    "Provider search is off: only your Search APIs are used, for every model. Without one, no search tool is added.": "已關閉供應商搜尋：所有模型都只用你設定的搜尋 API；沒有設定就不加搜尋工具。",
     "Model search": "模型代搜",
     "No provider can search, so these are asked": "沒有能搜尋的供應商，由這些 API 來搜",
     "Provider search is off: only your Search APIs are used. Without one, no search tool is added. Providers' native search is unchanged.": "已關閉供應商搜尋：只用你設定的搜尋 API；沒有設定就不加搜尋工具。供應商自帶的網路搜尋不受影響。",
