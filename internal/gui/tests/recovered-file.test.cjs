@@ -65,7 +65,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         // the backup's time, in the page's language: its year and day
         assert.match(said, /2026/);
         assert.match(said, /9|10/);
-        assert.equal(await st.getAttribute("class"), "status warn");
+        // warn, and lift when the footer is out of sight (d4c05ca11)
+        assert.match(await st.getAttribute("class"), /(^|\s)status(\s|$)/);
+        assert.match(await st.getAttribute("class"), /(^|\s)warn(\s|$)/);
         // narrow: the pill stays in the window
         const box = await st.boundingBox();
         assert.ok(box.x >= 0 && box.x + box.width <= 420 + 1, JSON.stringify(box));
