@@ -89,6 +89,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         const bulk = (name) => editor.locator(".mbulk").getByRole("button", { name, exact: true });
         const works = bulk(w.works);
         const picks = () => editor.locator(".mchips .mchip.on").evaluateAll((cs) => cs.map((c) => c.querySelector("span").textContent).sort());
+        // while some are picked the editor draws the picks alone: Show the
+        // other {n} draws the rest, which a pick of an unpicked one needs
+        const showAll = async () => { const r = editor.locator(".mchips-rest"); if (await r.count()) { await r.click(); await page.waitForTimeout(200); } };
         const scrolled = () => page.evaluate(() => [window.scrollY, ...[...document.querySelectorAll("*")].filter((e) => e.scrollTop > 0).map((e) => `${e.className}:${e.scrollTop}`)].join(" "));
 
         // not offered before a test has answered
@@ -110,6 +113,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert(fits, "the button runs off the editor");
 
         // a model picked after the test: not tested, so it stays
+        await showAll();
         await editor.locator(".mchips .mchip", { hasText: "minimax-m3" }).click();
 
         // the editor's body scrolled to the buttons; the click leaves it,

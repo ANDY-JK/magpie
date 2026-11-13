@@ -69,6 +69,10 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           await page.locator(".row.provider", { hasText: "Relay" }).first().click();
           const chips = editor.locator(".mchips .mchip");
           await chips.first().waitFor();
+          // while some are picked the editor draws the picks alone: Show the
+          // other {n} draws every model, the list whose steadiness is checked
+          const rest = editor.locator(".mchips-rest");
+          if (await rest.count()) { await rest.click(); await page.waitForTimeout(250); }
           // each chip's box within the list's own content, so that a scroll
           // of the page or the list (the click brings a chip into view at
           // 420px) is not counted as a chip moving
