@@ -70,12 +70,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // page's length and a loaded machine both decide how far 120 goes,
       // and a row left out of sight is a click that waits out its timeout
       await page.mouse.move(width / 2, 450);
-      // clear of the foot too: the scroll-to-ends capsule floats at the
-      // lower right (scrollends.js) and a row resting under it is a row
-      // whose switch it takes the click for
       const inView = async () => {
         const box = await row.boundingBox();
-        return box && box.y >= 0 && box.y + box.height <= 900 - 96;
+        return box && box.y >= 0 && box.y + box.height <= 900;
       };
       const deadline = Date.now() + 20000;
       while (!(await inView())) {

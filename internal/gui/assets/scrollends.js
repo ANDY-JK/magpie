@@ -42,8 +42,21 @@
       const f = foot.getBoundingClientRect();
       if (getComputedStyle(foot).position === "sticky" && f.bottom > innerHeight - bottom - box.offsetHeight && f.top < innerHeight - bottom) bottom = Math.max(bottom, innerHeight - f.top + 8);
     }
-    box.style.right = Math.max(8, innerWidth - r.right + bar + (gutter ? (pad - box.offsetWidth) / 2 : 10)) + "px";
     box.style.bottom = bottom + "px";
+    // in the page's right margin when a wide window leaves one; else at the
+    // page's left corner, where a row's own switch is not: a narrow window
+    // has no margin to sit in, and at the right corner the capsule took the
+    // press meant for Settings' Off/On (at 420, WebKit said so: "intercepts
+    // pointer events"). The left corner holds a row's words, which are not
+    // pressed.
+    if (gutter) {
+      box.style.right = Math.max(8, innerWidth - r.right + bar + (pad - box.offsetWidth) / 2) + "px";
+      box.style.left = "auto";
+    } else {
+      box.style.left = Math.max(8, r.left - bar + 10) + "px";
+      box.style.right = "auto";
+    }
+    box.classList.toggle("on", on || held);
     up.setAttribute("aria-disabled", v.scrollTop < 1);
     down.setAttribute("aria-disabled", atEnd(v));
   }
