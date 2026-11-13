@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -65,6 +66,15 @@ func TestGitSourceReads(t *testing.T) {
 // PATH away: looked up after it, every test of a git repository skipped.
 var realGit, _ = exec.LookPath("git")
 
+// gitPATH is the PATH git itself is run with: the sandbox PATH is the
+// test's bin alone, and git 2.53 on Windows segfaults in push when its
+// own folders are off PATH (its mingw64\bin and the usr\bin beside it),
+// so the child keeps the running git's folder and both usr\bin candidates
+// of its install layout first, then whatever PATH the machine has.
+var gitPATH = filepath.Dir(realGit) + string(os.PathListSeparator) +
+	filepath.Join(filepath.Dir(filepath.Dir(realGit)), "usr", "bin") + string(os.PathListSeparator) +
+	filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(realGit))), "usr", "bin")
+
 // gitRemoved, as a file's body in a commit, removes that file or folder.
 const gitRemoved = "\x00removed"
 
@@ -89,6 +99,8 @@ func gitRepo(t *testing.T, files map[string]string) (string, func(map[string]str
 		t.Helper()
 		cmd := exec.Command(git, append([]string{"-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "init.defaultBranch=main", "-c", "commit.gpgsign=false"}, args...)...)
 		cmd.Dir = dir
+		env := slices.DeleteFunc(slices.Clone(os.Environ()), func(v string) bool { return strings.HasPrefix(v, "PATH=") })
+		cmd.Env = append(env, "PATH="+gitPATH+string(os.PathListSeparator)+os.Getenv("PATH"))
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}

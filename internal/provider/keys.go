@@ -66,6 +66,16 @@ type KeyRest struct {
 	// Probed: the gateway asks it again in the background, and lifts the
 	// rest as soon as it answers (gateway/rest_probe.go)
 	Probed bool `json:"probed,omitempty"`
+	// By is what set how long (gateway.Rest.By): "key" when the vendor
+	// refuses the key outright with a 401 that says nothing else, "resets"
+	// or "retry-after" when it named the time. The page reads it to mark a
+	// key refused like this as dead, not resting.
+	By string `json:"by,omitempty"`
+	// Model is the one model resting, the account or key still answering
+	// its others; "" for the whole account or key.
+	Model string `json:"model,omitempty"`
+	// Error is what the vendor said, for the page to show beside "failed".
+	Error string `json:"error,omitempty"`
 }
 
 // RestKey is what the gateway rests the key k of a provider by: the

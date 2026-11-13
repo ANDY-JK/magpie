@@ -108,7 +108,10 @@ func stateOf(s usage.Summary) Usage {
 	which := providerFaces(provider.All())
 	for _, g := range s.Models {
 		p := which(g.Provider)
-		ug := Group{Group: g, Name: g.Model, Sub: p.Name, Icon: p.Icon}
+		// the name the user gave the model shows in its id's place
+		// (usage.Group.ModelName); the counts, and a clear of its usage, go
+		// by the id
+		ug := Group{Group: g, Name: cmp.Or(g.ModelName, g.Model), Sub: p.Name, Icon: p.Icon}
 		if g.Host != "" {
 			ug.Sub += " · " + g.Host
 		}

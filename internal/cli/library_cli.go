@@ -19,7 +19,9 @@ const libraryUsage = `magpie library                     what the library gives 
   magpie library instructions        print the shared instructions
   magpie library instructions set <file|->   replace them with a file's text (- for stdin)
   magpie library instructions agents <a,b…|none>   the agents that get them
-  magpie library mcp add <name> <url | command args…> [agents=a,b…] [--local]
+  magpie library mcp add <name> <url | command args…> [agents=a,b…] [--description=…] [--local]
+                                     --description: one line of what it's for (200 characters at most), shown under its
+                                     name on the Library page; no agent is given it
   magpie library mcp agents <name> <a,b…|none>
   magpie library mcp local <name> on|off   keep it to this computer: a sync or a backup never carries it, and one
                                      coming in neither takes it away nor puts another computer's in its place
@@ -102,10 +104,12 @@ func libraryCmd(args []string) error {
 		switch {
 		case len(rest) >= 3 && rest[0] == "add":
 			var cmd, agents []string
-			local := false
+			local, desc := false, ""
 			for _, a := range rest[2:] {
 				if a == "--local" {
 					local = true
+				} else if v, ok := strings.CutPrefix(a, "--description="); ok {
+					desc = v
 				} else if v, ok := strings.CutPrefix(a, "agents="); ok {
 					if agents, err = libraryAgents(v, "mcp"); err != nil {
 						return err
@@ -121,7 +125,10 @@ func libraryCmd(args []string) error {
 			if agents != nil {
 				s.Agents = agents
 			}
+			// what it's for, in the user's own words: SaveServer's check
+			// folds its whitespace and refuses one over 200 characters
 			s.Local = local
+			s.Description = desc
 			res, err = library.SaveServer("", s)
 			if len(s.Agents) == 0 {
 				unused = s.Name

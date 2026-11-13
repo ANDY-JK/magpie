@@ -50,3 +50,45 @@ func TestProviderSaveModelPrefs(t *testing.T) {
 		t.Fatalf("%d %s", w.Code, w.Body)
 	}
 }
+
+// The wire name the Names & levels say per model is carried by the save's
+// modelPrefs (wire) and made as `magpie model wire` makes it: kept under
+// the id the model is listed by, taken away by a blank one, and one for a
+// model the provider does not serve fails the Save, saying why — the gate
+// is SetUpstreamName's own.
+func TestProviderSaveModelPrefsWire(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	mux := http.NewServeMux()
+	providerRoutes(mux, nil)
+	post := func(body string) *httptest.ResponseRecorder {
+		t.Helper()
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, httptest.NewRequest("POST", "/api/provider/save", strings.NewReader(body)))
+		return w
+	}
+	if w := post(`{"id":"relay","name":"Relay","key":"k","chat":"http://127.0.0.1:1/v1","models":["sol"],"new":true}`); w.Code != 200 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if w := post(`{"id":"relay","from":"relay","name":"Relay","chat":"http://127.0.0.1:1/v1","models":["sol"],
+		"modelPrefs":{"sol":{"wire":"vendor-c/sol"}}}`); w.Code != 200 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if got := settings.Load().ModelWires["relay/sol"]; got != "vendor-c/sol" {
+		t.Fatalf("wire %q", got)
+	}
+	// a blank one asks for the model by the name magpie knows it by again
+	if w := post(`{"id":"relay","from":"relay","name":"Relay","chat":"http://127.0.0.1:1/v1","models":["sol"],
+		"modelPrefs":{"sol":{"wire":""}}}`); w.Code != 200 {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+	if _, ok := settings.Load().ModelWires["relay/sol"]; ok {
+		t.Fatal("a blank wire was kept")
+	}
+	if w := post(`{"id":"relay","from":"relay","name":"Relay","chat":"http://127.0.0.1:1/v1","models":["sol"],
+		"modelPrefs":{"nope":{"wire":"vendor-c/sol"}}}`); w.Code == 200 || !strings.Contains(w.Body.String(), "nope") {
+		t.Fatalf("%d %s", w.Code, w.Body)
+	}
+}

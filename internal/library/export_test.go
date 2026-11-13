@@ -9,9 +9,10 @@ import (
 )
 
 // ExportFiles writes the library as files: one JSON for each MCP server, hook
-// and subagent, under names a file can take, and a README saying they are a
-// mirror magpie never reads back. A second export drops what the library no
-// longer has.
+// and subagent, under names a file can take, and a README saying Load from
+// files reads them back — an edited file updates its entry, a file the
+// library has no entry for adds one. A second export drops what the library
+// no longer has.
 func TestExportFiles(t *testing.T) {
 	sandbox(t)
 	if _, err := SaveServer("", Server{Name: "github", Description: "Issues and PRs", Transport: "stdio", Command: "npx", Agents: []string{"claude"}}); err != nil {
@@ -44,9 +45,19 @@ func TestExportFiles(t *testing.T) {
 			t.Fatalf("%s holds %q", rel, b)
 		}
 	}
+	// the README says what Load from files really does (import.go), not the
+	// old claim that magpie never reads these files back
 	readme, err := os.ReadFile(filepath.Join(dir, "README.txt"))
-	if err != nil || !strings.Contains(string(readme), "never reads them back") {
-		t.Fatalf("README: %v %q", err, readme)
+	if err != nil {
+		t.Fatalf("README: %v", err)
+	}
+	for _, want := range []string{"Load from files", "updates that entry", "no file here is removed"} {
+		if !strings.Contains(string(readme), want) {
+			t.Fatalf("README doesn't say %q: %q", want, readme)
+		}
+	}
+	if strings.Contains(string(readme), "never reads") {
+		t.Fatalf("README still says magpie never reads the files back: %q", readme)
 	}
 
 	// the mirror drops what the library no longer has

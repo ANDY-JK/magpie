@@ -417,8 +417,19 @@ func SubagentAgentsSet(name string, agents []string) (*Result, error) {
 	})
 }
 
-// SomeSubagentsAgents gives the subagents named to the agents, or takes them
-// from them, in one change, as SomeHooksAgents does for hooks.
+// EverySubagentsAgents gives every subagent in the library to the agents
+// named, or takes every one from them, in one write rather than one for
+// each subagent. An agent not named keeps what it has, as with a
+// subagent's All chip.
+func EverySubagentsAgents(agents []string, on bool) (*Result, error) {
+	if len(agents) == 0 {
+		return nil, errors.New("no agents to give the subagents to")
+	}
+	return subagentsAgents(nil, agents, on)
+}
+
+// SomeSubagentsAgents does as EverySubagentsAgents for the subagents named
+// alone: the ones picked on the page.
 func SomeSubagentsAgents(names, agents []string, on bool) (*Result, error) {
 	if len(names) == 0 {
 		return nil, errors.New("no subagents to give the agents")
@@ -426,6 +437,12 @@ func SomeSubagentsAgents(names, agents []string, on bool) (*Result, error) {
 	if len(agents) == 0 {
 		return nil, errors.New("no agents to give the subagents to")
 	}
+	return subagentsAgents(names, agents, on)
+}
+
+// subagentsAgents gives the subagents named, or every one when none are, to
+// the agents, or takes them from them.
+func subagentsAgents(names, agents []string, on bool) (*Result, error) {
 	return change(func(l *Library) error {
 		for _, name := range names {
 			if l.subagent(name) == nil {
@@ -433,7 +450,7 @@ func SomeSubagentsAgents(names, agents []string, on bool) (*Result, error) {
 			}
 		}
 		for _, s := range l.Subagents {
-			if !slices.Contains(names, s.Name) {
+			if names != nil && !slices.Contains(names, s.Name) {
 				continue
 			}
 			list := slices.Clone(s.Agents)

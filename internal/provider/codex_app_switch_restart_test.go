@@ -120,8 +120,13 @@ func (f *fakeCodexApp) start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := proc.CommandContext(ctx, os.Args[0], "-test.run=^TestCodexSwitchAppHelper$")
 	// TMPDIR is this test's: given no testenv.Marker, the helper makes a
-	// test home of its own there, which it never removes once ended
-	cmd.Env = []string{"MAGPIE_CODEX_SWITCH_HELPER=1", "TMPDIR=" + f.t.TempDir(), "HOME=" + f.t.TempDir()}
+	// test home of its own there, which it never removes once ended.
+	// Windows reads TMP and TEMP for that folder and falls back to the
+	// Windows directory without them, where the home can't be made
+	// (testenv's checkChild says the same to a started-again binary), so
+	// the helper is given both spellings
+	tmp, home := f.t.TempDir(), f.t.TempDir()
+	cmd.Env = []string{"MAGPIE_CODEX_SWITCH_HELPER=1", "TMPDIR=" + tmp, "TMP=" + tmp, "TEMP=" + tmp, "HOME=" + home}
 	out, _ := cmd.StdoutPipe()
 	if err := cmd.Start(); err != nil {
 		cancel()

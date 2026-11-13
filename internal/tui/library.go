@@ -64,13 +64,23 @@ func (m *model) reloadLibrary() {
 		if s.Command != "" {
 			what = strings.TrimSpace(s.Command + " " + strings.Join(s.Args, " "))
 		}
+		if s.Description != "" {
+			// the user's own words for what it is for, under the
+			// command or address as the Library page shows them
+			what = strings.TrimSpace(what + " · " + s.Description)
+		}
 		if s.Local {
 			what = "not synced · " + what
 		}
 		m.lib = append(m.lib, libRow{kind: "mcp", name: s.Name, about: what, on: s.Agents, bad: len(s.Problems)})
 	}
 	for _, s := range v.Skills {
-		r := libRow{kind: "skill", name: s.Name, about: s.Description, on: s.Agents, bad: len(s.Problems)}
+		about := s.Description
+		if s.Note != "" {
+			// the description the user saved here, as the page shows it
+			about = s.Note
+		}
+		r := libRow{kind: "skill", name: s.Name, about: about, on: s.Agents, bad: len(s.Problems)}
 		if s.Missing {
 			r.about, r.bad = "its folder is gone", r.bad+1
 		} else if s.Gone != "" {

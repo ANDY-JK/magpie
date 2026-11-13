@@ -66,6 +66,14 @@ type modelJSON struct {
 	// says the provider's models can be given ids at all (a key's)
 	Vendor string `json:"vendor,omitempty"`
 	IDs    bool   `json:"ids,omitempty"`
+	// Wires says the provider's models can be given the name their
+	// requests go out under (the editor's Wire as): not on one magpie
+	// reaches through its agent's own backend, where no model field goes
+	// out to rename (provider.asksOwnBackend)
+	Wires bool `json:"wires,omitempty"`
+	// Wire is the name requests for it go out under now
+	// (settings.ModelWires), "" for the vendor's own
+	Wire string `json:"wire,omitempty"`
 	// Desktop is the number Claude Desktop's menu says beside this model
 	// (gateway.DesktopNumber), so a row of that menu can be matched to its
 	// provider (#2578): only for a model Claude Desktop, installed here,
@@ -79,6 +87,15 @@ type modelJSON struct {
 	// RemoteList says the list price is what the other magpie counts the
 	// model at, as its list told (a Remote magpie's), not models.dev's
 	RemoteList bool `json:"remoteList,omitempty"`
+	// Inputs and Outputs are what the model's source listed it takes and
+	// gives (catalog.Model's InputModalities, OutputModalities); nil is
+	// not said. Images above stays the one bool agents are told, the
+	// user's override over the vendor's word
+	Inputs  []string `json:"inputs,omitempty"`
+	Outputs []string `json:"outputs,omitempty"`
+	// Released is the model's release day (YYYY-MM-DD) as its list or
+	// models.dev says it, "" when neither does (catalog.Model's)
+	Released string `json:"released,omitempty"`
 }
 
 type providerJSON struct {
@@ -312,6 +329,16 @@ type providerJSON struct {
 	Sponsored bool               `json:"sponsored"`
 	KeyList   []provider.KeyInfo `json:"keyList"`           // its keys, in the order requests try them
 	Account   *accountJSON       `json:"account,omitempty"` // a signed-in agent, see provider.Account
+	// Rest is why the provider is passed over as a whole, whatever key or
+	// account a request would ask: its vendor's firewall blocked this
+	// computer's address, or its endpoint answered its web page (gateway's
+	// blockedKey, id+"*"). No key's or account's own row carries it, so
+	// without this the whole provider sits out unexplained.
+	Rest *provider.KeyRest `json:"rest,omitempty"`
+	// AccountRests are a subscription account's rests in force, by its
+	// user in lower case: its own and each of its models' (a pool used up
+	// holds one model, the others still answer, #1960)
+	AccountRests map[string][]provider.KeyRest `json:"accountRests,omitempty"`
 	// Move is where a built-in subscription stands with the community
 	// plugin that can run it (provider.Move): set for those that have one
 	Move *moveJSON `json:"move,omitempty"`
@@ -769,8 +796,17 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 		}
 		key := restKey(k)
 		if r, ok := keyRestOf(key); ok {
-			out.KeyList[i].Rest = &provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: key, Probed: r.Probed}
+			out.KeyList[i].Rest = &provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: key, Probed: r.Probed, By: r.By, Model: r.Model, Error: r.Error}
 		}
+	}
+	// a provider the vendor refused as a whole — its firewall blocking
+	// this computer's address, or its endpoint answering its web page
+	// (gateway's blockedKey, id+"*") — rests by no key's or account's own
+	// name, so none of their rows says why nothing is asked; the page says
+	// it on the provider's row, and Try now on one of those lifts the
+	// whole block (Unrest's blockedKeyOf)
+	if r, ok := keyRestOf(p.ID + "*"); ok {
+		out.Rest = &provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: p.ID + "*", Probed: r.Probed, By: r.By, Model: r.Model, Error: r.Error}
 	}
 	if !out.Key.Set && p.Ready() {
 		out.Key.Optional = true
@@ -814,9 +850,13 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 		for i, l := range out.Account.Logins {
 			key := p.ID + "@" + strings.ToLower(l.User)
 			if r, ok := keyRestOf(key); ok {
-				out.Account.Logins[i].Rest = &provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: key, Probed: r.Probed}
+				out.Account.Logins[i].Rest = &provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: key, Probed: r.Probed, By: r.By, Model: r.Model, Error: r.Error}
 			}
 		}
+		// a model of the account can rest alone (the account's others still
+		// answer, #1960): the page reads the account's rests by its user,
+		// the whole account's and each model's
+		out.AccountRests = accountRests(p.ID)
 	}
 	exposed := map[string]bool{}
 	exposedList := ls.Exposed
@@ -859,7 +899,7 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 			images = said
 		}
 		window := p.WindowOf(m)
-		j := modelJSON{ID: m.ID, Name: m.Name, Efforts: provider.EffortsOf(m), On: on, Context: window, Output: provider.OutputWithin(window, p.ReplyLimitIn(m, set)), Listed: provider.ListedWindow(m), Max: m.MaxContext, Free: m.Free, Rate: m.Rate, RateWas: m.RateWas, Images: images, ImageSet: imageSet, Own: own, Best: newest[m.ID]}
+		j := modelJSON{ID: m.ID, Name: m.Name, Efforts: provider.EffortsOf(m), On: on, Context: window, Output: provider.OutputWithin(window, p.ReplyLimitIn(m, set)), Listed: provider.ListedWindow(m), Max: m.MaxContext, Free: m.Free, Rate: m.Rate, RateWas: m.RateWas, Images: images, ImageSet: imageSet, Own: own, Best: newest[m.ID], Inputs: m.InputModalities, Outputs: m.OutputModalities, Released: m.Released}
 		// a plugin reports a model's load by its own id, not one the user
 		// lists it by (axelburks on Discord)
 		ownID := p.OwnModelID(m.ID)
@@ -889,6 +929,9 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 			j.Vendor = ownID
 		}
 		j.IDs = p.TakesModelIDs()
+		// the wire name saved for it, for the editor's Wire as box to show
+		j.Wires = p.TakesModelWires()
+		j.Wire = held.ModelWires[ref]
 		j.Kind = p.ModelKind(m.ID)
 		j.Merge = provider.MergeName(m.ID)
 		j.Desktop = desktop[ref]
@@ -1012,6 +1055,29 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 
 // keyRestOf is gateway.RestOf, swapped in tests.
 var keyRestOf = gateway.RestOf
+
+// restsUnder is gateway.RestsUnder, swapped in tests.
+var restsUnder = gateway.RestsUnder
+
+// accountRests are the rests in force of a subscription's accounts, by
+// user in lower case: an account's own (provider@user) and each of its
+// models' (provider@user/model), as the gateway keys them (restKey,
+// restID); nil when none rests. A rest the note names no model for gets
+// the one its key carries.
+func accountRests(id string) map[string][]provider.KeyRest {
+	var out map[string][]provider.KeyRest
+	for _, r := range restsUnder(id + "@") {
+		user, model, _ := strings.Cut(strings.TrimPrefix(r.Key, id+"@"), "/")
+		if user == "" {
+			continue
+		}
+		if out == nil {
+			out = map[string][]provider.KeyRest{}
+		}
+		out[user] = append(out[user], provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: r.Key, Probed: r.Probed, By: r.By, Model: cmp.Or(r.Model, model), Error: r.Error})
+	}
+	return out
+}
 
 func providersState() providersJSON {
 	// an account signed in since start-up is listed with its vendor's
@@ -1414,9 +1480,9 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			// Images, for images: whether the model takes images. Nil
 			// gives the vendor's answer back.
 			Images *bool `json:"images"`
-			// ModelPrefs, for save: the names, levels and images the
-			// editor's Names & levels changed, by model id, made with the
-			// rest of the Save and not a click at a time
+			// ModelPrefs, for save: the names, levels, images and wire
+			// names the editor's Names & levels changed, by model id,
+			// made with the rest of the Save and not a click at a time
 			ModelPrefs map[string]provider.ModelPref `json:"modelPrefs"`
 			// Outputs, for save: the reply limits the editor's Max output
 			// says, by model id, "*" for all (provider.SetModelOutputs); a

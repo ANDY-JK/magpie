@@ -15,7 +15,12 @@ func TestUsageReadAndReadAgain(t *testing.T) {
 	signIn(t)
 	resets := time.Now().Add(3 * time.Hour)
 	var meFails atomic.Bool
+	// reads counts the readings made through the stand-in: the clock is
+	// coarse (Windows' can tick every few ms), so two readings a moment
+	// apart can carry the same time, and only the count tells them apart
+	var reads atomic.Int32
 	LoginUsageVia(func(context.Context, string) map[string]SubscriptionQuota {
+		reads.Add(1)
 		me := SubscriptionQuota{Windows: []QuotaWindow{{Span: 5 * time.Hour, Used: 40, ResetsAt: &resets}}}
 		if meFails.Load() {
 			me = SubscriptionQuota{Error: "usage endpoint said 503"}
@@ -59,13 +64,15 @@ func TestUsageReadAndReadAgain(t *testing.T) {
 		t.Fatalf("other: failed %v ok %v", failed, ok)
 	}
 
-	// read again: a newer good reading
-	good := at
+	// read again: a newer good reading — asked of the account again (the
+	// count), and never stamped older, though a clock too coarse to tell
+	// two readings a moment apart leaves the time the same
+	good, asked := at, reads.Load()
 	if !ReadUsageNow(ctx, "codex", "me@example.com") {
 		t.Fatal("no second reading")
 	}
-	if at, failed, _ := UsageRead("codex", "me@example.com"); failed || !at.After(good) {
-		t.Fatalf("read again: at %v, was %v, failed %v", at, good, failed)
+	if at, failed, _ := UsageRead("codex", "me@example.com"); failed || at.Before(good) || reads.Load() == asked {
+		t.Fatalf("read again: at %v, was %v, read %d times, failed %v", at, good, reads.Load()-asked, failed)
 	}
 	good, _, _ = UsageRead("codex", "me@example.com")
 

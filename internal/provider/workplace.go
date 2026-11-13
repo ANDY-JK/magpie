@@ -211,7 +211,9 @@ func gitHead(path string) (bool, error) {
 	}
 	if fi.Mode()&fs.ModeSymlink != 0 {
 		to, err := os.Readlink(path)
-		return strings.HasPrefix(to, "refs/"), err
+		// Windows reads a link's target back with its own separator,
+		// "refs\heads\main", where git wrote "refs/heads/main"
+		return strings.HasPrefix(filepath.ToSlash(to), "refs/"), err
 	}
 	if !fi.Mode().IsRegular() {
 		return false, nil

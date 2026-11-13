@@ -110,3 +110,49 @@ func TestLibraryMCPAddNoAgents(t *testing.T) {
 		t.Fatalf("added to claude: %q", got)
 	}
 }
+
+// magpie library mcp add --description=… keeps the user's own words for
+// what the server is for: folded to one line by the editor's check, and
+// refused over 200 characters.
+func TestLibraryMCPAddDescription(t *testing.T) {
+	h := t.TempDir()
+	for k, v := range map[string]string{"HOME": h, "USERPROFILE": h, "XDG_CONFIG_HOME": filepath.Join(h, ".config"), "CLAUDE_CONFIG_DIR": "", "CODEX_HOME": "", "APPDATA": "", "LOCALAPPDATA": ""} {
+		t.Setenv(k, v)
+	}
+	if err := os.MkdirAll(filepath.Join(h, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(h, ".claude/settings.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	desc := func(name string) string {
+		t.Helper()
+		v, err := library.Read(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range v.Servers {
+			if s.Name == name {
+				return s.Description
+			}
+		}
+		t.Fatalf("no server called %s", name)
+		return ""
+	}
+	if err := libraryCmd([]string{"library", "mcp", "add", "ctx7", "https://mcp.example.com/mcp",
+		"--description=Docs for your code  帮你查文档"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := desc("ctx7"); got != "Docs for your code 帮你查文档" {
+		t.Fatalf("saved %q", got)
+	}
+	if err := libraryCmd([]string{"library", "mcp", "add", "long", "https://mcp.example.com/long",
+		"--description=" + strings.Repeat("长", 201)}); err == nil {
+		t.Fatal("a description over 200 characters was taken")
+	}
+	if v, err := library.Read(nil); err != nil {
+		t.Fatal(err)
+	} else if len(v.Servers) != 1 {
+		t.Fatalf("the refused server was saved anyway: %d servers", len(v.Servers))
+	}
+}

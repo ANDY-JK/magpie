@@ -20,6 +20,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -260,4 +261,73 @@ func (s *Server) probed(key string, until time.Time, err error, now time.Time) {
 		unsink(key)
 		s.trace.lifted()
 	}
+}
+
+// probeCandidate is who a rest key rests by, named as perKeyEvery names
+// the keys and accounts it plans over: the provider alone, its key after
+// a "#", an account after an "@". A list asked by hand goes out as the
+// request would have, with that key or account and the proxy it goes
+// through. ok false when no candidate of magpie's rests by it: a provider
+// deleted since, a model's own rest, or the provider's whole rest for a
+// blocked address, which no candidate names.
+func probeCandidate(key string) (c candidate, ok bool) {
+	id, _, _ := strings.Cut(key, "#")
+	id, _, _ = strings.Cut(id, "@")
+	p, err := provider.Find(id)
+	if err != nil {
+		return candidate{}, false
+	}
+	if p.Account != nil {
+		if c = candidateOf(*p, ""); c.restKey() == key {
+			return c, true
+		}
+		for _, q := range p.AlsoOn() {
+			if c = candidateOf(q, ""); c.restKey() == key {
+				return c, true
+			}
+		}
+		return candidate{}, false
+	}
+	for _, k := range p.KeysOn() {
+		if c = candidateOf(p.WithKey(k), ""); c.restKey() == key {
+			return c, true
+		}
+	}
+	return candidate{}, false
+}
+
+// Probe asks what rests by key whether its vendor is back — its model
+// list, as the background asks it (listForProbe, which costs no
+// allowance) — and lifts the rest only once it answers, so the Doctor
+// page's hand can check before it lifts as blind as Try now does. The
+// same word as the background's (probeable) says which rests are asked:
+// a rate limit answers while the chat endpoint still refuses, and one the
+// vendor or the user timed ends on its own. The refusal's own header the
+// background keeps to isn't kept here, a stored rest not carrying it —
+// the hand ask is the user's own Try now with a list first, and Unrest
+// never waited for the header either. probed says the ask went out, false
+// leaving nothing asked and nothing lifted; lifted says the rest is no
+// more; err says the vendor didn't answer, and the rest stands.
+func (s *Server) Probe(key string) (probed, lifted bool, err error) {
+	r, ok := restOf(key)
+	if !ok {
+		return false, false, nil // nothing resting by it now
+	}
+	c, ok := probeCandidate(key)
+	if !ok || !probeable(c, r, nil, time.Now()) {
+		return false, false, nil
+	}
+	ctx, done := context.WithTimeout(context.Background(), restProbeWait)
+	err = listForProbe(ctx, c.p)
+	done()
+	if err != nil {
+		return true, false, err // the vendor still refuses: the rest stands
+	}
+	// the rest the list answered for is the rest it lifts: another since —
+	// a failure while it was being asked — or none isn't the one it spoke
+	// for
+	if now, ok := restOf(key); !ok || !now.Until.Equal(r.Until) {
+		return true, false, nil
+	}
+	return true, s.Unrest(key), nil
 }

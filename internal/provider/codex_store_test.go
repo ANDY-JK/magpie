@@ -128,7 +128,10 @@ func codexInKeychain(t *testing.T, home, store string) (*fakeKeychain, string) {
 	m["agent_identity"] = map[string]any{"kept": "as is"}
 	one, _ := json.Marshal(m)
 	os.Remove(filepath.Join(dir, "auth.json"))
-	os.WriteFile(filepath.Join(dir, "config.toml"), []byte("cli_auth_credentials_store = \""+store+"\"\n"), 0o600)
+	// secret_auth_storage off: on Windows Codex's default is on, and
+	// readCodexStoreSetting would take the keyring mode as its encrypted
+	// storage, which magpie doesn't read, not as the item below
+	os.WriteFile(filepath.Join(dir, "config.toml"), []byte("cli_auth_credentials_store = \""+store+"\"\n[features]\nsecret_auth_storage = false\n"), 0o600)
 	k := &fakeKeychain{items: map[string][]byte{codexKeychainAccount(dir): one}}
 	codexKeychain, codexKeychainHere = k, true // isolate puts them back
 	resetCodexKeychain()
@@ -581,7 +584,9 @@ func TestCodexSignInKnown(t *testing.T) {
 	check("logged out", false, true)
 
 	codexKeychain, codexKeychainHere = &fakeKeychain{}, true
-	os.WriteFile(filepath.Join(dir, "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n"), 0o600)
+	// secret_auth_storage off: on Windows Codex's default is on, and the
+	// store would then be its encrypted storage, not the item read here
+	os.WriteFile(filepath.Join(dir, "config.toml"), []byte("cli_auth_credentials_store = \"keyring\"\n[features]\nsecret_auth_storage = false\n"), 0o600)
 	resetCodexKeychain()
 	check("keyring, no item", false, true)
 	codexKeychain = &fakeKeychain{findErr: errKeychainRefused, items: map[string][]byte{codexKeychainAccount(dir): []byte(`{}`)}}

@@ -1015,9 +1015,20 @@ func HookAgents(name string, agents []string) (*Result, error) {
 	})
 }
 
-// SomeHooksAgents gives the hooks named to the agents, or takes them from
-// them, each to the agents that can take it: an agent's own event stays
+// EveryHooksAgents gives every hook in the library to the agents named, or
+// takes every one from them, in one write rather than one for each hook. An
+// agent not named keeps what it has, as with a hook's All chip; each hook
+// goes only to the agents that can take it, an agent's own event staying
 // that agent's alone.
+func EveryHooksAgents(agents []string, on bool) (*Result, error) {
+	if len(agents) == 0 {
+		return nil, errors.New("no agents to give the hooks to")
+	}
+	return hooksAgents(nil, agents, on)
+}
+
+// SomeHooksAgents does as EveryHooksAgents for the hooks named alone: the
+// ones picked on the page.
 func SomeHooksAgents(names, agents []string, on bool) (*Result, error) {
 	if len(names) == 0 {
 		return nil, errors.New("no hooks to give the agents")
@@ -1025,6 +1036,13 @@ func SomeHooksAgents(names, agents []string, on bool) (*Result, error) {
 	if len(agents) == 0 {
 		return nil, errors.New("no agents to give the hooks to")
 	}
+	return hooksAgents(names, agents, on)
+}
+
+// hooksAgents gives the hooks named, or every one when none are, to the
+// agents, or takes them from them, each to the agents that can take it: an
+// agent's own event stays that agent's alone.
+func hooksAgents(names, agents []string, on bool) (*Result, error) {
 	return change(func(l *Library) error {
 		for _, name := range names {
 			if l.hook(name) == nil {
@@ -1032,7 +1050,7 @@ func SomeHooksAgents(names, agents []string, on bool) (*Result, error) {
 			}
 		}
 		for _, h := range l.Hooks {
-			if !slices.Contains(names, h.Name) {
+			if names != nil && !slices.Contains(names, h.Name) {
 				continue
 			}
 			list := slices.Clone(h.Agents)

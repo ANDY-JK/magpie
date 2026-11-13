@@ -855,9 +855,14 @@ func (r Record) RetriedRequest() bool { return !r.HandedOn && !r.Failed() && r.T
 
 // Group is the share of one agent or model.
 type Group struct {
-	ID              string `json:"id"`
-	Provider        string `json:"provider,omitempty"` // models only
-	Model           string `json:"model,omitempty"`
+	ID       string `json:"id"`
+	Provider string `json:"provider,omitempty"` // models only
+	Model    string `json:"model,omitempty"`
+	// ModelName is what the user calls this model at this provider
+	// (provider.ModelName), beside the id the counts are keyed on (Model):
+	// the Usage page shows it in the id's place, and a clear of the model's
+	// usage still goes by the id. "" when the model goes by its id.
+	ModelName       string `json:"modelName,omitempty"`
 	ProviderKeyID   string `json:"providerKeyId,omitempty"`
 	ProviderKeyName string `json:"providerKeyName,omitempty"`
 	// Account is the subscription account of an Accounts group: "" for

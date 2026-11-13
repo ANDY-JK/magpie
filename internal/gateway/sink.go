@@ -68,6 +68,21 @@ func unsinkAll(key string) {
 	sunk.Unlock()
 }
 
+// SunkKeys says whether what rests by key has sunk — itself (restKey), or
+// one of its models' (restID, key/model, as unsinkAll lifts them). A sunk
+// one is not resting more than it was: with Sink on it is held at the back
+// of the order, which no rest row alone explains.
+func SunkKeys(key string) bool {
+	sunk.Lock()
+	defer sunk.Unlock()
+	for k := range sunk.m {
+		if k == key || strings.HasPrefix(k, key+"/") {
+			return true
+		}
+	}
+	return false
+}
+
 // sunkAt is when a candidate sank, if it did: its model alone, as
 // another magpie's model rate limited there sinks (remoteModelRest,
 // #2167), or its whole key or account.

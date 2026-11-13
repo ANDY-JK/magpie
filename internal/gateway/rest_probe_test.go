@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -234,5 +235,94 @@ func TestRestProbeOnlyByARunningLoop(t *testing.T) {
 	}
 	if _, ok := restOf(c.restKey()); !ok {
 		t.Fatal("an ask cut short lifted the rest")
+	}
+}
+
+// probeSaved saves the provider a rest key rests by, so the probe finds
+// who to ask (probeCandidate reads Find): keyed, one key, as the Doctors
+// page's rows are. Its address is the test's own, and nothing asks it —
+// the list is the swapped listForProbe.
+func probeSaved(t *testing.T, id string) {
+	t.Helper()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	up := httptest.NewServer(http.HandlerFunc(http.NotFound))
+	t.Cleanup(up.Close)
+	if err := provider.Save(provider.Provider{ID: id, Name: "Probe " + id, Key: "sk-" + id, Chat: up.URL + "/v1", Models: []string{"m"}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The Doctor page's probe lifts a rest only once its vendor answers: the
+// vendor still refusing, the rest stands and the ask's word comes back,
+// and a list that answers lifts it as Try now does. The ask goes out with
+// the resting key.
+func TestProbeLiftsARestItsVendorAnswers(t *testing.T) {
+	probeSaved(t, "probe-hand")
+	asked := 0
+	steps, was := restProbeSteps, listForProbe
+	t.Cleanup(func() { restProbeSteps, listForProbe = steps, was })
+	restProbeSteps = []time.Duration{20 * time.Millisecond, 40 * time.Millisecond}
+	listForProbe = func(_ context.Context, p provider.Provider) error {
+		asked++
+		if p.Key != "sk-probe-hand" {
+			t.Errorf("the list was asked with %q, not the resting key", p.Key)
+		}
+		return errors.New("still down")
+	}
+	s := &Server{}
+	c := probeKey(t, "probe-hand")
+	r := s.restAfter(c, http.StatusServiceUnavailable, http.Header{}, []byte(outage))
+	if !r.Probed || r.By != "backoff" || r.Key != c.restKey() {
+		t.Fatalf("a 503 rests %+v, not one the probe may ask", r)
+	}
+	probed, lifted, err := s.Probe(c.restKey())
+	if !probed || lifted || err == nil {
+		t.Fatalf("a vendor still down: probed %v, lifted %v, err %v", probed, lifted, err)
+	}
+	if _, ok := restOf(c.restKey()); !ok {
+		t.Fatal("the rest was lifted though its vendor still refuses")
+	}
+	listForProbe = func(context.Context, provider.Provider) error { asked++; return nil }
+	probed, lifted, err = s.Probe(c.restKey())
+	if !probed || !lifted || err != nil {
+		t.Fatalf("a vendor back: probed %v, lifted %v, err %v", probed, lifted, err)
+	}
+	if _, ok := restOf(c.restKey()); ok {
+		t.Fatal("the rest stands after its vendor answered")
+	}
+	if asked != 2 {
+		t.Fatalf("asked %d times, want the refusing ask and the answering one", asked)
+	}
+}
+
+// A rest a list can't speak for is neither asked nor lifted by the probe:
+// a rate limit answers while the chat endpoint still refuses, and
+// nothing resting by a key asks nothing at all.
+func TestProbeLeavesARestAListCantSpeakFor(t *testing.T) {
+	probeSaved(t, "probe-rate")
+	asked := 0
+	steps, was := restProbeSteps, listForProbe
+	t.Cleanup(func() { restProbeSteps, listForProbe = steps, was })
+	restProbeSteps = []time.Duration{20 * time.Millisecond, 40 * time.Millisecond}
+	listForProbe = func(context.Context, provider.Provider) error { asked++; return nil }
+	s := &Server{}
+	c := probeKey(t, "probe-rate")
+	if r := s.restAfter(c, http.StatusTooManyRequests, http.Header{}, []byte(`{"error":{"message":"rate limit exceeded"}}`)); r.Why != "rate" {
+		t.Fatalf("a 429 rests %+v, not a rate limit", r)
+	}
+	if _, ok := restOf(c.restKey()); !ok {
+		t.Fatal("the rate limit's rest is not standing")
+	}
+	probed, lifted, err := s.Probe(c.restKey())
+	if probed || lifted || err != nil || asked != 0 {
+		t.Fatalf("a rate limit probed: probed %v, lifted %v, err %v, asked %d", probed, lifted, err, asked)
+	}
+	if _, ok := restOf(c.restKey()); !ok {
+		t.Fatal("the rate limit's rest was lifted")
+	}
+	probed, lifted, err = s.Probe("probe-nowhere")
+	if probed || lifted || err != nil || asked != 0 {
+		t.Fatalf("an idle key probed: probed %v, lifted %v, err %v, asked %d", probed, lifted, err, asked)
 	}
 }

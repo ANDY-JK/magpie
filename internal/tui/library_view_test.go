@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -53,4 +54,53 @@ func libIndexOf(lib []libRow, name string) int {
 		}
 	}
 	return -1
+}
+
+// The library page reads a skill's note (the description saved here, often
+// Chinese) in place of the SKILL.md's description, as the Library window
+// does, and shows a server's description after its command or address.
+func TestLibraryRowsShowTheDescriptions(t *testing.T) {
+	home(t)
+	src := t.TempDir()
+	write(t, filepath.Join(src, "pdf", "SKILL.md"), "---\nname: pdf\ndescription: Handle PDFs\n---\n")
+	write(t, filepath.Join(src, "xlsx", "SKILL.md"), "---\nname: xlsx\ndescription: Handle sheets\n---\n")
+	if _, err := library.InstallSkills(src, []string{"pdf", "xlsx"}, []string{"claude"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := library.SetSkillNote("pdf", "处理 PDF 的技能"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := library.SaveServer("", library.Server{Name: "github", Description: "Issues and PRs",
+		Transport: "stdio", Command: "npx", Args: []string{"-y", "gh-mcp"}, Agents: []string{"claude"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := library.SaveServer("", library.Server{Name: "plain", Transport: "http",
+		URL: "https://example.com/mcp", Agents: []string{"claude"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	var m model
+	m.reloadLibrary()
+	about := func(kind, name string) string {
+		t.Helper()
+		for _, r := range m.lib {
+			if r.kind == kind && r.name == name {
+				return r.about
+			}
+		}
+		t.Fatalf("no %s row for %s", kind, name)
+		return ""
+	}
+	if got := about("skill", "pdf"); got != "处理 PDF 的技能" {
+		t.Fatalf("pdf shows %q, not the note", got)
+	}
+	if got := about("skill", "xlsx"); got != "Handle sheets" {
+		t.Fatalf("xlsx without a note shows %q", got)
+	}
+	if got := about("mcp", "github"); got != "npx -y gh-mcp · Issues and PRs" {
+		t.Fatalf("github's row: %q", got)
+	}
+	if got := about("mcp", "plain"); got != "https://example.com/mcp" {
+		t.Fatalf("plain's row: %q", got)
+	}
 }

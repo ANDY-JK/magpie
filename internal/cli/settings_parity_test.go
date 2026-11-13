@@ -281,6 +281,8 @@ var notYet = map[string]string{
 	"GET /api/library/mcp-signin/{id}":           L,  // library.go
 	"GET /api/library/rtk":                       L,  // library.go
 	"GET /api/library/skill":                     L,  // library.go
+	"POST /api/library/export":                   L,  // library.go: writes the library as files, a page job past `magpie library`
+	"POST /api/library/import":                   L,  // library.go: reads those files back, a page job past `magpie library`
 	"POST /api/library/market/about":             L,  // library.go
 	"POST /api/library/mcp-signin":               L,  // library.go
 	"POST /api/library/mcp-signin/{id}/cancel":   L,  // library.go
@@ -367,6 +369,7 @@ var notYet = map[string]string{
 	"GET /api/gateway/history":                   U,  // trace.go
 	"GET /api/gateway/route":                     U,  // trace.go
 	"GET /api/gateway/trace":                     U,  // trace.go
+	"POST /api/gateway/probe":                    U,  // trace.go
 	"POST /api/gateway/session-titles":           U,  // trace.go
 	"POST /api/gateway/unrest":                   U,  // trace.go
 	"GET /api/tune":                              U,  // tune.go

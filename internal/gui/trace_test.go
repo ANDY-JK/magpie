@@ -93,3 +93,38 @@ func TestRouteLookup(t *testing.T) {
 	}
 
 }
+
+// The Doctor page's probe route forwards the gateway's ask: a key resting
+// is asked of its vendor, and the answer says probed and lifted. Nothing
+// resting by the key, nothing is asked of anyone (the probe's own word is
+// the gateway's to give); no key, nothing to ask.
+func TestProbeRoute(t *testing.T) {
+	sandboxHome(t)
+	old := served.Swap(nil)
+	t.Cleanup(func() { served.Store(old) })
+	mux := http.NewServeMux()
+	traceRoutes(mux)
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest("POST", "/api/gateway/probe", strings.NewReader(`{"key":"pp"}`)))
+	if w.Code != 400 {
+		t.Fatalf("no gateway served: %d %s", w.Code, w.Body)
+	}
+	served.Store(gateway.New())
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest("POST", "/api/gateway/probe", strings.NewReader(`{"key":""}`)))
+	if w.Code != 400 {
+		t.Fatalf("no key: %d %s", w.Code, w.Body)
+	}
+	w = httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest("POST", "/api/gateway/probe", strings.NewReader(`{"key":"pp"}`)))
+	if w.Code != 200 {
+		t.Fatalf("nothing resting by pp: %d %s", w.Code, w.Body)
+	}
+	var out struct {
+		Probed bool `json:"probed"`
+		Lifted bool `json:"lifted"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil || out.Probed || out.Lifted {
+		t.Fatalf("nothing resting by pp: %d %s (%v)", w.Code, w.Body, err)
+	}
+}

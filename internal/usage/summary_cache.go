@@ -141,6 +141,10 @@ func usagePriceCacheKey(now time.Time) string {
 	// and the names models' usage is counted under, which the groups key on
 	usageAliases, _ := json.Marshal(st.UsageAliases)
 	fmt.Fprint(h, string(prices), string(aliases), string(usageAliases))
+	// and the names the user gave the provider's models, which the groups
+	// carry beside the ids (usage.Group.ModelName): a rename must recount
+	modelNames, _ := json.Marshal(st.ModelNames)
+	fmt.Fprint(h, string(modelNames))
 	for _, current := range provider.All() {
 		fmt.Fprintf(h, "%q:%q:%v:%t:%t:%t;", current.ID, current.Where(), current.Catalogs(), current.IsPlugin(), current.Account == nil, current.Key != "")
 		if current.Account != nil {

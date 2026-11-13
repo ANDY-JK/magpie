@@ -247,7 +247,14 @@ func (c *summaryCounts) add(u *summaryRun, k *summaryKeying, r Record) {
 	if w := who(r.Host); w != "" && (k.manyHosts[r.Provider] || w != k.goesNow[r.Provider]) {
 		key, host = key+" @ "+w, w
 	}
-	m := c.models.at(key, func() Group { return Group{ID: key, Provider: r.Provider, Model: model, Host: host} })
+	// the group is one model at one provider, so its name (what the user
+	// calls it, Group.ModelName) is read once at its making; the counts key
+	// on the id, and the summary's cache is keyed on the names with it
+	// (usagePriceCacheKey)
+	m := c.models.at(key, func() Group {
+		name, _ := provider.ModelName(r.Provider, model)
+		return Group{ID: key, Provider: r.Provider, Model: model, Host: host, ModelName: name}
+	})
 	m.add(r, pr)
 	m.addOwn(r, pr)
 	if r.CallerKeyID != "" {

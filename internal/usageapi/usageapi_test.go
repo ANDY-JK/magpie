@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/provider"
+	"github.com/yetone/magpie/internal/settings"
 	"github.com/yetone/magpie/internal/testenv"
 	"github.com/yetone/magpie/internal/usage"
 )
@@ -76,6 +77,29 @@ func TestProvidersNotSetUpAreNamed(t *testing.T) {
 	}
 	if len(s.Models) != 3 {
 		t.Errorf("models: %+v", s.Models)
+	}
+}
+
+// The Usage page's model list is headed by the name the user gave the model
+// (usage.Group.ModelName), the id staying what the counts and a clear of its
+// usage go by.
+func TestUsageModelListShowsTheUsersName(t *testing.T) {
+	home := t.TempDir()
+	testenv.SetHome(t, home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+	s := settings.Load()
+	s.ModelNames = map[string]string{"relay/gpt-9": "Nine"}
+	if err := settings.Save(s); err != nil {
+		t.Fatal(err)
+	}
+	usage.Append(usage.Record{Time: time.Now().Add(-time.Hour), Agent: "codex", Provider: "relay", Model: "gpt-9", Input: 10, Output: 2})
+	u := State(usage.All)
+	if len(u.Models) != 1 {
+		t.Fatalf("models: %+v", u.Models)
+	}
+	if g := u.Models[0]; g.Model != "gpt-9" || g.ModelName != "Nine" || g.Name != "Nine" {
+		t.Fatalf("the model's group: %+v (name %q)", g.Group, g.Name)
 	}
 }
 

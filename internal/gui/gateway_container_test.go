@@ -55,7 +55,25 @@ func TestGatewayHeldByAContainer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := t.TempDir()
+	// Windows keeps the image of a process it has just ended locked for a
+	// moment after cmd.Wait has said it went, and the copies below are run
+	// from this folder: TempDir's RemoveAll, which runs in the same breath
+	// as the kills, fails on them with "Access is denied", so the folder is
+	// removed here instead, once its files can go
+	dir, err := os.MkdirTemp("", "magpie-held-by-a-container")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		var err error
+		for range 50 {
+			if err = os.RemoveAll(dir); err == nil {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Logf("the test's folder stayed behind: %v", err)
+	})
 	start := func(name string) (*exec.Cmd, chan struct{}) {
 		if runtime.GOOS == "windows" {
 			name += ".exe"

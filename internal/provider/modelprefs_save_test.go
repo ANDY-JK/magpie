@@ -57,3 +57,64 @@ func TestSetModelPrefs(t *testing.T) {
 		t.Fatalf("names %v, told %d times", settings.Load().ModelNames, touched)
 	}
 }
+
+// The wire name the Names & levels say beside the name is made with the
+// save too, as `magpie model wire` gives it: kept under the id the model
+// is listed by, taken away by a blank one, moved with it when the same
+// save lists the model by another id, and refused for a model the
+// provider does not serve — that gate is SetUpstreamName's, not a second
+// one here. Like a price it tells the agents nothing: which model an
+// agent picks, and what it is called, have not changed.
+func TestSetModelPrefsWiresTheModel(t *testing.T) {
+	prefsHome(t)
+	touched := 0
+	catalog.Changed = func() { touched++ }
+	t.Cleanup(func() { catalog.Changed = nil })
+	wire := "vendor-c/sol"
+	name := "My Sol"
+	if err := SetModelPrefs("a", map[string]ModelPref{"sol": {Wire: &wire}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := settings.Load().ModelWires["a/sol"]; got != "vendor-c/sol" {
+		t.Fatalf("wire %q", got)
+	}
+	if touched != 0 {
+		t.Fatalf("agents told %d times, want none", touched)
+	}
+	// "" asks for it by the name magpie knows it by again
+	blank := ""
+	if err := SetModelPrefs("a", map[string]ModelPref{"sol": {Wire: &blank}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := settings.Load().ModelWires["a/sol"]; ok {
+		t.Fatal("a blank wire was kept")
+	}
+	// a name for a model the provider does not serve is refused, and
+	// nothing of it is stored
+	if err := SetModelPrefs("a", map[string]ModelPref{"nope": {Wire: &wire}}); err == nil || !strings.Contains(err.Error(), "no model nope") {
+		t.Fatalf("got %v", err)
+	}
+	if _, ok := settings.Load().ModelWires["a/nope"]; ok {
+		t.Fatal("a refused wire was stored anyway")
+	}
+	// a save that stops at a refused wire has told the agents of the
+	// changes made before it: sol comes before zope
+	if err := SetModelPrefs("a", map[string]ModelPref{"sol": {Name: &name}, "zope": {Wire: &wire}}); err == nil || !strings.Contains(err.Error(), "no model zope") {
+		t.Fatalf("got %v", err)
+	}
+	if settings.Load().ModelNames["a/sol"] != "My Sol" || touched != 1 {
+		t.Fatalf("names %v, told %d times", settings.Load().ModelNames, touched)
+	}
+	// the wire goes with the model to the id the same save lists it by
+	listed := "sol-1017"
+	if err := SetModelPrefs("a", map[string]ModelPref{"sol": {Wire: &wire, ID: &listed}}); err != nil {
+		t.Fatal(err)
+	}
+	s := settings.Load()
+	if got := s.ModelWires["a/sol-1017"]; got != "vendor-c/sol" {
+		t.Fatalf("wire after the id %v", s.ModelWires)
+	}
+	if _, ok := s.ModelWires["a/sol"]; ok {
+		t.Fatal("the wire stayed under the id the model had")
+	}
+}

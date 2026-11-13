@@ -539,6 +539,12 @@ type ModelPref struct {
 	// Kind is what the model makes, as SetModelKind takes it: "image",
 	// "video", or "" for what its vendor's list and name say (#1399)
 	Kind *string `json:"kind,omitempty"`
+	// Wire is the name the provider is asked for the model by, as
+	// SetUpstreamName takes it: "" asks for it by the name magpie knows
+	// it by again. Like the ID below it goes to the id the model is
+	// listed by after the save (Settings.MoveModel), and like a price it
+	// tells the agents nothing: only the request goes out renamed.
+	Wire *string `json:"wire,omitempty"`
 	// ID is the id the model is listed by at its provider, as SetModelID
 	// takes it: "" for the provider's own. It is applied after every
 	// other change of the save, so those go with the model to its id.
@@ -608,6 +614,15 @@ func SetModelPrefs(pid string, prefs map[string]ModelPref) error {
 					price = nil
 				}
 				if err := SetModelPrice(ref, price); err != nil {
+					return err
+				}
+			}
+			// nor the name the request goes out under: SetUpstreamName's
+			// own checks stay the ones on it — a model the provider does
+			// not serve, and an account asked through its agent's own
+			// backend, are refused there
+			if m.Wire != nil {
+				if err := SetUpstreamName(ref, *m.Wire); err != nil {
 					return err
 				}
 			}
@@ -1347,6 +1362,12 @@ func (p Provider) UpstreamNames() map[string]string {
 	}
 	return out
 }
+
+// TakesModelWires reports whether p's models can be given the name their
+// requests go out under (the editor's Wire as, SetUpstreamName): not on one
+// magpie reaches through its agent's own backend, where no model field goes
+// out to rename.
+func (p Provider) TakesModelWires() bool { return !p.asksOwnBackend() }
 
 // asksOwnBackend reports whether p is a signed-in account magpie reaches
 // through that agent's own backend rather than through a vendor API: the

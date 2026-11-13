@@ -109,7 +109,11 @@ func TestLaneLimitRoutes(t *testing.T) {
 		t.Fatal("null kept its own limit")
 	}
 
-	// the lanes, with no gateway served here: none
+	// the lanes, with no gateway served here: none. Another magpie on this
+	// computer may serve the gateway (this machine's own does), and its
+	// lanes are the ones to show, so the answer is asked at an address
+	// nothing serves
+	t.Setenv("MAGPIE_ADDR", "127.0.0.1:1")
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, httptest.NewRequest("GET", "/api/lanes", nil))
 	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != "{}" {

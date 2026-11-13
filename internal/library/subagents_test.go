@@ -244,3 +244,50 @@ func TestSomeSubagentsAgents(t *testing.T) {
 		t.Fatal("no agents was accepted")
 	}
 }
+
+// Turn all on/off on the subagents page: every subagent in the library goes
+// to the agents named, or comes from them, in one write, and an agent not
+// named keeps what it has.
+func TestEverySubagentsAgents(t *testing.T) {
+	sandbox(t)
+	first := reviewer
+	first.Agents = []string{"claude"}
+	ok(t)(SaveSubagent("", first))
+	second := reviewer
+	second.Name, second.Agents = "critic", []string{"codex"}
+	ok(t)(SaveSubagent("", second))
+
+	agentsNow := func(name string) []string {
+		t.Helper()
+		var got []string
+		ok(t)(change(func(l *Library) error {
+			got = slices.Clone(l.subagent(name).Agents)
+			return nil
+		}))
+		return got
+	}
+	ok(t)(EverySubagentsAgents([]string{"claude", "codex"}, true))
+	for _, name := range []string{"reviewer", "critic"} {
+		if got := agentsNow(name); !slices.Equal(got, []string{"claude", "codex"}) {
+			t.Fatalf("%s after turn all on: %v", name, got)
+		}
+	}
+	// gemini wasn't named and keeps what it has; the named ones join it
+	ok(t)(EverySubagentsAgents([]string{"gemini"}, true))
+	if got := agentsNow("critic"); !slices.Equal(got, []string{"claude", "codex", "gemini"}) {
+		t.Fatalf("critic after gemini's turn all on: %v", got)
+	}
+	ok(t)(EverySubagentsAgents([]string{"claude", "codex"}, false))
+	// gemini, the agent not named, keeps both
+	for _, name := range []string{"reviewer", "critic"} {
+		if got := agentsNow(name); !slices.Equal(got, []string{"gemini"}) {
+			t.Fatalf("%s after turn all off: %v", name, got)
+		}
+	}
+	if _, err := EverySubagentsAgents(nil, true); err == nil {
+		t.Fatal("no agents was accepted")
+	}
+	if _, err := EverySubagentsAgents([]string{}, false); err == nil {
+		t.Fatal("an empty agent list was accepted")
+	}
+}

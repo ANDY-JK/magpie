@@ -54,7 +54,9 @@ func TestBuiltinSwitch(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 			t.Fatal(err)
 		}
-		if len(out) != 14 {
+		// fifteen: the fourteen the page has had and the Doctor page
+		// (f6e41cf9c), which Essentials leaves off
+		if len(out) != 15 {
 			t.Fatalf("the built-ins: %+v", out)
 		}
 		for _, b := range out {
@@ -133,7 +135,7 @@ func TestBootSaysBuiltinsOff(t *testing.T) {
 	if err := pluginrt.Set("library", true); err != nil {
 		t.Fatal(err)
 	}
-	if b := boot(); !strings.Contains(b, `"featuresOff":["groups","otel","sessions","warmups"]`) {
+	if b := boot(); !strings.Contains(b, `"featuresOff":["doctor","groups","otel","sessions","warmups"]`) {
 		t.Fatalf("Essentials picked: %s", b)
 	}
 }

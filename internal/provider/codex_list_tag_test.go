@@ -92,7 +92,12 @@ func TestCodexListTagKeptWhileNothingChanged(t *testing.T) {
 	}
 	n, by := measure(func() { CodexListTag(); CodexOwnListTag() })
 	t.Logf("CodexListTag and CodexOwnListTag: %.0f allocs, %.0f bytes a call", n, by)
-	if n > 200 {
+	// without a hold each ask sums the environment afresh (environSum),
+	// an allocation a variable, so the budget counts the two sums as
+	// well: a machine with a long environment would otherwise read as a
+	// rebuild
+	budget := 200 + 2*float64(len(os.Environ()))
+	if n > budget {
 		t.Errorf("with nothing changed, the tags took %.0f allocations (%.0f bytes) a call: the catalog built again", n, by)
 	}
 	release := Hold()

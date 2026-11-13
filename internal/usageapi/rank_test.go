@@ -8,6 +8,7 @@ import (
 
 	"github.com/yetone/magpie/internal/provider"
 	"github.com/yetone/magpie/internal/sessions"
+	"github.com/yetone/magpie/internal/settings"
 	"github.com/yetone/magpie/internal/usage"
 )
 
@@ -426,4 +427,97 @@ func isRankWord(key string) bool {
 		return true
 	}
 	return false
+}
+
+// The standings are one row a model over the providers that served it: the
+// same model two providers served is two modelAt shares and one row here,
+// its totals their sum, the gate held to the merged calls — each provider
+// alone served too little to rank the model, summed they serve enough — and
+// a model served too little all round is not there.
+func TestRankModelStandingsMergeProviders(t *testing.T) {
+	now := rankHome(t)
+	saveProvider(t, rankCase{id: "one", name: "One"})
+	saveProvider(t, rankCase{id: "two", name: "Two"})
+	for i := 0; i < RankMinCalls-2; i++ { // three each, under the gate alone
+		at := now.Add(-time.Duration(i) * time.Minute)
+		usage.Append(usage.Record{Time: at, Agent: "codex", Provider: "one", Model: "shared", Input: 100, Output: 50, Status: 200})
+		usage.Append(usage.Record{Time: at, Agent: "codex", Provider: "two", Model: "shared", Input: 100, Output: 50, Status: 200})
+	}
+	usage.Append(usage.Record{Time: now, Agent: "codex", Provider: "one", Model: "tiny", Input: 100, Output: 50, Status: 200})
+	r := Rank(usage.All, provider.All(), time.Local)
+	if len(r.Models) != 1 || r.Models[0].Model != "shared" {
+		t.Fatalf("standings: %+v", r.Models)
+	}
+	m := r.Models[0]
+	if m.Calls != 2*(RankMinCalls-2) || m.Input != 2*(RankMinCalls-2)*100 {
+		t.Fatalf("the merged totals: %+v", m.Totals)
+	}
+	if !slices.Equal(m.Providers, []string{"one", "two"}) {
+		t.Fatalf("the providers that served it: %+v", m.Providers)
+	}
+	if len(m.At) != 2 || m.At[0].At != "one" || m.At[0].Calls != RankMinCalls-2 || m.At[1].At != "two" {
+		t.Fatalf("the shares it was merged from: %+v", m.At)
+	}
+	// nothing timed: a model's pace is its served and stood again, folded
+	// into the two that can be told, as any model row's is
+	if m.Score != 100 || m.Grade != "A" {
+		t.Fatalf("the standing's score: %d (%s)", m.Score, m.Grade)
+	}
+}
+
+// The standings and the per-provider model rows are named by what the user
+// calls the model (provider.ModelName): a standing by the name of the
+// provider that served it most, a split share by its own provider's, and a
+// model no name was given by its id. The best score stands first, and a
+// standing's causes are its shares' summed.
+func TestRankStandingsShowTheirNames(t *testing.T) {
+	rankHome(t)
+	s := settings.Load()
+	s.ModelNames = map[string]string{"one/shared": "Shared", "two/shared": "Shared 2"}
+	if err := settings.Save(s); err != nil {
+		t.Fatal(err)
+	}
+	saveProvider(t, rankCase{id: "one", name: "One"})
+	saveProvider(t, rankCase{id: "two", name: "Two"})
+	for i := 0; i < 7; i++ { // one served it more, so the name is one's
+		usage.Append(usage.Record{Time: usage.Clock().Add(-time.Duration(i) * time.Minute), Agent: "codex", Provider: "one", Model: "shared", Input: 100, Output: 50, Status: 200})
+	}
+	for i := 0; i < 5; i++ {
+		usage.Append(usage.Record{Time: usage.Clock().Add(-time.Duration(i) * time.Minute), Agent: "codex", Provider: "two", Model: "shared", Input: 100, Output: 50, Status: 200})
+	}
+	for i := 0; i < 6; i++ { // a failing model of one's, to stand below
+		r := usage.Record{Time: usage.Clock().Add(-time.Duration(i) * time.Minute), Agent: "codex", Provider: "one", Model: "flaky", Input: 100, Output: 50}
+		if i < 3 {
+			r.Status, r.Error, r.ErrType = 429, "rate limit", "rate_limit_error"
+		} else {
+			r.Status = 200
+		}
+		usage.Append(r)
+	}
+	all := provider.All()
+	r := Rank(usage.All, all, time.Local)
+	if len(r.Models) != 2 {
+		t.Fatalf("standings: %+v", r.Models)
+	}
+	first, second := r.Models[0], r.Models[1]
+	if first.Model != "shared" || first.Score <= second.Score {
+		t.Fatalf("the best score first: %+v", r.Models)
+	}
+	if first.Name != "Shared" || first.Providers[0] != "one" {
+		t.Fatalf("named by the bigger share: %q by %+v", first.Name, first.Providers)
+	}
+	if first.At[1].Name != "Shared 2" {
+		t.Fatalf("a share named by its own provider: %+v", first.At[1])
+	}
+	if len(second.Causes) != 1 || second.Causes[0].Key != "rate_limit" || second.Causes[0].Count != 3 {
+		t.Fatalf("the standing's causes: %+v", second.Causes)
+	}
+	// the provider's own model rows carry the name too, an unnamed model none
+	e := rankEntry(t, r, "one")
+	if len(e.Models) != 2 || e.Models[0].Name != "Shared" || e.Models[1].Name != "" {
+		t.Fatalf("one's model rows: %+v", e.Models)
+	}
+	if two := rankEntry(t, r, "two"); len(two.Models) != 1 || two.Models[0].Name != "Shared 2" {
+		t.Fatalf("two's model rows: %+v", two.Models)
+	}
 }

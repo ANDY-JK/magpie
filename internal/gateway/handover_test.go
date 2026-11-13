@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,18 @@ import (
 
 	"github.com/yetone/magpie/internal/provider"
 )
+
+// skipOnWindows: the socket handover is a Mac and Linux feature (gui's
+// restart to update hands the gateway over through internal/handoff, which
+// has nothing on Windows, and gui/handover.go says why), and the copy of
+// the gateway's listener its tests hand on is one net.FileListener cannot
+// serve from there.
+func skipOnWindows(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the socket handover is a darwin and linux feature")
+	}
+}
 
 // serveOn starts s's ListenAndServe and waits for it to listen.
 func listening(t *testing.T, s *Server) (stop context.CancelFunc, done <-chan error) {
@@ -48,6 +61,7 @@ func listening(t *testing.T, s *Server) (stop context.CancelFunc, done <-chan er
 // old one's end waits for it, rather than 2s — while new requests are
 // answered by the new one, and none is refused on the way.
 func TestHandedOverGatewayFinishesItsStream(t *testing.T) {
+	skipOnWindows(t)
 	fresh(t)
 	release := make(chan struct{})
 	var upstreamCalls atomic.Int32
@@ -239,6 +253,7 @@ func answerOn(c net.Conn) (string, error) {
 // closed its listener, and closed it unanswered when it read the request
 // after that end began (#3568).
 func TestHandedOffGatewayTakesNoNewConnection(t *testing.T) {
+	skipOnWindows(t)
 	old, addr, stopOld, oldDone := handOffSandbox(t)
 	defer func() {
 		stopOld()
@@ -286,6 +301,7 @@ func TestHandedOffGatewayTakesNoNewConnection(t *testing.T) {
 // one it reads after it began unanswered (#3568). So too for a `make dev`
 // backend ending beside the one started after it (Handover).
 func TestHandedOffGatewayAnswersAConnectionItTook(t *testing.T) {
+	skipOnWindows(t)
 	for _, dev := range []bool{false, true} {
 		name := "handed off"
 		if dev {
@@ -358,6 +374,7 @@ func TestHandedOffGatewayAnswersAConnectionItTook(t *testing.T) {
 // agent's request just sent on it was cut ("connection reset", #3451).
 // So too for a `make dev` backend ending beside the one started after it.
 func TestHandedOffGatewayAnswersAKeptAliveConnection(t *testing.T) {
+	skipOnWindows(t)
 	for _, dev := range []bool{false, true} {
 		name := "handed off"
 		if dev {
@@ -467,6 +484,7 @@ func (c *lagConn) Write(b []byte) (int, error) {
 // net/http noted it, and the agent's next request was cut (ubuntu CI,
 // 56602426d). So too for a `make dev` backend.
 func TestHandedOffGatewayAnswersAConnectionStillAnswering(t *testing.T) {
+	skipOnWindows(t)
 	for _, dev := range []bool{false, true} {
 		name := "handed off"
 		if dev {

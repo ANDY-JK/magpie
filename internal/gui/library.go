@@ -545,6 +545,8 @@ func libraryRoutes(mux *http.ServeMux, w Windows) {
 			res, err = library.HookAgents(in.Name, in.Agents)
 		case "hooks/agents-some":
 			res, err = library.SomeHooksAgents(in.Names, in.Agents, in.On)
+		case "hooks/agents-all":
+			res, err = library.EveryHooksAgents(in.Agents, in.On)
 		case "hooks/remove":
 			res, err = library.RemoveHooks([]string{in.Name})
 		case "hooks/remove-all":
@@ -555,6 +557,8 @@ func libraryRoutes(mux *http.ServeMux, w Windows) {
 			res, err = library.SubagentAgentsSet(in.Name, in.Agents)
 		case "subagents/agents-some":
 			res, err = library.SomeSubagentsAgents(in.Names, in.Agents, in.On)
+		case "subagents/agents-all":
+			res, err = library.EverySubagentsAgents(in.Agents, in.On)
 		case "subagents/remove-all":
 			res, err = library.RemoveSubagents(in.Names)
 		case "subagents/remove":

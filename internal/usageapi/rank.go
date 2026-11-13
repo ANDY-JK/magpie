@@ -117,6 +117,9 @@ type RankTag struct {
 // every model is.
 type RankModel struct {
 	Model string `json:"model"`
+	// Name is what the user calls the model at At (provider.ModelName), ""
+	// when it goes by its id: the id stays what the log keeps
+	Name string `json:"name,omitempty"`
 	// At is the provider the model's calls are shown under now, which can
 	// be another after a merge (usage.Record.renameBy)
 	At    string `json:"at"`
@@ -125,6 +128,33 @@ type RankModel struct {
 	usage.Totals
 	Causes []RankCause `json:"causes,omitempty"`
 	Parts  []RankPart  `json:"parts,omitempty"`
+}
+
+// RankedModel is one model's standing over every provider that served it in
+// the period, the standings' own list beside the per-provider model rows
+// each entry keeps: the same model two providers served is two modelAt
+// shares (usage.ModelAtKey) and one row here, its totals their sum and its
+// At the shares it was merged from, so the page can part it again.
+type RankedModel struct {
+	// Model is the model's id as the log keeps it, the standings' name
+	// beside it (Name) what the user calls it at the provider that served
+	// it most — one model at two providers can have two names, and the
+	// bigger share's is the one shown
+	Model string `json:"model"`
+	Name  string `json:"name,omitempty"`
+	// Providers are the ids that served it, the most calls first, then by
+	// id: a stable order for a page that is read again while the numbers
+	// move
+	Providers []string `json:"providers,omitempty"`
+	// At are the shares it was merged from, one a provider's, with its
+	// totals and causes but no score of its own: the provider's own model
+	// rows are the ones ranked
+	At []RankModel `json:"at,omitempty"`
+	usage.Totals
+	Causes []RankCause `json:"causes,omitempty"`
+	Parts  []RankPart  `json:"parts,omitempty"`
+	Score  int         `json:"score"`
+	Grade  string      `json:"grade"`
 }
 
 // RankEntry is one provider's place in the ranking.
@@ -182,8 +212,12 @@ type Ranking struct {
 	// failures are still named. Drops are the ones whose standing failure
 	// puts them in the last place.
 	Providers []RankEntry `json:"providers"`
-	Thin      []Named     `json:"thin,omitempty"`
-	Gone      []Named     `json:"gone,omitempty"`
+	// Models are the period's standings by model, over the providers: one
+	// row a model whatever served it, ranked by the same order as the
+	// providers, a model with fewer than RankMinCalls calls merged left out
+	Models []RankedModel `json:"models,omitempty"`
+	Thin   []Named       `json:"thin,omitempty"`
+	Gone   []Named       `json:"gone,omitempty"`
 }
 
 // Rank is the ranking of a period, read in zone: each provider's score, what
@@ -240,6 +274,7 @@ func Rank(p usage.Period, all []provider.Provider, zone *time.Location) Ranking 
 			out.Drops = append(out.Drops, e.ID)
 		}
 	}
+	out.Models = rankModelStandings(modelShares, by, fast, soon)
 	rankSort(out.Providers)
 	for i := range out.Providers {
 		out.Providers[i].Rank = i + 1
@@ -483,6 +518,9 @@ func rankModels(shares []usage.Share, id string, by map[string]*rankDetail, fast
 			continue
 		}
 		m := RankModel{Model: model, At: id, Totals: s.Totals}
+		if n, ok := provider.ModelName(id, model); ok {
+			m.Name = n
+		}
 		if d := by[s.ID]; d != nil {
 			m.Causes = rankCauses(d.causes)
 		}
@@ -498,6 +536,91 @@ func rankModels(shares []usage.Share, id string, by map[string]*rankDetail, fast
 			return out[i].Score > out[j].Score
 		}
 		return out[i].Calls > out[j].Calls
+	})
+	return out
+}
+
+// rankModelStandings is one row per model over the providers that served it:
+// the standings' list beside the per-provider model rows each entry keeps. A
+// share (modelAt, "provider/model") is summed under its model alone, the
+// provider id being everything before the first "/" — a provider's id holds
+// none and a model's may hold more — and a model the log names nothing for
+// has no standing. The gate is RankMinCalls on the merged calls, so a model
+// each provider served too little of to rank still stands once they are
+// summed. Its pace is scored as a model's is anywhere (rankParts with top
+// false, its fast and soon its served and stood again for the reason given
+// there); holding a model's pace against the period's fastest provider is
+// deliberately not done here either this round.
+func rankModelStandings(shares []usage.Share, by map[string]*rankDetail, fast, soon float64) []RankedModel {
+	type merged struct {
+		shares []usage.Share
+		at     []RankModel
+		calls  map[string]int
+		causes map[string]int
+	}
+	at := map[string]*merged{}
+	var order []string
+	for _, s := range shares {
+		pid, model, ok := strings.Cut(s.ID, "/")
+		if !ok || pid == "" || model == "" {
+			continue
+		}
+		m := at[model]
+		if m == nil {
+			m = &merged{calls: map[string]int{}, causes: map[string]int{}}
+			at[model], order = m, append(order, model)
+		}
+		m.shares = append(m.shares, s)
+		m.calls[pid] += s.Calls
+		share := RankModel{Model: model, At: pid, Totals: s.Totals}
+		if n, ok := provider.ModelName(pid, model); ok {
+			share.Name = n
+		}
+		m.at = append(m.at, share)
+		if d := by[s.ID]; d != nil {
+			for k, n := range d.causes {
+				m.causes[k] += n
+			}
+		}
+	}
+	out := make([]RankedModel, 0, len(order))
+	for _, model := range order {
+		m := at[model]
+		t := usage.MergedTotals(m.shares)
+		if t.Calls < RankMinCalls {
+			continue
+		}
+		e := RankedModel{Model: model, At: m.at, Totals: t}
+		e.Providers = rankModelProviders(m.calls)
+		if n, ok := provider.ModelName(e.Providers[0], model); ok {
+			e.Name = n
+		}
+		e.Causes = rankCauses(m.causes)
+		e.Parts = rankParts(t, fast, soon, false)
+		for _, part := range e.Parts {
+			e.Score += int(math.Round(part.Points))
+		}
+		e.Grade = rankGrade(e.Score)
+		out = append(out, e)
+	}
+	slices.SortStableFunc(out, func(a, b RankedModel) int {
+		return rankOrder(a.Score, a.Calls, a.Model, b.Score, b.Calls, b.Model)
+	})
+	return out
+}
+
+// rankModelProviders is the ids that served a standing's model, the most
+// calls first, then by id: the first is the one the model is named by.
+func rankModelProviders(calls map[string]int) []string {
+	out := make([]string, 0, len(calls))
+	for id := range calls {
+		out = append(out, id)
+	}
+	slices.SortStableFunc(out, func(a, b string) int {
+		if calls[a] != calls[b] {
+			return calls[b] - calls[a]
+		}
+		return strings.Compare(a, b)
 	})
 	return out
 }
@@ -522,17 +645,23 @@ func rankAccounts(at map[string]int) []string {
 	return out
 }
 
-// rankSort puts the best score first, then the most calls, then by name: a
-// stable order for a page that is read again while the numbers move.
+// rankOrder is the ranking's order — the best score first, then the most
+// calls, then by name: a stable order for a page that is read again while
+// the numbers move. rankSort and the model standings' sort share it.
+func rankOrder(aScore, aCalls int, aName string, bScore, bCalls int, bName string) int {
+	if aScore != bScore {
+		return bScore - aScore
+	}
+	if aCalls != bCalls {
+		return bCalls - aCalls
+	}
+	return strings.Compare(aName, bName)
+}
+
+// rankSort puts the providers in rankOrder's order.
 func rankSort(entries []RankEntry) {
 	slices.SortStableFunc(entries, func(a, b RankEntry) int {
-		if a.Score != b.Score {
-			return b.Score - a.Score
-		}
-		if a.Calls != b.Calls {
-			return b.Calls - a.Calls
-		}
-		return strings.Compare(a.Name, b.Name)
+		return rankOrder(a.Score, a.Calls, a.Name, b.Score, b.Calls, b.Name)
 	})
 }
 

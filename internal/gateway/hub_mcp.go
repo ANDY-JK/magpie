@@ -690,7 +690,10 @@ func hubRoots(r *http.Request, meta hubCallMeta) []string {
 		// what the call says itself first; a thread's rollout is read
 		// only when it says no workspace (a folder that isn't a repository)
 		for _, dir := range slices.Sorted(maps.Keys(meta.Turn.Workspaces)) {
-			if filepath.IsAbs(dir) {
+			// a path of the distro's (/home/…) that a Codex in WSL names a
+			// Windows turn with is absolute where it comes from, though
+			// filepath.IsAbs doesn't say so on Windows
+			if filepath.IsAbs(dir) || strings.HasPrefix(dir, "/") {
 				roots = append(roots, fileURI(dir))
 			}
 		}

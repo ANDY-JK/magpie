@@ -834,6 +834,17 @@ func (t *Totals) plus(d *Totals) {
 	t.FloorN += d.FloorN
 }
 
+// MergedTotals is the shares' sum, what Totals.plus does to a row counted
+// into each of the many groups it is in (#3493): what one model's shares at
+// several providers come to, for the standings that hold them as one.
+func MergedTotals(shares []Share) Totals {
+	var t Totals
+	for i := range shares {
+		t.plus(&shares[i].Totals)
+	}
+	return t
+}
+
 // FloorAgents are the agents whose session files time a call from what
 // asked for it to its reply's end, never from inside it: Claude Code's and
 // Claude Desktop's from the line that asked, written before it was sent;

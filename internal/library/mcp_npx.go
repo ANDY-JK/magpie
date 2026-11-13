@@ -15,6 +15,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"os/exec"
@@ -151,6 +152,15 @@ func npxBin(dir, name string) string {
 	return bin
 }
 
+// npxSandbox is testenv.Marker, which library can't import outside its
+// tests: set in a test binary testenv isolated. Nothing is installed from
+// the registry then: a background npm still running when the test ends
+// holds a file in its temporary home, and on Windows that home can't be
+// removed ("being used by another process"), failing its TempDir cleanup —
+// internal/cli's TestLibraryMCPHub, on the npx line its server has. The
+// library's own tests stand in a fake installer and never reach this.
+const npxSandbox = "MAGPIE_TEST_SANDBOX"
+
 // npxDirect is s as node running the package's program, when magpie has
 // the package installed; s when it hasn't, with the install started.
 func npxDirect(s *Server) *Server {
@@ -225,6 +235,9 @@ func npxStart(r npxRun, npx, dir string, new bool) {
 var npxInstall = realInstall
 
 func realInstall(spec, npx, dir string) error {
+	if os.Getenv(npxSandbox) != "" {
+		return errors.New("a test binary never installs from the registry")
+	}
 	npm := "npm"
 	if strings.ContainsAny(npx, `/\`) {
 		npm = filepath.Join(filepath.Dir(npx), "npm")

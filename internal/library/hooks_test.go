@@ -461,3 +461,51 @@ func TestHooksClaudeEventsAll(t *testing.T) {
 		t.Fatalf("claude's events: %+v", v.HookAgents)
 	}
 }
+
+// Turn all on/off on the hooks page: every hook in the library goes to the
+// agents named, or comes from them, in one write, each only to the agents
+// that can take it — an agent's own event stays that agent's — and an agent
+// not named keeps what it has.
+func TestEveryHooksAgents(t *testing.T) {
+	sandbox(t)
+	ok(t)(SaveHook("", Hook{Name: "bark", Event: "turn-end", Command: "bark", Agents: []string{"codex"}}))
+	ok(t)(SaveHook("", Hook{Name: "ask", Event: "codex:PermissionRequest", Command: "ask"}))
+	agentsNow := func(name string) []string {
+		t.Helper()
+		var got []string
+		ok(t)(change(func(l *Library) error {
+			got = slices.Clone(l.hook(name).Agents)
+			return nil
+		}))
+		return got
+	}
+
+	ok(t)(EveryHooksAgents([]string{"claude", "codex"}, true))
+	if got := agentsNow("bark"); !slices.Equal(got, []string{"claude", "codex"}) {
+		t.Fatalf("bark after turn all on: %v", got)
+	}
+	// claude can't take codex's own event
+	if got := agentsNow("ask"); !slices.Equal(got, []string{"codex"}) {
+		t.Fatalf("the codex-own event went to %v", got)
+	}
+	// gemini wasn't named and keeps what it has; the named ones join it
+	ok(t)(SaveHook("", Hook{Name: "fmt", Event: "after-tool", Matcher: "edit", Command: "fmt", Agents: []string{"gemini"}}))
+	ok(t)(EveryHooksAgents([]string{"claude", "codex"}, true))
+	if got := agentsNow("fmt"); !slices.Equal(got, []string{"claude", "codex", "gemini"}) {
+		t.Fatalf("fmt after turn all on: %v", got)
+	}
+
+	ok(t)(EveryHooksAgents([]string{"claude", "codex"}, false))
+	if got := agentsNow("bark"); len(got) != 0 {
+		t.Fatalf("bark after turn all off: %v", got)
+	}
+	if got := agentsNow("fmt"); !slices.Equal(got, []string{"gemini"}) {
+		t.Fatalf("fmt after turn all off: %v", got)
+	}
+	if _, err := EveryHooksAgents(nil, true); err == nil {
+		t.Fatal("no agents was accepted")
+	}
+	if _, err := EveryHooksAgents([]string{}, false); err == nil {
+		t.Fatal("an empty agent list was accepted")
+	}
+}

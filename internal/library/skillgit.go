@@ -18,6 +18,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -200,6 +202,19 @@ func errNoGit() error {
 // git's messages in English, as magpie reads them.
 func gitEnv(git string) []string {
 	env := append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "LC_ALL=C", "LANGUAGE=C")
+	// git 2.53 on Windows segfaults in fetch and push when its own folders
+	// are off PATH, and magpie run from a shortcut hands it the user's
+	// PATH, which names only Git\cmd: the child keeps the folder of the git
+	// that runs and the usr\bin of its installation (one under the root,
+	// whichever of the two layouts git sits in), then the PATH it was given
+	if runtime.GOOS == "windows" {
+		dir, root := filepath.Dir(git), filepath.Dir(filepath.Dir(git))
+		env = append(slices.DeleteFunc(env, func(v string) bool { return strings.HasPrefix(v, "PATH=") }),
+			"PATH="+dir+string(os.PathListSeparator)+
+				filepath.Join(root, "usr", "bin")+string(os.PathListSeparator)+
+				filepath.Join(filepath.Dir(root), "usr", "bin")+string(os.PathListSeparator)+
+				os.Getenv("PATH"))
+	}
 	if os.Getenv("GIT_SSH_COMMAND") == "" && os.Getenv("GIT_SSH") == "" {
 		// ssh asks for a passphrase or a new host's key on the terminal:
 		// BatchMode refuses instead. A core.sshCommand of the user's own

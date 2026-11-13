@@ -10,11 +10,12 @@ import (
 )
 
 // ExportFiles writes the library as files under the library's export folder:
-// one JSON for each MCP server, hook and subagent, and a README saying where
-// they come from. They are a mirror of library.json, written to be read and
-// copied — magpie never reads them back, so editing one changes nothing. It
-// answers the folder, how many entries it wrote, and how many files it wrote
-// over that had been changed by hand since the last export.
+// one JSON for each MCP server, hook and subagent, and a README saying how
+// Load from files reads them back. They are a mirror of library.json, written
+// to be read and copied — and read back: a file edited by hand changes its
+// entry at the next Load from files. It answers the folder, how many entries
+// it wrote, and how many files it wrote over that had been changed by hand
+// since the last export.
 func ExportFiles() (string, int, int, error) {
 	l, err := load()
 	if err != nil {
@@ -56,8 +57,15 @@ func writeExport(l *Library) (string, int, int, error) {
 		}
 		n, changed = n+w, changed+c
 	}
-	readme := "These files are a mirror of magpie's library.json, written for reading and copying.\n" +
-		"magpie never reads them back: editing one changes nothing. Use the Library page instead.\n"
+	// what the README says follows what ImportFiles does, sentence by
+	// sentence: an edited file updates its entry, a file the library has
+	// no entry for adds one, and an entry with no file isn't removed
+	readme := "These files are a mirror of magpie's library.json, written for reading and copying —\n" +
+		"and for reading back: Load from files on the Library page takes them into the library.\n" +
+		"A file whose entry differs from the library's updates that entry, the agents it names\n" +
+		"included; a file named for an entry the library doesn't have adds one. Nothing in the\n" +
+		"library that has no file here is removed. A file that can't be read, or whose entry\n" +
+		"fails magpie's check, stops the whole load: the page says what would change first, and asks.\n"
 	if err := os.WriteFile(filepath.Join(root, "README.txt"), []byte(readme), 0o644); err != nil {
 		return "", 0, 0, err
 	}

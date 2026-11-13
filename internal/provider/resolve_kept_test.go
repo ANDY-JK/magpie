@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -41,9 +42,14 @@ func TestResolveKeptAcrossRequests(t *testing.T) {
 		_, _, ok := Resolve(id)
 		return ok
 	}
+	// each request's Hold hashes the environment afresh (environSum), an
+	// allocation a variable where os.Environ builds them (Windows), so
+	// the budget counts one pass over it: a long environment would
+	// otherwise read as the catalog built again
+	budget := 60 + float64(len(os.Environ()))
 	for _, id := range []string{"group/g", "nope", "m-b2"} {
 		request(id)
-		if n := testing.AllocsPerRun(20, func() { request(id) }); n > 60 {
+		if n := testing.AllocsPerRun(20, func() { request(id) }); n > budget {
 			t.Errorf("%s resolved again with nothing changed: %.0f allocations", id, n)
 		}
 	}

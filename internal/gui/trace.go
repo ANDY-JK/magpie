@@ -434,4 +434,23 @@ func traceRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(rw, map[string]bool{"lifted": gw.Unrest(in.Key)})
 	})
+	// a rest lifted by hand only once its vendor answers: the ask goes out
+	// from the gateway (gw.Probe, the background's own list ask), and the
+	// answer says whether it was asked and whether the rest is no more
+	mux.HandleFunc("POST /api/gateway/probe", func(rw http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Key string `json:"key"`
+		}
+		gw := served.Load()
+		if json.NewDecoder(r.Body).Decode(&in) != nil || in.Key == "" || gw == nil {
+			http.Error(rw, "nothing to ask", http.StatusBadRequest)
+			return
+		}
+		probed, lifted, err := gw.Probe(in.Key)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(rw, map[string]bool{"probed": probed, "lifted": lifted})
+	})
 }
