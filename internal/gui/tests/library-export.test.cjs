@@ -23,14 +23,14 @@ const lib = {
   foundServers: [], projects: [], foundSkills: [], problems: [],
 };
 
-function server(lang, posts) {
+function server(lang, posts, data = lib) {
   return async (route) => {
     const req = route.request(), url = new URL(req.url());
     const json = (data) => route.fulfill({ json: data });
     if (url.pathname === "/boot.js") return route.fulfill({ contentType: "text/javascript", body: `window.bootPrefs = {lang:"${lang}",theme:"light",web:true};` });
     if (url.pathname === "/wails/runtime.js") return route.fulfill({ contentType: "text/javascript", body: "export const Window = {};" });
     if (url.pathname === "/api/state") return json({ agents: [], profiles: [], settings: { lang, theme: "light" } });
-    if (url.pathname === "/api/library") return json(lib);
+    if (url.pathname === "/api/library") return json(data);
     if (url.pathname === "/api/library/export" && req.method() === "POST") {
       posts.push("export");
       // the second export finds one file edited by hand
@@ -48,10 +48,23 @@ function server(lang, posts) {
   };
 }
 const L = {
-  en: { btn: "Save as files", said: "3 entries written to ~/.magpie/library/export", over: "3 entries written to ~/.magpie/library/export; 1 files edited by hand were written over" },
-  zh: { btn: "另存为文件", said: "已把 3 项写入 ~/.magpie/library/export", over: "已把 3 项写入 ~/.magpie/library/export；有 1 个手工改过的文件被覆盖" },
+  en: {
+    btn: "Save as files", said: "3 entries written to ~/.magpie/library/export", over: "3 entries written to ~/.magpie/library/export; 1 files edited by hand were written over",
+    xp: "Export folder",
+    xpTip: "The export folder has 1 MCP servers, 1 hooks and 1 subagents as files, and a README that says how Load from files reads them back",
+    xpNone: "There is no export folder yet: Save as files writes one, with a README that says how Load from files reads it back",
+  },
+  zh: {
+    btn: "另存为文件", said: "已把 3 项写入 ~/.magpie/library/export", over: "已把 3 项写入 ~/.magpie/library/export；有 1 个手工改过的文件被覆盖",
+    xp: "导出目录",
+    xpTip: "导出目录里有 1 个 MCP 服务器、1 个 Hook 和 1 个子代理的文件，以及一份 README 说明从文件载入如何读回",
+    xpNone: "还没有导出目录：另存为文件会创建一个，并附一份 README 说明从文件载入如何读回",
+  },
 };
-const KEYS = ["Save as files", "Write the servers, hooks and subagents as files under the library's export folder, to read and copy", "{n} entries written to {dir}"];
+const KEYS = ["Save as files", "Write the servers, hooks and subagents as files under the library's export folder, to read and copy", "{n} entries written to {dir}",
+  "Export folder",
+  "There is no export folder yet: Save as files writes one, with a README that says how Load from files reads it back",
+  "The export folder has {mcp} MCP servers, {hooks} hooks and {subagents} subagents as files, and a README that says how Load from files reads them back"];
 
 for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
   for (const lang of ["en", "zh"]) {
@@ -82,6 +95,47 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(missing, [], "every word has its Chinese");
       assert.deepEqual(errors, []);
       await page.context().close();
+    });
+
+    // the header's Export folder: lit when Save as files has made one, saying
+    // what is in it and how Load from files reads it back; greyed with what
+    // makes one until then
+    test(`${engine} ${lang}: the header's Export folder opens what was written`, async (t) => {
+      const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
+      t.after(() => browser.close());
+      const ctx = await browser.newContext({ viewport: { width: 980, height: 760 }, reducedMotion: "reduce", locale: lang === "zh" ? "zh-CN" : "en-US" });
+      const open = async (data) => {
+        const page = await ctx.newPage();
+        page.setDefaultTimeout(5000);
+        page.setDefaultNavigationTimeout(60000);
+        const posts = [], errors = [];
+        page.on("pageerror", (e) => errors.push(e.message));
+        await page.route("http://magpie.test/**", server(lang, posts, data));
+        await page.goto("http://magpie.test/");
+        await page.locator('[data-view="library"]').click();
+        return { page, posts, errors };
+      };
+      // the folder is there: the button says what is in it, and opens it
+      const a = await open({ ...lib, exported: true });
+      const xp = a.page.locator(".lib-exportdir");
+      await xp.waitFor();
+      assert.equal((await xp.textContent()).trim(), w.xp);
+      assert.equal(await xp.isDisabled(), false);
+      assert.equal(await xp.getAttribute("title"), w.xpTip);
+      const revealed = a.page.waitForRequest((r) => r.url().endsWith("/api/library/reveal"));
+      await xp.click();
+      await revealed;
+      assert.deepEqual(a.posts, ["reveal"], "opened, nothing written");
+      assert.deepEqual(a.errors, []);
+      // a library never saved as files: greyed, saying what makes one
+      const b = await open({ ...lib, exported: false });
+      const xpNone = b.page.locator(".lib-exportdir");
+      await xpNone.waitFor();
+      assert.equal(await xpNone.getAttribute("title"), w.xpNone);
+      assert.equal(await xpNone.isDisabled(), true);
+      assert.deepEqual(b.posts, []);
+      assert.deepEqual(b.errors, []);
+      await ctx.close();
     });
   }
 }

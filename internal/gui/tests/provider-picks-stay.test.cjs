@@ -94,14 +94,26 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // or Forget, and the editor left for GPT Relay's before the list is in
       for (const [action, label] of [["models", w.refresh], ["unfetch", w.forget]]) {
         await open("Claude Relay");
+        // the picks alone are drawn: Show the other {n} draws the rest
+        { const r = editor.locator(".mchips-rest"); if (await r.count()) { await r.click(); await page.waitForTimeout(200); } }
         await editor.locator(".mchips .mchip", { hasText: "claude-sonnet-4-6" }).click();
         assert.deepEqual(await picks(), ["claude-opus-4-6", "claude-sonnet-4-6"]);
         shut();
         const n = posts.length;
         await button(label).click();
         await until(() => posts.slice(n).some((p) => p.path === "/api/provider/" + action) && gate.waiting > 0);
+        // the Refresh/Forget the gate holds is not abandoned: opened again
+        // after it, the editor waits for the one before it, so the list is
+        // in first, then Leave
+        release();
+        // the confirm the Refresh/Forget raised on its answer: taken, or
+        // Escape closes it; then the editor's own Leave (Escape closes the
+        // editor only once nothing stands in front of it)
+        const confirm = page.locator("dialog.action-confirm[open]");
+        await confirm.waitFor().catch(() => {});
+        if (await confirm.count()) await page.keyboard.press("Escape");
+        await confirm.waitFor({ state: "hidden" }).catch(() => {});
         await page.keyboard.press("Escape");
-        await page.locator("dialog.action-confirm[open] button").last().click();
         await page.locator("#modal").waitFor({ state: "hidden" });
         await open("GPT Relay");
         release();

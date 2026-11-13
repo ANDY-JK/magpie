@@ -253,7 +253,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           for (const sel of rules) for (const part of sel.split(",")) { const m = part.trim().match(/^\.([\w-]+)$/); if (m) global.add(m[1]); }
           const used = new Set();
           for (const e of document.querySelectorAll("#ledDash *, #ledWrap .led-detail *")) for (const c of e.classList) used.add(c);
-          const ok = new Set(["segs", "opt", "grow", "text", "sess-pick", "skeleton", "thumb", "on", "ic"]); // the page's shared parts, used as meant
+          // the page's shared parts, used as meant; the trend's heading is the
+          // window's own heading-and-fold words, as the Overview's lists use them
+          const ok = new Set(["segs", "opt", "grow", "text", "sess-pick", "skeleton", "thumb", "on", "ic", "row-head", "fold", "label"]);
           // the new parts' own, prefixed names are theirs; a short bare one may be anyone's
           const own = /^(led|pu|cx|rk|usage)-/;
           return [...used].filter((c) => global.has(c) && !ok.has(c) && !own.test(c));

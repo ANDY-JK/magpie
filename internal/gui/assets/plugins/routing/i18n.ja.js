@@ -402,7 +402,6 @@ magpie.strings({
     "{who} answered {status}: the vendor wants the account verified before it serves it again, and nobody is left to try, so {agent} gets the error with how to verify it. For a minute {agent}'s retries get the same answer without asking the vendor.": "{who} が {status} を返しました。ベンダーは再び応答する前にアカウントの確認を求めており、他に試せる相手もいないため、{agent} には確認方法付きでこのエラーが届きます。1 分間、{agent} の再試行にはベンダーに問い合わせず同じ応答が返ります。",
     "Verify the account ↗": "アカウントを確認 ↗",
     "It's verified — try it again": "確認済み — もう一度試す",
-    "account restricted by the vendor": "ベンダーがアカウントを制限",
     "The vendor restricted the account: it rests {d}, as only the vendor lifting the restriction brings it back. Appeal with the vendor; once it's lifted, try it again here": "ベンダーがこのアカウントを制限しました：制限を解除できるのはベンダーだけなので、{d} 休止します。ベンダーに異議を申し立て、解除されたらここでもう一度試してください",
     "The restriction is lifted — try it again": "制限が解除された — もう一度試す",
     "{who} turned away the reasoning effort changed mid-conversation as an update that keeps its cache, so it is asked again at the new effort the usual way, before any of the reply reaches {agent}.": "{who} は会話の途中で推理レベルをキャッシュを保つ「更新」として変更することを受け付けなかったため、通常の方法で新しい推理レベルで再度リクエストします。応答が {agent} に届く前に処理されます。",

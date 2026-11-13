@@ -819,6 +819,17 @@ magpie.plugin("library", (ctx) => {
     back.setAttribute("aria-label", t("Backups"));
     if (lib) back.title = t("magpie keeps a copy of every file before it writes it.") + "\n" + tilde(lib.backups);
     else back.disabled = true;
+    // the export folder Save as files made, on every tab: what is in it,
+    // and the README that says how Load from files reads it back (#11). A
+    // library never saved as files has none, and the button says what makes
+    // one; the library says whether it has one with the page's own payload
+    const xp = button("", "lib-exportdir", () => lib && reveal(lib.dir));
+    xp.append(glyph(GLYPH.doc, "lib-mini"), el("span", "", t("Export folder")));
+    xp.setAttribute("aria-label", t("Export folder"));
+    if (!lib || lib.exported === false) xp.disabled = true;
+    if (!lib) xp.title = t("Export folder");
+    else if (lib.exported === false) xp.title = t("There is no export folder yet: Save as files writes one, with a README that says how Load from files reads it back");
+    else xp.title = t("The export folder has {mcp} MCP servers, {hooks} hooks and {subagents} subagents as files, and a README that says how Load from files reads them back", { mcp: counts?.mcp || 0, hooks: counts?.hooks || 0, subagents: counts?.subagents || 0 });
     // the library as files, to read and copy, beside the folder and backups
     const exp = button("", "lib-export", async () => {
       exp.disabled = true;
@@ -858,7 +869,7 @@ magpie.plugin("library", (ctx) => {
     imp.append(glyph(GLYPH.up, "lib-mini"), el("span", "", t("Load from files")));
     imp.setAttribute("aria-label", t("Load from files"));
     imp.title = t("Read the export folder back into the library: files changed by hand update their entries, new ones are added; nothing in the library is removed");
-    acts.append(more, back, exp, imp);
+    acts.append(more, back, xp, exp, imp);
     head.append(acts);
     return head;
   }
@@ -1040,7 +1051,24 @@ magpie.plugin("library", (ctx) => {
     body.append(rh);
     const list = el("div", "list lib-list");
     const rows = rtk.agents.filter((a) => !isHidden(a));
-    for (const a of rows) {
+    // a filter, as the skills have, once there are more agents than fit: it
+    // narrows by what each row says — the agent, its distro, its tags
+    const drawAgents = () => {
+      const q = rtkQuery.trim().toLowerCase();
+      const drawn = rows.map((a) => [a, rtkRow(a)]);
+      const shown = q ? drawn.filter(([, row]) => row.textContent.toLowerCase().includes(q)) : drawn;
+      list.replaceChildren(...shown.map(([, row]) => row));
+      if (!shown.length && q) list.append(el("div", "list lib-none", t("No agent matches “{q}”.", { q: rtkQuery.trim() })));
+      if (!rows.length) list.append(el("div", "lib-none", t("None of your agents is one RTK has a hook for.")));
+    };
+    if (rows.length > 6) body.append(listFilter(t("Filter {n} agents…", { n: rows.length }), rtkQuery, (v) => { rtkQuery = v; drawAgents(); }));
+    body.append(list);
+    drawAgents();
+  }
+
+  // One agent's row on the RTK tab: its name, whatever keeps it from turning
+  // RTK on, and the switch.
+  function rtkRow(a) {
       const row = el("div", "row lib-row");
       const who = el("div", "who");
       who.append(el("div", "name", a.name));
@@ -1073,10 +1101,7 @@ magpie.plugin("library", (ctx) => {
       const sw = toggle(a.on, t("{agent} runs its commands through RTK", { agent: a.name }), (on) => setRTK(a, on));
       if ((!path && !a.on) || a.asleep || (a.blocked && !a.on) || rtkBusy.has(a.id) || rtkInstalling || rtkInstallingIn || rtkUpgrading) sw.disabled = true;
       row.append(sw);
-      list.append(row);
-    }
-    if (!rows.length) list.append(el("div", "lib-none", t("None of your agents is one RTK has a hook for.")));
-    body.append(list);
+      return row;
   }
   // Why RTK has no hook for an agent: each agent's own reason and its own
   // rtk-ai/rtk issue, never another agent's (新v学员 on Discord: Grok Build's
@@ -1377,9 +1402,19 @@ magpie.plugin("library", (ctx) => {
     const list = el("div", "list lib-list");
     // a hidden agent still reading them is listed, to switch it off (#475)
     const rows = iv.agents.filter((a) => !isHidden({ id: a.agent }) || a.on);
-    for (const a of rows) list.append(...instructionsRow(a));
-    if (!rows.length) list.append(el("div", "lib-none", t("None of your agents reads a user-wide instructions file magpie knows.")));
+    // a filter, as the skills have, once there are more agents than fit:
+    // it narrows by what each row says — the agent, its file, its tags
+    const drawInstr = () => {
+      const q = instrQuery.trim().toLowerCase();
+      const drawn = rows.map((a) => [a, instructionsRow(a)]);
+      const shown = q ? drawn.filter(([, rs]) => rs.map((r) => r.textContent).join(" ").toLowerCase().includes(q)) : drawn;
+      list.replaceChildren(...shown.flatMap(([, rs]) => rs));
+      if (!shown.length && q) list.append(el("div", "list lib-none", t("No agent matches “{q}”.", { q: instrQuery.trim() })));
+      if (!rows.length) list.append(el("div", "lib-none", t("None of your agents reads a user-wide instructions file magpie knows.")));
+    };
+    if (rows.length > 6) body.append(listFilter(t("Filter {n} agents…", { n: rows.length }), instrQuery, (v) => { instrQuery = v; drawInstr(); }));
     body.append(list);
+    drawInstr();
     // a stopped WSL distro's agents are rows above when magpie saw their
     // file; one it didn't see isn't said to keep none
     const skip = shownAgents().filter((a) => !a.instructions && !a.asleep);
@@ -3054,7 +3089,7 @@ magpie.plugin("library", (ctx) => {
       if (hooks.length > 1) {
         const rh = el("div", "row-head lib-hookhead");
         rh.append(el("span", "label", t("In the library")), el("span", "grow"));
-        if (all.length) rh.append(pickButton("hooks"));
+        if (all.length) rh.append(pickButton("hooks"), ...everyButtons("hooks", all));
         rh.append(removeEveryButton("hooks"));
         body.append(rh);
       }
@@ -3277,7 +3312,7 @@ magpie.plugin("library", (ctx) => {
       if (subs.length > 1) {
         const rh = el("div", "row-head lib-subagenthead");
         rh.append(el("span", "label", t("In the library")), el("span", "grow"));
-        if (all.length) rh.append(pickButton("subagents"));
+        if (all.length) rh.append(pickButton("subagents"), ...everyButtons("subagents", all));
         rh.append(removeEveryButton("subagents"));
         body.append(rh);
       }
@@ -3632,6 +3667,8 @@ magpie.plugin("library", (ctx) => {
   let skillQuery = "";         // what the filter over the skills holds
   let hookQuery = "";          // and over the hooks, once there are many
   let subQuery = "";           // and over the subagents
+  let instrQuery = "";         // and over the Instructions tab's agents
+  let rtkQuery = "";           // and over the RTK tab's agents
   let skillTimer = 0;          // the filter's redraw, waiting for typing to pause
   const unfiltered = new Set(); // groups folded while filtering, till the filter changes
   let folds = {};              // group → true when folded, false when opened by hand
@@ -4926,31 +4963,79 @@ magpie.plugin("library", (ctx) => {
     openLib(ed);
   }
 
-  // Every skill, or every server (#1027), on or off for every agent shown
-  // at once; an agent not shown keeps what it has, and a server goes only
-  // to the agents that can reach it, as its All chip gives it.
+  // What Turn all on and Turn all off work on, a kind to a line (#1027):
+  // the list to take the rows from, whether an agent can be given one, the
+  // glyph the confirmation shows, and what each button says. Skills and
+  // servers came first; hooks and subagents are the same two buttons on
+  // their own lists (the owner, 11-11). A kind's can() only keeps a row
+  // that no agent shown can take out of the button being lit: a server
+  // reaches only the agents that can reach it, a hook only those that can
+  // run it, and a subagent only those that read subagents at all.
+  const EVERY = () => ({
+    skills: {
+      items: () => lib.skills,
+      can: () => () => true,
+      glyph: GLYPH.skill,
+      onTitle: (n) => t("Give every skill to all {n} agents that can take skills", { n }),
+      offTitle: (n) => t("Take every skill from all {n} agents", { n }),
+      offHead: (n) => t("Turn off all {n} skills?", { n }),
+      offText: (agents) => t("Every skill is taken out of {agents}. They stay in the library, to turn on again.", { agents }),
+      said: (n, m, on) => on ? t("{n} skills are on for all {m} agents", { n, m }) : t("{n} skills are off for all {m} agents", { n, m }),
+    },
+    servers: {
+      items: () => lib.servers,
+      can: (x) => (a) => reaches(x)(a),
+      glyph: GLYPH.cmd,
+      onTitle: (n) => t("Give every server to all {n} agents, each the ones it can reach", { n }),
+      offTitle: (n) => t("Take every server from all {n} agents", { n }),
+      offHead: (n) => t("Turn off all {n} servers?", { n }),
+      offText: (agents) => t("Every server is taken out of {agents}. They stay in the library, to turn on again.", { agents }),
+      said: (n, m, on) => on ? t("{n} servers are on for all {m} agents", { n, m }) : t("{n} servers are off for all {m} agents", { n, m }),
+    },
+    hooks: {
+      items: () => lib.hooks || [],
+      can: (h) => (a) => !hookBlocked(h)(a),
+      glyph: GLYPH.hook,
+      onTitle: (n) => t("Give every hook to all {n} agents that can run hooks", { n }),
+      offTitle: (n) => t("Take every hook from all {n} agents", { n }),
+      offHead: (n) => t("Turn off all {n} hooks?", { n }),
+      offText: (agents) => t("Every hook is taken out of {agents}. They stay in the library, to turn on again.", { agents }),
+      said: (n, m, on) => on ? t("{n} hooks are on for all {m} agents", { n, m }) : t("{n} hooks are off for all {m} agents", { n, m }),
+    },
+    subagents: {
+      items: () => lib.subagents || [],
+      can: () => (a) => !subagentBlocked(a),
+      glyph: GLYPH.subagent,
+      onTitle: (n) => t("Give every subagent to all {n} agents that can take them", { n }),
+      offTitle: (n) => t("Take every subagent from all {n} agents", { n }),
+      offHead: (n) => t("Turn off all {n} subagents?", { n }),
+      offText: (agents) => t("Every subagent is taken out of {agents}. They stay in the library, to turn on again.", { agents }),
+      said: (n, m, on) => on ? t("{n} subagents are on for all {m} agents", { n, m }) : t("{n} subagents are off for all {m} agents", { n, m }),
+    },
+  });
+
+  // Every skill, server, hook or subagent, on or off for every agent shown
+  // at once; an agent not shown keeps what it has. An agent that can't take
+  // a row is left out by the library's own change(), and its chip is greyed
+  // here, saying why — the button goes on for the ones that can.
   function everyButtons(kind, all) {
-    const ids = all.map((a) => a.id), n = all.length, skills = kind === "skills";
-    const items = skills ? lib.skills : lib.servers;
-    const can = (x, a) => skills || reaches(x)(a);
+    const k = EVERY()[kind], ids = all.map((a) => a.id), n = all.length, items = k.items();
     const on = button(t("Turn all on"), "action lib-updall lib-everyon", () => everyOf(kind, ids, true));
-    on.title = skills ? t("Give every skill to all {n} agents that can take skills", { n }) : t("Give every server to all {n} agents, each the ones it can reach", { n });
-    on.disabled = items.every((x) => all.every((a) => !can(x, a) || x.agents?.includes(a.id)));
+    on.title = k.onTitle(n);
+    on.disabled = items.every((x) => all.every((a) => !k.can(x)(a) || x.agents?.includes(a.id)));
     const off = button(t("Turn all off"), "action lib-updall lib-everyoff", () => confirmEveryOff(kind, ids));
-    off.title = skills ? t("Take every skill from all {n} agents", { n }) : t("Take every server from all {n} agents", { n });
+    off.title = k.offTitle(n);
     off.disabled = !items.some((x) => ids.some((id) => x.agents?.includes(id)));
     return [on, off];
   }
 
   function confirmEveryOff(kind, ids) {
-    const skills = kind === "skills", n = (skills ? lib.skills : lib.servers).length, agents = ids.map(nameOf).join(", ");
+    const k = EVERY()[kind], n = k.items().length, agents = ids.map(nameOf).join(", ");
     const ed = el("div", "editor lib-editor");
     const head = el("div", "ehead");
-    head.append(glyph(skills ? GLYPH.skill : GLYPH.cmd), el("b", "", skills ? t("Turn off all {n} skills?", { n }) : t("Turn off all {n} servers?", { n })));
+    head.append(glyph(k.glyph), el("b", "", k.offHead(n)));
     ed.append(head);
-    ed.append(el("p", "lib-confirm", skills
-      ? t("Every skill is taken out of {agents}. They stay in the library, to turn on again.", { agents })
-      : t("Every server is taken out of {agents}. They stay in the library, to turn on again.", { agents })));
+    ed.append(el("p", "lib-confirm", k.offText(agents)));
     const bar = el("div", "bar");
     const go = button(t("Turn all off"), "primary danger-fill", async () => { go.disabled = true; if (await everyOf(kind, ids, false)) closeLibModal(true); else go.disabled = false; });
     bar.append(el("span", "grow"), button(t("Cancel"), "", closeLibModal), go);
@@ -4963,14 +5048,8 @@ magpie.plugin("library", (ctx) => {
     try {
       const v = await api("library/" + kind + "/agents-all", { agents: ids, on });
       take(v);
-      const m = ids.length;
-      if (kind === "skills") {
-        const n = lib.skills.length;
-        report(v.result, on ? t("{n} skills are on for all {m} agents", { n, m }) : t("{n} skills are off for all {m} agents", { n, m }));
-      } else {
-        const n = lib.servers.length;
-        report(v.result, on ? t("{n} servers are on for all {m} agents", { n, m }) : t("{n} servers are off for all {m} agents", { n, m }));
-      }
+      const k = EVERY()[kind];
+      report(v.result, k.said(k.items().length, ids.length, on));
       render();
       return true;
     } catch (e) {

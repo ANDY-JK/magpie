@@ -75,13 +75,14 @@ magpie.plugin("usage", (ctx) => {
     <div class="led-dash" id="ledDash" hidden>
       <div class="led-strip" id="ledKpi"></div>
       <section class="led-trend">
-        <div class="led-bar">
+        <div class="row-head"><button class="fold" type="button" data-fold="trend" aria-expanded="true" aria-controls="ledBar"><span class="label" data-t>Requests over time</span></button></div>
+        <div class="led-bar" id="ledBar">
           <div class="segs" id="ledMetric"></div>
           <div class="segs led-style" id="ledStyle"></div>
           <span class="grow"></span>
           <span class="led-split"><span class="led-by" data-t>Split by</span><span class="segs" id="ledSplit"></span></span>
         </div>
-        <div class="led-body">
+        <div class="led-body" id="ledBody">
           <div class="led-chart" id="ledChart"></div>
           <div class="led-rank" id="ledRank"></div>
           <div class="led-rail" id="ledRail" hidden><i></i></div>
@@ -90,13 +91,15 @@ magpie.plugin("usage", (ctx) => {
     </div>
     <section class="led-heat" id="ledHeat" hidden>
       <div class="led-bar">
-        <div class="heat-title"><b data-t>Usage heatmap</b><span data-t>Daily usage over the last 53 weeks</span></div>
+        <button class="fold" type="button" data-fold="heat" aria-expanded="true" aria-controls="ledHeatBody"><span class="heat-title"><b data-t>Usage heatmap</b><span data-t>Daily usage over the last 53 weeks</span></span></button>
         <span class="grow"></span>
-        <div class="segs" id="ledHeatMetric"></div>
       </div>
-      <div class="heat-scroll" id="ledHeatScroll"></div>
-      <div class="heat-foot"></div>
-      <div class="heat-tip" id="ledHeatTip" hidden></div>
+      <div id="ledHeatBody">
+        <div class="led-bar"><span class="grow"></span><div class="segs" id="ledHeatMetric"></div></div>
+        <div class="heat-scroll" id="ledHeatScroll"></div>
+        <div class="heat-foot"></div>
+        <div class="heat-tip" id="ledHeatTip" hidden></div>
+      </div>
     </section>
     <div class="led-head"><p class="led-sum" id="ledSum"></p><span class="grow"></span><span class="led-arch" id="ledArchive"></span></div>
     <div class="led-strip led-vias" id="ledVia" hidden></div>
@@ -108,6 +111,7 @@ magpie.plugin("usage", (ctx) => {
   <div class="usage-pane ctx-pane" id="contextPane" hidden></div>
   <div class="usage-pane rank-pane" id="rankPane" hidden></div>
   <div class="usage-pane sess-pane" id="sessionsPane" hidden>
+    <div class="row-head"><div class="segs" id="sessTabs" role="tablist" aria-label="Sessions" hidden></div></div>
     <div class="sess-tools">
       <button class="sess-pick" id="sessAgent" type="button" hidden></button>
       <button class="sess-pick" id="sessModel" type="button" hidden></button>

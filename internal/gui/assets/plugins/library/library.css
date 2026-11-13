@@ -29,7 +29,7 @@ body.window .lib-head { top: -2px; margin: -2px 0 0; padding: 8px 0 4px; --bleed
     --bleed-l: var(--view-left); --bleed-r: var(--view-right);
   }
   body.web .lib-tabs { max-width: 100%; flex-wrap: wrap; }
-  body.web .lib-more, body.web .lib-discover, body.web .lib-backups { flex: none; }
+  body.web .lib-more, body.web .lib-discover, body.web .lib-backups, body.web .lib-exportdir { flex: none; }
   /* a phone's inputs are 44pt with 16px text: the search box grows round it */
   body.web .editor.lib-hubsheet label.lib-hubsearch { height: 44px; border-radius: 10px; }
 }
@@ -43,7 +43,7 @@ body.window .lib-head { top: -2px; margin: -2px 0 0; padding: 8px 0 4px; --bleed
 .lib-headacts { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
 .lib-head.stuck::before { box-shadow: 0 1px 0 var(--line-2); }
 .lib-tabs .opt { height: 24px; padding: 0 12px; font-size: 12.5px; }
-.lib-more, .lib-discover, .lib-backups { display: inline-flex; align-items: center; gap: 5px; }
+.lib-more, .lib-discover, .lib-backups, .lib-exportdir { display: inline-flex; align-items: center; gap: 5px; }
 .lib-mini { display: inline-grid; place-items: center; color: var(--muted); }
 .lib-mini svg { width: 13px; height: 13px; }
 .lib-body { display: flex; flex-direction: column; flex: none; }
@@ -139,7 +139,7 @@ button.row.lib-hubfolded:hover { background: var(--pill); }
   .lib-hubsheet .lib-list .row { flex-wrap: nowrap; }
   .lib-hubtag { display: none; }
   /* the file buttons go icon-only, so the sticky head keeps its height */
-  .lib-headacts .lib-more span, .lib-headacts .lib-backups span, .lib-headacts .lib-export span, .lib-headacts .lib-import span { display: none; }
+  .lib-headacts .lib-more span, .lib-headacts .lib-backups span, .lib-headacts .lib-exportdir span, .lib-headacts .lib-export span, .lib-headacts .lib-import span { display: none; }
 }
 
 /* the glyph at the front of a row: drawn, in the text colour */

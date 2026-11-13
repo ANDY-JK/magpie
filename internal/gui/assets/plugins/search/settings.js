@@ -329,10 +329,14 @@ function renderSearcher(s, keep, box) {
   const icOf = (id) => choices.find((x) => x.id === id.split("/")[0])?.icon;
   const r = el("div", "row pref searcher-row");
   const who = el("div", "who");
+  // two lines, not six sentences joined into one (the owner, 诉求9): the
+  // first line says what the picker does and what failed last; the hint
+  // line under it holds the rest, each still said, in the same order
   const sub = el("div", "sub", off ? (s.searchAll ? t("Provider search is off: only your Search APIs are used, for every model. Without one, no search tool is added.") : t("Provider search is off: only your Search APIs are used. Without one, no search tool is added. Providers' native search is unchanged.")) : t("When a model can't search directly, the picked provider searches for it. Searches may cost quota or money; if one fails, the next providers are tried, then other sources and your Search APIs."));
+  const hint = el("div", "sub hint");
   if (!off && v && s.searchUnused) {
     const why = { gone: t("it is no longer in magpie"), off: t("it is turned off"), cant: t("it can't search the web by itself"), nomodel: t("it lists no model") }[s.searchUnused] || s.searchUnused;
-    sub.append(" · ", el("span", "warn searcher-unused", t("{who} isn't used: {why}, so magpie picks one", { who: named(v), why })));
+    hint.append(el("span", "warn searcher-unused", t("{who} isn't used: {why}, so magpie picks one", { who: named(v), why })), " · ");
   }
   // the one named didn't search last time, and no other provider searched
   // in its place (Gearclickist on Discord: Grok picked answered without
@@ -347,19 +351,22 @@ function renderSearcher(s, keep, box) {
     sub.prepend(el("span", "warn searcher-failed", said), " · ");
   }
   const plans = choices.filter((c) => c.service).map((c) => c.name);
-  if (!off && plans.length) sub.append(" · ", el("span", "searcher-own",
-    t("A Kimi Code plan ({names}) searches for its own models first, with its web search; for other models only when named here", { names: plans.join(", ") })));
+  if (!off && plans.length) hint.append(el("span", "searcher-own",
+    t("A Kimi Code plan ({names}) searches for its own models first, with its web search; for other models only when named here", { names: plans.join(", ") })), " · ");
   const googles = choices.filter((c) => c.own).map((c) => c.name);
-  if (!off && googles.length) sub.append(" · ", el("span", "searcher-own",
-    t("{names} search for their own models first, with Gemini's Google Search", { names: googles.join(", ") })));
-  if (!off && s.searchRelays?.length) sub.append(" · ", el("span", "searcher-relays",
-    t("These relays must be selected manually and are not used for automatic selection or fallback: {names}.", { names: s.searchRelays.join(", ") })));
+  if (!off && googles.length) hint.append(el("span", "searcher-own",
+    t("{names} search for their own models first, with Gemini's Google Search", { names: googles.join(", ") })), " · ");
+  if (!off && s.searchRelays?.length) hint.append(el("span", "searcher-relays",
+    t("These relays must be selected manually and are not used for automatic selection or fallback: {names}.", { names: s.searchRelays.join(", ") })), " · ");
   // Being left out can also mean no usable model, not just no search support.
-  if (!off && s.searchLeftOut?.length) sub.append(" · ", el("span", "searcher-left-out",
+  if (!off && s.searchLeftOut?.length) hint.append(el("span", "searcher-left-out",
     t("These providers can't be selected to search for other models with the current configuration: {names}. Their models can still get search results through other available search providers or configured search APIs.", { names: s.searchLeftOut.length > 6
       ? t("{names} and {n} more", { names: s.searchLeftOut.slice(0, 5).join(", "), n: s.searchLeftOut.length - 5 })
       : s.searchLeftOut.join(", ") })));
+  // no trailing separator on the hint's last word
+  while (hint.lastChild && hint.lastChild.nodeType === 3) hint.lastChild.remove();
   who.append(el("div", "name", t("Searches for other models")), sub);
+  if (hint.childElementCount) who.append(hint);
   const b = el("button", "rt-cond on searcher-pick");
   b.type = "button";
   b.setAttribute("aria-label", t("Searches for other models"));

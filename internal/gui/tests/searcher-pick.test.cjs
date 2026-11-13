@@ -187,10 +187,16 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await row.scrollIntoViewIfNeeded();
       assert.equal(await row.locator(".name").innerText(), w.name);
       assert.equal(await row.locator("button.searcher-pick").innerText(), `${w.auto} · Claude · claude-haiku-4-5`);
-      assert((await row.locator(".sub").innerText()).startsWith(h.help), "costs and fallback apply to every search provider");
+      // two lines, not six sentences joined into one (the owner, 诉求9):
+      // the first says what the picker does; the hint line under it holds
+      // the plans, the own-search notes and the relays
+      const lines = await row.locator(".sub").allInnerTexts();
+      assert(lines[0].startsWith(h.help), "costs and fallback apply to every search provider");
       assert.equal(await row.locator(".searcher-relays").innerText(), h.relays);
-      assert((await row.locator(".sub").innerText()).includes(w.own), "the Kimi Code plan is said to search for its own models");
-      assert((await row.locator(".sub").innerText()).includes(w.google), "a Google sign-in is said to search for its own models (#757)");
+      assert.equal(lines.length, 2, `two lines: ${JSON.stringify(lines)}`);
+      assert(lines[1].includes(w.own), "the Kimi Code plan is said to search for its own models");
+      assert(lines[1].includes(w.google), "a Google sign-in is said to search for its own models (#757)");
+      assert(!lines[0].includes(w.own) && !lines[1].startsWith(h.help), "the two lines do not repeat each other");
       assert.equal(await row.locator(".searcher-left-out").innerText(), h.left);
       // a long list is cut short
       st.leftOut = ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8"];
@@ -310,7 +316,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await row.locator("button.searcher-pick").innerText(), w.off);
       assert.equal(await row.locator(".searcher-own, .searcher-unused, .searcher-relays, .searcher-left-out").count(), 0);
       assert.equal(await page.locator("#searchFirstRow").count(), 0);
-      assert.equal(await row.locator(".sub").innerText(), lang === "zh"
+      assert.equal(await row.locator(".sub").first().innerText(), lang === "zh"
         ? "已关闭供应商搜索：只用你配置的搜索 API；没有配置就不加搜索工具。供应商自带的联网搜索不受影响。"
         : "Provider search is off: only your Search APIs are used. Without one, no search tool is added. Providers' native search is unchanged.");
 
@@ -350,17 +356,17 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           // no title before the pointer has come over the help: asked here,
           // as reach's wheel, from the view's middle, can pass over it (with
           // Image generation timeout drawn above, it does in Japanese)
-          assert.equal(await row.locator(".sub").getAttribute("title"), null);
+          assert.equal(await row.locator(".sub").first().getAttribute("title"), null);
           // under Image recognition's MCP address (6c1c0a747) the row is
           // past the window's foot: the reader scrolls down to it
           await reach(page, row.locator("button.searcher-pick"));
           // Hover retries if Settings' startup refresh replaces the row.
           await row.locator("button.searcher-pick").hover();
-          assert((await row.locator(".sub").innerText()).startsWith(h.help));
+          assert((await row.locator(".sub").first().innerText()).startsWith(h.help));
           assert.equal(await row.locator(".searcher-relays").innerText(), h.relays);
           assert.equal(await row.locator(".searcher-left-out").innerText(), h.left);
           assert.equal(await row.locator("button.searcher-pick").innerText(), "Claude Haiku 4.5 · MyRelay");
-          const sub = row.locator(".sub");
+          const sub = row.locator(".sub").first();
           assert.equal(await sub.getAttribute("class"), "sub", "every setting row's line wraps, with no class of its own to opt in");
           // the help explains the row: it rests out of sight and the
           // pointer on the row shows it whole in the card (the owner,
@@ -401,7 +407,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await settingsDrawn(page); // rows found are the ones that stay (#1659)
       const row = page.locator("#searchList .searcher-row");
       await row.waitFor();
-      assert((await row.locator(".sub").innerText()).startsWith(h.help));
+      assert((await row.locator(".sub").first().innerText()).startsWith(h.help));
       assert.equal(await row.locator(".searcher-relays, .searcher-left-out").count(), 0);
       assert.deepEqual(posted, [], "reading help must not change settings");
       assert.deepEqual(errors, []);

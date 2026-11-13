@@ -5306,13 +5306,37 @@ function contextTag(n, name) {
 // limit are the ones agents get, the user's setting over its vendor's.
 function modelFacts(p, m) {
   const size = (n) => contextsText({ "*": n }).toUpperCase();
+  const usd = (n) => "$" + String(Math.round(n * 1e6) / 1e6);
   const out = [];
   if (m.context) out.push(t("Context: {n} tokens", { n: m.context.toLocaleString(intlLang()) }));
   if (m.output) out.push(t("Output: up to {n} tokens", { n: m.output.toLocaleString(intlLang()) }));
-  const compact = p.compacts?.[m.id] ?? p.compacts?.["*"] ?? (state.settings?.compactAt || 0);
-  out.push(compact ? t("Compact at {n}", { n: size(compact) }) : t("Compact at: follows Long conversations"));
-  // how many of its requests may be out at once: the provider's own limit
-  out.push(p.maxConcurrency ? t("Concurrency: {n} at once", { n: p.maxConcurrency }) : t("Concurrency: no limit set"));
+  // where it compacts, said as the server behaves: Full window leaves Codex
+  // and Claude Code without a compaction window at all (codexcat.go:1091,
+  // agent/claude.go:273); the user's own threshold comes first; a window
+  // they typed compacts whole (provider.CompactFor, #1809); what is left
+  // follows Long conversations
+  if (state.settings?.fullContext) out.push(t("Full window: no compaction"));
+  else {
+    const compact = p.compacts?.[m.id] ?? p.compacts?.["*"] ?? (state.settings?.compactAt || 0);
+    if (compact) out.push(t("Compact at {n}", { n: size(compact) }));
+    else if (m.listed && m.context && m.context !== m.listed) out.push(t("Compact at {n} (the window you typed)", { n: size(m.context) }));
+    else out.push(t("Compact at: follows Long conversations"));
+  }
+  // what it costs as Usage counts it: the user's price over its list's
+  const price = m.price || m.list;
+  if (price && (price.input != null || price.output != null)) {
+    out.push(t("Price: {in} in · {out} out per 1M tokens", { in: usd(price.input || 0), out: usd(price.output || 0) }) + (!m.price && m.list ? " · " + t("list price") : ""));
+  }
+  // how many of its requests may be out at once: the user's own over what
+  // its plugin declares (provider.AtOnce, laneLimitOf); a key or account
+  // may hold its own (laneOwnOf)
+  const at = p.maxConcurrency != null ? p.maxConcurrency : p.pluginConcurrency;
+  out.push(at ? t("Concurrency: {n} at once", { n: at }) : t("Concurrency: no limit set"));
+  if (p.accountConcurrency && Object.keys(p.accountConcurrency).length) out.push(t("Keys and accounts may hold their own limits"));
+  // what its list or models.dev says it takes and gives, and when it came
+  if (m.inputs?.length) out.push(t("Takes: {list}", { list: m.inputs.join(", ") }));
+  if (m.outputs?.length) out.push(t("Gives: {list}", { list: m.outputs.join(", ") }));
+  if (m.released) out.push(t("Released {day}", { day: m.released }));
   out.push(t(m.images ? "Accepts images" : "Text only"));
   const levels = m.efforts || [];
   out.push(levels.length ? t("Reasoning: {levels}", { levels: levels.map((l) => t(l)).join(", ") }) : t("Reasoning levels: none known"));
@@ -6168,8 +6192,10 @@ function renderProviders(quiet) {
     // without opening the editor (the owner, 11-10)
     const rests = restingOf(p);
     if (rests.length) {
-      const failed = rests.filter((x) => x.rest.why === "auth" || x.rest.why === "credit").length;
-      const title = rests.map((x) => `${x.name} · ` + t("Resting · {why} · back at {time}", { why: (x.rest.status ? x.rest.status + " " : "") + keyRestWords(x.rest), time: restBack(x.rest.until) })).join("\n");
+      const failed = rests.filter((x) => x.rest.why === "auth" || x.rest.why === "credit" || x.rest.by === "key").length;
+      const title = rests.map((x) => `${x.name} · ` + (x.whole
+        ? t("Blocked as a whole: the vendor's firewall refuses this computer's address, or its endpoint answers its web page · back at {time}", { time: restBack(x.rest.until) })
+        : t("Resting · {why} · back at {time}", { why: (x.rest.status ? x.rest.status + " " : "") + keyRestWords(x.rest) + (x.rest.error ? " · " + x.rest.error : ""), time: restBack(x.rest.until) }))).join("\n");
       if (failed) name.append(Object.assign(el("span", "badge rest-now bad", t("{n} failed", { n: failed })), { title }));
       if (rests.length > failed) name.append(Object.assign(el("span", "badge rest-now", t("{n} resting", { n: rests.length - failed })), { title }));
     }
@@ -11197,6 +11223,10 @@ function renderModels(p) {
       b.title = capWord(k, v === "yes");
       c.append(b);
     }
+    // a caps test that settled no letter says so once in the hover: it was
+    // not asked (Gemini skips streaming, an OpenCode free tier skips tools),
+    // or it did not say (the owner, 11-11)
+    if (x?.caps && !capLine(x.caps)) c.title = (c.title ? c.title + "\n" : "") + t("Not asked, or it didn't say");
   };
   // a chip's right-click (or the menu key) tests that model alone: Test models
   // asks every one, and a list of many takes a while (yonghe, Discord). A
@@ -11271,8 +11301,11 @@ function renderModels(p) {
       const acts = [noTest ? { name: "Test this model", icon: "M5.5 3.75v8.5L12.25 8z", off: true, why: noTest, run() {} }
         : { name: "Test this model", icon: "M5.5 3.75v8.5L12.25 8z", run: () => testOne(id) }];
       // what it can do besides answer: a tool call, a picture, a stream; a
-      // model reached through its own API or a sign-in has none to ask
-      if (!noTest) acts.push({ name: "Test its capabilities", icon: "M5.5 3.75v8.5L12.25 8z", run: () => testOne(id, undefined, true) });
+      // model reached through its own API or a sign-in has none to ask, and
+      // a decision or image/video model would answer nothing but "it
+      // answered" — hide the item rather than test silently (the owner)
+      const mk = kindNow(id);
+      if (!noTest && !decidesModel(p, id) && mk !== "image" && mk !== "video") acts.push({ name: "Test its capabilities", icon: "M5.5 3.75v8.5L12.25 8z", run: () => testOne(id, undefined, true) });
       // asked as Codex or Claude Code asks, for a relay that serves only
       // them (耍赖天都爱 on Discord); Claude Code's once it has come
       // through magpie, its headers being the ones it came with
@@ -11600,6 +11633,26 @@ function renderModels(p) {
         idInput.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") idInput.blur(); else if (e.key === "Escape") { idInput.value = idNow(); idInput.blur(); } };
         idBox.append(el("span", "", t("Listed as")), idInput);
         row.append(idBox);
+      }
+      // the name the request to the vendor carries, the one per-model
+      // setting that had no GUI until now (the owner, 诉求8: Wire as);
+      // empty keeps the vendor's own. No box on a provider magpie reaches
+      // through its agent's own backend: no model field goes out there to
+      // rename (provider.asksOwnBackend), so the save would refuse it
+      if (m.wires) {
+        const wireNow = () => prefs[id]?.wire ?? m.wire ?? "";
+        const wireBox = el("label", "msame mlocal");
+        const wire = input(wireNow(), m.vendor || m.id);
+        wire.title = t("The name the request to the vendor carries for {id}; agents and magpie still list it as {id}. Empty: the vendor's own id", { id: m.id });
+        wire.spellcheck = false;
+        wire.onchange = () => {
+          const v = wire.value.trim();
+          if (v === (m.wire ?? "")) delete pref().wire; else pref().wire = v;
+          drawReset();
+        };
+        wire.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") wire.blur(); else if (e.key === "Escape") { wire.value = wireNow(); wire.blur(); } };
+        wireBox.append(el("span", "", t("Wire as")), wire);
+        row.append(wireBox);
       }
       // its cost to the user, $ per million tokens, as Usage counts it
       // (#819): a box empty is its list price. The 1-hour cache write,
@@ -11973,12 +12026,15 @@ function renderModels(p) {
   const testAll = testButton(p, t("Test models"), t("Send a tiny request to each model agents see, to find the ones that don't answer") + byKey + "\n" + t("Right-click a model to test just it"), async () => {
     const ids = servedIds(p).filter((id) => p.decideTest || !decidesModel(p, id));
     if (!ids.length) { status(t("Pick a model first."), "err"); return; }
-    const got = modelTests[p.id] = {};
+    // merge, not reset: the caps letters a Test capabilities run earned
+    // stay once the connectivity answers come in (the owner, 11-11)
+    const got = modelTests[p.id] = modelTests[p.id] || {};
+    const capsOf = ids.map((id) => got[id]?.caps);
     for (const id of ids) got[id] = null;
     draw();
     try {
       const r = await provTest(p.id, { ...asTyped(), test: ids });
-      r.results.forEach((x, i) => { got[ids[i]] = x; });
+      r.results.forEach((x, i) => { got[ids[i]] = capsOf[i] && !x.caps ? { ...x, caps: capsOf[i] } : x; });
       const i = r.results.findIndex((x) => !x.ok), x = r.results[i], bad = r.results.filter((x) => !x.ok).length;
       status(x ? t("{n} of {all} models didn't answer; {model}: {error}", { n: bad, all: ids.length, model: ids[i], error: (x.status ? x.status + " · " : "") + x.error }) : t("All {n} models answered", { n: ids.length }), x ? "err" : "ok");
     } catch (e) { delete modelTests[p.id]; testErr(e); }
@@ -11997,7 +12053,10 @@ function renderModels(p) {
       const r = await provTest(p.id, { ...asTyped(), test: ids, caps: true });
       r.results.forEach((x, i) => { got[ids[i]] = x; });
       const yes = (k) => r.results.filter((x) => x.caps?.[k] === "yes").length;
-      status(t("Tools: {t} of {n} · vision: {v} · streaming: {s}", { t: yes("tools"), v: yes("vision"), s: yes("stream"), n: ids.length }), "ok");
+      // a model that didn't answer is named, as Test models does: the count
+      // alone left "one model failed" unfindable (the owner, 11-11)
+      const i = r.results.findIndex((x) => !x.ok), x = r.results[i];
+      status(x ? t("{n} of {all} models didn't answer; {model}: {error}", { n: r.results.filter((x) => !x.ok).length, all: ids.length, model: ids[i], error: (x.status ? x.status + " · " : "") + x.error }) : t("Tools: {t} of {n} · vision: {v} · streaming: {s}", { t: yes("tools"), v: yes("vision"), s: yes("stream"), n: ids.length }), x ? "err" : "ok");
     } catch (e) { delete modelTests[p.id]; testErr(e); }
     draw();
   });
@@ -13451,6 +13510,7 @@ function renderAccounts(a, p) {
       row.classList.add("resting");
     }
     row.classList.add("with-aq"); // not :has(.aq), which Safari 15.0 lacks (#220)
+    if (p) row.append(...accountRestRows(p, l.user)); // a model resting alone (#1960)
     // Remove goes under ⋯ too, but beside Sign in again while signed out
     if (!row.classList.contains("signed-out")) tools.append(...line.querySelectorAll(":scope > .text.quiet"));
     if (tools.childElementCount) {
@@ -14760,7 +14820,6 @@ function renderKeyAccounts(p) {
         renderProviders();
         status(t("{key} is asked again from the next request", { key: k.name || k.masked }), "ok");
       });
-      row.append(restLine);
       row.classList.add("resting");
     }
     if (k.on && several) row.append(keyWeight(p, k, weightOf(k), weights));
@@ -15025,7 +15084,7 @@ function splitKeys(text) {
   return out;
 }
 // a key's rest, worded as the Routing page words a failure
-const KEY_FAIL = { rate: "rate limited", credit: "out of credit", quota: "quota used up", other: "failed", auth: "sign-in required", verify: "needs verification", refused: "refused (safety filter)", proxy: "proxy not reachable", slow: "slow to start" };
+const KEY_FAIL = { rate: "rate limited", credit: "out of credit", quota: "quota used up", other: "failed", auth: "sign-in required", verify: "needs verification", refused: "refused (safety filter)", proxy: "proxy not reachable", slow: "slow to start", restricted: "account restricted by the vendor" };
 // keyRestWords is that, or a key its vendor refuses outright (by "key",
 // keyRefusedRest): not out of an allowance, and not a sign-in to renew
 const keyRestWords = (r) => r.by === "key" ? t("key refused") : t(KEY_FAIL[r.why] || "failed");
@@ -15262,10 +15321,11 @@ function keyPill(p) {
 }
 
 // restingOf: the keys and accounts the gateway is passing over, with why and
-// until when, each as { name, rest }: its row says how many at the provider's
-// name, and each one's words on hover (the owner, 11-10)
+// until when, as { name, rest }, for the row's count and its hover (the
+// owner, 11-10). A provider refused as a whole (blockedKey) is one row too.
 function restingOf(p) {
   const now = Date.now(), out = [];
+  if (p.rest && new Date(p.rest.until) > now) out.push({ name: p.name, rest: p.rest, whole: true });
   for (const k of p.keyList || []) if (k.rest && new Date(k.rest.until) > now) out.push({ name: k.name || k.masked || t("Key"), rest: k.rest });
   for (const l of p.account?.logins || []) if (l.rest && new Date(l.rest.until) > now) out.push({ name: l.alias || l.user || t("account"), rest: l.rest });
   return out;
@@ -20566,14 +20626,13 @@ function refreshAfterSync() {
 // hhmm: a time's hours and minutes, in the user's language
 const hhmm = (d) => new Date(d).toLocaleTimeString(intlLang(), { hour: "2-digit", minute: "2-digit" });
 const restBack = (d) => ((d = new Date(d)).toDateString() === new Date().toDateString() ? "" : d.toLocaleDateString(intlLang(), { month: "short", day: "numeric" }) + " ") + hhmm(d);
-// keyRestRow is the line under a key's or an account's own: that the
-// gateway passes it over, why and until when, and a Try now to lift the
-// rest (#1772, #1869). A key's row keeps its own title and press name; an
-// account's says the account
+// keyRestRow is the line under a key's or an account's own: that the gateway
+// passes it over, why and until when, and a Try now (#1772, #1869)
 function keyRestRow(r, what, probed, onTry) {
   const line = el("div", "key-rest-line");
-  const note = el("span", "key-rest", t("Resting · {why} · back at {time}", { why: (r.status ? r.status + " " : "") + keyRestWords(r), time: restBack(r.until) }) + (probed ? " · " + t("checked in the background, back as soon as it answers") : ""));
-  note.title = t("The gateway passes this {what} over until then, and tries the next one", { what });
+  const why = (r.status ? r.status + " " : "") + keyRestWords(r), time = restBack(r.until);
+  const note = el("span", "key-rest", (r.model ? t("{model} resting · {why} · back at {time}", { model: r.model, why, time }) : t("Resting · {why} · back at {time}", { why, time })) + (probed ? " · " + t("checked in the background, back as soon as it answers") : ""));
+  note.title = r.model ? t("Until then {model} goes to another account; its other models are used as before", { model: r.model }) : t("The gateway passes this {what} over until then, and tries the next one", { what });
   const go = el("button", "text key-unrest", t("Try now"));
   go.title = t("Ends the rest: the next request asks it again. Refused again, it rests again.");
   go.onclick = async (e) => {
@@ -20582,8 +20641,21 @@ function keyRestRow(r, what, probed, onTry) {
     try { await api("gateway/unrest", { key: r.key }); onTry(); }
     catch (err) { go.classList.remove("busy"); statusErr(err); }
   };
-  line.append(note, go);
+  line.append(note);
+  if (r.error) line.append(Object.assign(el("span", "key-rest-said", r.error), { title: r.error }));
+  line.append(go);
   return line;
+}
+
+// accountRestRows: the models of an account resting alone, its own rest being
+// the row's own line (gateway's RestsUnder, #1960)
+function accountRestRows(p, user) {
+  const u = String(user).toLowerCase();
+  return (p.accountRests?.[u] || []).filter((r) => r.model && new Date(r.until) > Date.now()).map((r) => keyRestRow(r, "account", false, () => {
+    p.accountRests[u] = p.accountRests[u].filter((x) => x !== r);
+    renderProviders();
+    status(t("{key} is asked again from the next request", { key: r.model + " · " + user }), "ok");
+  }));
 }
 
 

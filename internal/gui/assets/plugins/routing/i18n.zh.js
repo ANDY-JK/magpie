@@ -404,7 +404,6 @@ magpie.strings({
     "{who} answered {status}: the vendor wants the account verified before it serves it again, and nobody is left to try, so {agent} gets the error with how to verify it. For a minute {agent}'s retries get the same answer without asking the vendor.": "{who} 返回 {status}：服务商要求先验证账号，且无其他可试，{agent} 收到此错误及验证方法。一分钟内 {agent} 的重试直接得到相同回复，不再请求服务商。",
     "Verify the account ↗": "去验证账号 ↗",
     "It's verified — try it again": "已验证，重新使用",
-    "account restricted by the vendor": "账号被服务商限制",
     "The vendor restricted the account: it rests {d}, as only the vendor lifting the restriction brings it back. Appeal with the vendor; once it's lifted, try it again here": "服务商限制了这个账号：它休息 {d}，因为只有服务商解除限制才能让它恢复。请向服务商申诉；解除后，在这里重新使用",
     "The restriction is lifted — try it again": "限制已解除，重新使用",
     "{who} turned away the reasoning effort changed mid-conversation as an update that keeps its cache, so it is asked again at the new effort the usual way, before any of the reply reaches {agent}.": "{who} 不接受对话中途以保留缓存的「更新」方式切换推理强度，已在回复到达 {agent} 前按常规方式以新强度重问。",

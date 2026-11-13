@@ -15,6 +15,12 @@
 .dr-why { flex: none; max-width: 32%; padding: 2px 7px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dr-when { flex: none; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .dr-acts { flex: none; display: flex; gap: 6px; margin-left: auto; }
+/* the rest section's Try all, and what each rest asks for */
+.dr-all { flex: none; padding: 0 6px; font-size: 12px; }
+.dr-advice { margin-top: 2px; color: var(--muted); }
+/* an account signed out, paused or a key turned off is not a failure:
+   its word is grey, not the amber of a rest */
+.dr-idle .dr-why { background: var(--card-2); color: var(--muted); }
 .dr-none { margin: 4px 0 12px; color: var(--muted); }
 .dr-note { margin-top: 14px; color: var(--faint); }
 @media (max-width: 560px) {

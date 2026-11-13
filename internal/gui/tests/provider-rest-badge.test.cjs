@@ -37,6 +37,18 @@ const codex = {
     { user: "me@example.com", alias: "Work", plan: "PLUS", active: true, on: true, rest: { why: "credit", status: 402, until: soon(60), key: "codex@me@example.com" } },
   ] },
 };
+// a key the vendor refuses outright: a 401 that says nothing else, its why
+// "other" and by "key" (gateway's keyRefusedRest), skipped for the day
+const voided = { ...base, id: "voided", name: "Voided", chat: "http://127.0.0.1:8319/v1", key: { set: true, masked: "sk-…vvv" }, keyList: [
+  key("k1", "Dead", "sk-…vvv", { why: "other", status: 401, until: soon(24 * 60), key: "voided#k1", by: "key", probed: false }),
+] };
+// a provider its vendor's firewall blocks as a whole: the rest is the
+// provider's own (gateway's blockedKey, id+"*"), no key's or account's
+const walled = {
+  ...base, id: "walled", name: "Walled", chat: "http://127.0.0.1:8320/v1", key: { set: true, masked: "sk-…www" },
+  keyList: [key("k1", "Only", "sk-…www")],
+  rest: { why: "other", status: 403, until: soon(24 * 60), key: "walled*", by: "blocked" },
+};
 
 let I18N;
 const loadI18N = () => { I18N = strings().I18N; };
@@ -50,7 +62,7 @@ function tr(lang, key, vars = {}) {
 }
 
 function serve(lang) {
-  const providers = { providers: [agg, clean, codex], presets: [], excluded: [], gateway: { running: true, window: true } };
+  const providers = { providers: [agg, clean, codex, voided, walled], presets: [], excluded: [], gateway: { running: true, window: true } };
   const state = { agents: [], profiles: [], settings: { lang, theme: "light" } };
   return async (route) => {
     const url = new URL(route.request().url());
@@ -106,6 +118,23 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           assert.equal(await cb.count(), 1);
           assert.equal((await cb.textContent()).trim(), w("{n} failed", { n: 1 }));
           assert((await cb.getAttribute("title")).includes("Work"), "the account's alias");
+          // a key the vendor refuses outright is red, not resting, and its
+          // hover says the key was refused (by "key", not a limit)
+          const vk = row("Voided").locator(".name .badge.rest-now.bad");
+          assert.equal(await vk.count(), 1, "a refused key is a failure");
+          assert.equal((await vk.textContent()).trim(), w("{n} failed", { n: 1 }));
+          assert.equal(await row("Voided").locator(".name .badge.rest-now:not(.bad)").count(), 0, "and not also resting");
+          const vtitle = await vk.getAttribute("title");
+          assert(vtitle.includes(w("key refused")), `the hover says the key was refused: ${vtitle}`);
+          // a provider its vendor blocks as a whole says so on its own row,
+          // in a sentence of its own rather than a key's
+          const wb = row("Walled").locator(".name .badge.rest-now");
+          assert.equal(await wb.count(), 1, "the whole block is on the provider's row");
+          assert.equal((await wb.textContent()).trim(), w("{n} resting", { n: 1 }));
+          const wtitle = await wb.getAttribute("title");
+          assert(wtitle.startsWith("Walled · "), `the whole block is the provider's own: ${wtitle}`);
+          const whole = w("Blocked as a whole: the vendor's firewall refuses this computer's address, or its endpoint answers its web page · back at {time}", { time: "\u0000" });
+          for (const piece of whole.split("\u0000").filter(Boolean)) assert(wtitle.includes(piece), `the hover says the provider is blocked as a whole: ${wtitle}`);
           // nothing wider than the window
           const over = await page.evaluate(() => {
             const w = document.documentElement.clientWidth, out = [];

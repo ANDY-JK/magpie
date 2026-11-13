@@ -96,7 +96,7 @@ function renderBusyLoad(s) {
     .catch((e) => { status(t(e.message), "err"); echoPrefs(); });
   sub.dataset.en ??= sub.textContent; // its English, as translateStatic keeps it
   sub.classList.toggle("err", !!d?.err);
-  sub.textContent = d ? d.err || t("A load is in percent, as the plugin reports it: 100 is all its vendor serves at once, and past 100 requests queue (200 is twice that). Type 1 to 9999") : t(sub.dataset.en);
+  sub.textContent = d ? d.err || t("A load is a percent: 100 is the provider full; a larger value (say 200) lets the extra requests wait in its queue. Type 1 to 9999") : t(sub.dataset.en);
   if (d) {
     const field = input(d.value, "150");
     field.className = "words busy-load-at";

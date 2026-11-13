@@ -25,9 +25,9 @@ const now = Date.now();
 // 130 requests, newest first: a swapped one, one under a dated name, a
 // failure (passed on by another computer's magpie), one from before Requested was kept, then plain ones
 const ROWS = [
-  { route_id: 123, t: new Date(now - 60e3).toISOString(), agent: "codex", agentName: "Codex", icon: "codex-color", provider: "relay", providerName: "Relay", host: "team", req: "sol", model: "gpt-6-sol", served: "gpt-6-luna", swapped: true, effort: "high", in: 12840, out: 912, cache_read: 8192, reasoning: 300, ms: 4210, ttft_ms: 820, status: 200, session: "019a2b", cost: 0.0421, priced: true },
+  { route_id: 123, t: new Date(now - 60e3).toISOString(), agent: "codex", agentName: "Codex", icon: "codex-color", provider: "relay", providerName: "Relay", host: "team", req: "sol", model: "gpt-6-sol", served: "gpt-6-luna", swapped: true, effort: "high", in: 12840, out: 912, cache_read: 8192, reasoning: 300, ms: 4210, ttft_ms: 820, status: 200, session: "019a2b", cost: 0.0421, priced: true, providerKeyName: "sk-team-1", providerAccount: "team@example.com" },
   { route_id: 999, t: new Date(now - 120e3).toISOString(), agent: "claude", agentName: "Claude Code", icon: "claudecode-color", provider: "anthropic", providerName: "Claude", host: "ann@example.com", req: "sonnet", model: "claude-sonnet-5", served: "claude-sonnet-5-20260801", effort: "", in: 3021, out: 440, cache_write: 2048, cache_read: 61000, ms: 2380, status: 200, cost: 0.0312, priced: true },
-  { route_id: 123, t: new Date(now - 180e3).toISOString(), agent: "codex", agentName: "Codex", via: "office-mac", icon: "codex-color", provider: "relay", providerName: "Relay", host: "team", req: "sol", model: "gpt-6-sol", in: 0, out: 0, ms: 610, status: 429, cost: 0, priced: false },
+  { route_id: 123, t: new Date(now - 180e3).toISOString(), agent: "codex", agentName: "Codex", via: "office-mac", icon: "codex-color", provider: "relay", providerName: "Relay", host: "team", req: "sol", model: "gpt-6-sol", in: 0, out: 0, ms: 610, status: 429, cost: 0, priced: false, providerKeyName: "sk-team-2" },
   { t: new Date(now - 240e3).toISOString(), agent: "claude", agentName: "Claude Code", icon: "claudecode-color", provider: "deepseek", providerName: "DeepSeek", model: "deepseek-v4", in: 900, out: 120, ms: 1320, status: 200, cost: 0, priced: false },
 ];
 for (let i = 0; i < 126; i++) {
@@ -45,13 +45,13 @@ const RANK = {
   providers: [
     {
       id: "relay", name: "Relay", icon: "generic", rank: 1, score: 23, grade: "E",
-      calls: 120, errors: 40, retried: 8, input: 90000, output: 9000, cost: 1.2, unpriced: 2,
+      calls: 120, errors: 40, retried: 8, input: 90000, output: 9000, cache_read: 60000, cache_write: 30000, cost: 1.2, unpriced: 2,
       days: 9, first: new Date(now - 9 * 86400e3).toISOString(), last: new Date(now - 3600e3).toISOString(),
       recentCalls: 30, recentErrors: 12,
       causes: [{ key: "rate_limit", count: 25 }, { key: "credit", count: 9 }],
       parts: [{ key: "served", points: 10, most: 25 }, { key: "stood", points: 6, most: 25 }, { key: "fast", points: 4, most: 25 }, { key: "soon", points: 3, most: 25 }],
       tags: [{ key: "failing", tone: "warn" }, { key: "slow-start", tone: "info" }],
-      models: [{ model: "gpt-6-sol", at: "relay", score: 30, grade: "E", calls: 100, errors: 35, parts: [{ key: "served", points: 12, most: 25 }] }],
+      models: [{ model: "gpt-6-sol", name: "Sol", at: "relay", score: 30, grade: "E", calls: 100, errors: 35, input: 80000, cache_read: 60000, cache_write: 4000, cost: 1.0, parts: [{ key: "served", points: 12, most: 25 }] }],
       accounts: ["team"],
       removable: true, drop: true,
     },
@@ -66,6 +66,11 @@ const RANK = {
     },
   ],
   thin: [{ id: "deepseek", name: "DeepSeek", icon: "generic" }],
+  // the standings over the providers, by model: the same model two providers
+  // served is one row here, its totals their sum
+  models: [
+    { model: "gpt-6-sol", name: "Sol", providers: ["relay", "anthropic"], score: 30, grade: "E", calls: 160, errors: 40, input: 130000, output: 12000, cache_read: 90000, cache_write: 6000, cost: 1.6, parts: [{ key: "served", points: 20, most: 25 }] },
+  ],
   gone: [{ id: "old-vendor", name: "Old Vendor", icon: "generic", deleted: new Date(now - 2 * 86400e3).toISOString() }],
 };
 
@@ -89,10 +94,22 @@ function page(q) {
   };
 }
 
-function server(lang, theme, asked, deleted = new Set()) {
+// The heatmap's 53 weeks, for the test that folds the trend and it away; the
+// other tests leave it out (the requests tab keeps its own height there).
+function heat() {
+  const iso = (d) => [d.getFullYear(), d.getMonth() + 1, d.getDate()].map((n) => String(n).padStart(2, "0")).join("-");
+  const to = new Date(), from = new Date(to);
+  from.setDate(from.getDate() - 370);
+  const days = [];
+  for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) days.push({ date: iso(d), calls: 3, tokens: 4000, cost: 0.1 });
+  return { from: iso(from), to: iso(to), days };
+}
+
+function server(lang, theme, asked, deleted = new Set(), withHeat = false) {
   return async (route) => {
     const req = route.request(), url = new URL(req.url());
     const json = (data) => route.fulfill({ json: data });
+    if (withHeat && url.pathname === "/api/usage/heatmap") return json(heat());
     if (url.pathname === "/api/usage/rank") {
       return json({ ...RANK, providers: RANK.providers.filter((p) => !deleted.has(p.id)) });
     }
@@ -114,7 +131,7 @@ function server(lang, theme, asked, deleted = new Set()) {
         tries: [{ id: "relay", model: "gpt-6-sol", start: new Date(now - 86400e3).toISOString(), done: true, status: 200, ms: 50 }],
         done: true, status: 200, ms: 50 });
     }
-    if (url.pathname === "/api/providers") return json({ providers: [{ id: "relay", name: "Relay", icon: "generic", chat: "https://example.invalid/v1", models: [], agents: [], fallback: [], headers: {}, key: { set: true, masked: "fixture" }, routing: "" }], presets: [], excluded: [], models: [], gateway: { running: false } });
+    if (url.pathname === "/api/providers") return json({ providers: [{ id: "relay", name: "Relay", icon: "generic", chat: "https://example.invalid/v1", models: [{ id: "gpt-6-sol", name: "Sol", default: "gpt-6-sol", on: true }], agents: [], fallback: [], headers: {}, key: { set: true, masked: "fixture" }, routing: "" }], presets: [], excluded: [], models: [], gateway: { running: false } });
     if (url.pathname === "/api/state") return json({ agents: [], profiles: [], settings: { lang, theme }, fx: { rate: 7.2, at: new Date().toISOString() } });
     if (url.pathname === "/api/usage/requests") {
       asked.push(url.searchParams);
@@ -159,7 +176,13 @@ const L = {
     rankLast: "Last 7 days: 30 requests, 12 failed",
     rankFoot: "Too little use: DeepSeek · Already gone: Old Vendor",
     rankEmpty: "No provider has enough gateway calls in this period.",
-    rankModelBtn: "gpt-6-sol",
+    rankModelBtn: "Sol",
+    byProv: "By provider", byModel: "By model",
+    perCost: "Cost per request $0.010+", cacheHit: "Cache hit 33%", recent: "Failure rate, last 7 days 40%",
+    modelPerCost: "Cost per request $0.010", modelCacheHit: "Cache hit 40%",
+    modelAlias: "Sol", modelId: "gpt-6-sol",
+    sentAlias: "Sol", badWhere: "Relay · team · sk-team-2", key: "Key", acct: "Account",
+    trend: "Requests over time", heat: "Usage heatmap",
   },
   zh: {
     tabs: ["概览", "请求", "会话", "上下文", "排行榜"],
@@ -177,7 +200,13 @@ const L = {
     rankLast: "最近 7 天：30 次请求，12 次失败",
     rankFoot: "用量太少：DeepSeek · 已经移除：Old Vendor",
     rankEmpty: "这个时间段还没有足够的网关请求可供排行。",
-    rankModelBtn: "gpt-6-sol",
+    rankModelBtn: "Sol",
+    byProv: "按供应商", byModel: "按模型",
+    perCost: "每请求成本 $0.010+", cacheHit: "缓存命中 33%", recent: "近 7 天失败率 40%",
+    modelPerCost: "每请求成本 $0.010", modelCacheHit: "缓存命中 40%",
+    modelAlias: "Sol", modelId: "gpt-6-sol",
+    sentAlias: "Sol", badWhere: "Relay · team · sk-team-2", key: "密钥", acct: "账号",
+    trend: "请求趋势", heat: "用量热力图",
   },
 };
 
@@ -203,13 +232,13 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
     const shots = process.env.ARTIFACT_DIR;
     if (shots) await fs.mkdir(shots, { recursive: true });
 
-    const open = async (lang, theme, asked, deleted, width = 1180, height = 640) => {
+    const open = async (lang, theme, asked, deleted, width = 1180, height = 640, withHeat = false) => {
       const errors = [];
       const page = await (await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" })).newPage();
       page.setDefaultTimeout(5000);
       page.setDefaultNavigationTimeout(60000);
       page.on("pageerror", (e) => errors.push(e.message));
-      await page.route("**/*", server(lang, theme, asked, deleted));
+      await page.route("**/*", server(lang, theme, asked, deleted, withHeat));
       await page.goto("http://magpie.test/");
       await page.locator('nav [data-view="usage"], [data-view="usage"]').first().click();
       await page.locator(":is(#usageTab .opt, .nav-s):visible").nth(1).click();
@@ -294,11 +323,17 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.equal(await page.locator("#ledSum").textContent().then((s) => s.split(" · ")[0]), w.sum);
         assert.equal((await page.locator("#ledPager > span").textContent()), w.pager);
 
-        // the first row: asked for sol, sent gpt-6-sol, served gpt-6-luna, amber
+        // the first row: asked for sol, sent gpt-6-sol under the user's name
+        // for it (the id the log keeps on hover), served gpt-6-luna, amber
         const first = page.locator(".led tbody tr").first().locator("td");
         assert.equal(await first.nth(2).textContent(), "sol");
         assert.equal(await first.nth(3).textContent(), "Relay · team");
-        assert.equal(await first.nth(4).textContent(), "gpt-6-sol");
+        // the names are read in on their own: the table draws again with them
+        // (the Sent column itself is one a narrow window gives way, so the
+        // wait is on the text, not on the cell in sight)
+        await page.waitForFunction((alias) => document.querySelector(".led tbody tr:not(.led-detail) td:nth-child(5)")?.textContent === alias, w.sentAlias);
+        assert.equal(await first.nth(4).textContent(), w.sentAlias);
+        assert.equal(await first.nth(4).getAttribute("title"), w.modelId);
         assert.equal(await first.nth(6).textContent(), "high");
         assert.equal(await page.locator(".led .swap").count(), 1, "only the swapped row is marked");
         const swap = page.locator(".led tbody tr").first().locator(".swap");
@@ -315,6 +350,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         const bad = page.locator(".led tr.bad td").last();
         assert.equal((await bad.textContent()).trim(), "429");
         assert.equal(await bad.getAttribute("title"), w.bad);
+        // its where column names the key the request went out on, at the end
+        assert.equal(await page.locator(".led tr.bad td").nth(3).textContent(), w.badWhere);
         // its agent is on another computer, whose magpie passed it on (Jorben on Discord)
         assert.equal(await page.locator(".led tr.bad td").nth(1).textContent(), w.via);
         const [dotBad, dotOk] = await page.evaluate(() => [
@@ -324,6 +361,21 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.notEqual(dotBad, dotOk, "a failure's dot is another colour");
         // a request from before Requested was kept
         assert.equal(await page.locator(".led tbody tr").nth(3).locator("td").nth(2).textContent(), "—");
+        // the detail names the key and the account the request went out on
+        const row0 = page.locator(".led tbody tr").first();
+        await click(page, row0);
+        await page.locator(".led-detail .led-dl").waitFor();
+        const pair = async (name) => {
+          for (const d of await page.locator(".led-detail .led-dl dt").all()) {
+            if ((await d.textContent()) === name) return d.evaluate((e) => e.nextElementSibling.textContent);
+          }
+          return null;
+        };
+        assert.equal(await pair(w.key), "sk-team-1");
+        assert.equal(await pair(w.acct), "team@example.com");
+        await click(page, row0); // folded back
+        await page.waitForTimeout(100);
+        assert.equal(await page.locator(".led-detail").count(), 0);
         // no coloured stripe down the box's, a row's or a cell's left side
         const stripes = await page.evaluate(() => [...document.querySelectorAll("#ledWrap, #ledWrap tr, #ledWrap td")]
           .filter((e) => { const c = getComputedStyle(e); return parseFloat(c.borderLeftWidth) > 0 && (c.borderLeftWidth !== c.borderRightWidth || c.borderLeftColor !== c.borderRightColor); }).length);
@@ -455,6 +507,59 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await page.close();
       });
 
+      await t.test(lang + ": the trend and the heatmap fold away", async () => {
+        const asked = [];
+        const { page, errors } = await open(lang, "light", asked, new Set(), 1180, 640, true);
+        const shown = (sel) => page.locator(sel).evaluate((e) => !!e.getClientRects().length);
+        const w = L[lang];
+        // both stand above the table, as they were
+        assert.equal(await shown("#ledBar"), true, "the trend's switches");
+        assert.equal(await shown("#ledBody"), true, "the trend's chart");
+        assert.equal(await shown("#ledHeatBody"), true, "the heatmap's days");
+        const rowAt = () => page.evaluate(() => {
+          const v = document.querySelector("#view-usage"), r = document.querySelector(".led tbody tr");
+          return Math.round(r.getBoundingClientRect().top - v.getBoundingClientRect().top + v.scrollTop);
+        });
+        const before = await rowAt();
+        const trend = page.locator('#ledDash .fold[data-fold="trend"]');
+        const heatBtn = page.locator('#ledHeat .fold[data-fold="heat"]');
+        // the heatmap's heading is its title and the days it counts, on two lines
+        assert.equal((await page.locator('#ledHeat .fold .heat-title b').textContent()).trim(), w.heat);
+        assert.equal((await trend.textContent()).trim(), w.trend);
+        assert.equal(await trend.getAttribute("aria-expanded"), "true");
+        // folded: the switches, the chart and the days go, the headings stay,
+        // and the table comes up the height they took
+        await click(page, trend);
+        await page.waitForTimeout(250);
+        assert.equal(await shown("#ledBar"), false, "the trend's switches go");
+        assert.equal(await shown("#ledBody"), false, "the trend's chart goes");
+        assert.equal(await trend.isVisible(), true, "its heading stays, to open it again");
+        assert.equal(await trend.getAttribute("aria-expanded"), "false");
+        assert.equal(await page.locator("#ledBar").evaluate((e) => e.classList.contains("folded")), true, "the folded box says so");
+        assert.equal(await page.locator("#ledBody").evaluate((e) => e.classList.contains("folded")), true);
+        assert.equal(await heatBtn.isVisible(), true, "the heatmap's heading stands");
+        await click(page, heatBtn);
+        await page.waitForTimeout(250);
+        assert.equal(await shown("#ledHeatBody"), false, "the heatmap's days go");
+        assert.equal(await heatBtn.getAttribute("aria-expanded"), "false");
+        assert.equal(await page.locator("#ledHeatBody").evaluate((e) => e.classList.contains("folded")), true);
+        const after = await rowAt();
+        assert(before - after > 300, `the table came up ${before - after}px`);
+        // remembered: a reload comes back folded, and a press opens it again
+        await page.reload();
+        await page.locator("#ledWrap .led tbody tr").first().waitFor();
+        await page.waitForTimeout(400);
+        assert.equal(await page.locator("#ledBar").evaluate((e) => e.classList.contains("folded")), true, "the trend is still folded");
+        assert.equal(await page.locator("#ledHeatBody").evaluate((e) => e.classList.contains("folded")), true, "the heatmap is still folded");
+        assert.equal(await page.locator('#ledDash .fold[data-fold="trend"]').getAttribute("aria-expanded"), "false");
+        await click(page, page.locator('#ledDash .fold[data-fold="trend"]'));
+        await page.waitForTimeout(250);
+        assert.equal(await shown("#ledBody"), true, "a press opens it again");
+        assert.equal(await page.locator("#ledBar").evaluate((e) => e.classList.contains("folded")), false);
+        assert.deepEqual(errors, []);
+        await page.close();
+      });
+
       await t.test(lang + ": clearing the route restores prior filters", async () => {
         const asked = [];
         const { page, errors } = await open(lang, "light", asked);
@@ -495,22 +600,48 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         assert.equal(await cards.nth(0).locator(".badge", { hasText: w.rankDropTag }).count(), 1);
         assert.equal(await cards.nth(1).locator(".rank-name").textContent(), "Claude");
         assert.equal(await cards.nth(1).locator(".rank-head .grade").textContent(), "A");
-        // its details: the failure kinds, the last days, the advice, the button
+        // its details: the failure kinds, the advice, the button, and the
+        // three columns: what one request cost, the cache's share of the
+        // prompt, and the share of the last days that failed (the days on hover)
         const first = cards.nth(0);
         assert.equal(await first.locator(".rank-causes .rank-label").textContent(), w.rankWhy);
         const causes = await first.locator(".rank-causes .badge").allTextContents();
         assert.deepEqual(causes, [w.rankRateLimit, w.rankCredit]);
-        assert(await first.locator(".rank-note", { hasText: w.rankLast }).count() === 1);
+        assert(await first.locator(".rank-metric", { hasText: w.perCost }).count() === 1);
+        assert(await first.locator(".rank-metric", { hasText: w.cacheHit }).count() === 1);
+        const recent = first.locator(".rank-metric", { hasText: w.recent });
+        assert(await recent.count() === 1);
+        assert.equal(await recent.getAttribute("title"), w.rankLast);
         assert.equal(await first.locator(".rank-advice").textContent(), w.rankAdvice);
         assert.equal(await first.locator("button", { hasText: w.rankRemoveBtn }).count(), 1);
         // Claude is not removable here (hidden, not deleted) and has no advice
         assert.equal(await cards.nth(1).locator(".rank-advice").count(), 0);
         assert.equal(await cards.nth(1).locator("button", { hasText: w.rankRemoveBtn }).count(), 0);
-        // the model under the provider, ranked on its own
+        // the model under the provider, ranked on its own: the user's name
+        // for it, the id the log keeps on hover
         await click(page, first.locator("summary", { hasText: w.rankModelBtn }));
         assert(await first.locator(".rank-model .rank-details").isVisible());
+        assert.equal(await first.locator(".rank-model-name").getAttribute("title"), w.modelId);
         // the foot line: the too-little-used and the deleted, by name
         assert.equal(await page.locator(".rank-foot").textContent(), w.rankFoot);
+
+        // the standings also rank the models over the providers: a sub-switch
+        // of the tab's own, not a tab of the page's
+        const by = page.locator("#rankPane .segs .opt");
+        assert.equal(await by.count(), 2);
+        assert.equal(await by.nth(0).textContent(), w.byProv);
+        assert.equal(await by.nth(1).textContent(), w.byModel);
+        await click(page, by.nth(1));
+        const board = page.locator(".rank-list > .rank-model");
+        await board.first().waitFor();
+        assert.equal(await board.count(), 1, "the same model two providers served is one row");
+        assert.equal(await board.first().locator(".rank-model-name").textContent(), w.modelAlias);
+        assert.equal(await board.first().locator(".rank-model-name").getAttribute("title"), w.modelId);
+        assert(await board.first().locator(".rank-metric", { hasText: w.modelPerCost }).count() === 1);
+        assert(await board.first().locator(".rank-metric", { hasText: w.modelCacheHit }).count() === 1);
+        // back to the providers for the removal below
+        await click(page, by.nth(0));
+        await page.locator(".rank-card").first().waitFor();
 
         // Remove asks first; the answer takes the provider off the list
         page.once("dialog", () => assert.fail("confirmAction is a dialog element, not window.confirm"));

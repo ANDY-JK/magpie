@@ -1,10 +1,13 @@
 // Run with Node's test runner and Playwright on the module path; see README.md.
 // The owner (11-10): 出了问题要排查 — the Doctor page says who is resting and
-// why (a key refused, out of credit, rate limited), what failed lately by
-// provider and why, and offers Try now for a rest (the same gateway/unrest a
-// provider row's button posts) and Open provider. Nothing is changed by the
-// page itself. English and Chinese, Chromium and WebKit; no backend, the API
-// is faked.
+// why (a key refused, out of credit, rate limited, restricted by the vendor),
+// names the key or account that failed lately, lists what is signed out,
+// paused or off, and offers Try now (the same gateway/unrest a provider row's
+// button posts), Probe and recover (gateway/probe, which asks the vendor
+// first) and Try all, a fifth of a second apart. The page reads itself again
+// every 45 seconds while it is in sight. Nothing is changed by the page
+// itself. English and Chinese, Chromium and WebKit; no backend, the API is
+// faked.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -21,6 +24,8 @@ const relay = {
     { id: "k1", name: "Main", masked: "sk-…1", on: true },
     { id: "k2", name: "Backup", masked: "sk-…2", on: true, rest: { why: "rate", status: 429, until: soon(20), key: "relay#k2" } },
     { id: "k3", name: "Dead", masked: "sk-…3", on: true, rest: { why: "auth", status: 401, until: soon(24 * 60), key: "relay#k3" } },
+    { id: "k4", name: "Spare", masked: "sk-…4", on: false },
+    { id: "k5", name: "Locked", masked: "sk-…5", on: true, rest: { why: "restricted", status: 403, until: soon(600), key: "relay#k5", error: "This account was restricted" } },
   ],
   balanceToken: { takes: false, set: false }, proxy: "",
 };
@@ -29,26 +34,62 @@ const acct = {
   models: [], agents: [], fallback: [], headers: {}, key: { set: false }, keyList: [],
   account: { agent: "codex", agentName: "Codex", user: "me@example.com", logins: [
     { user: "me@example.com", alias: "Work", plan: "PLUS", active: true, on: true, rest: { why: "quota", status: 429, until: soon(120), key: "codex@work" } },
+    { user: "old@example.com", alias: "Old", active: false, on: false, lapsed: "Sign-in has lapsed" },
+    { user: "idle@example.com", alias: "Idle", active: false, on: false, paused: true },
   ] },
   balanceToken: { takes: false, set: false }, proxy: "",
 };
+// its vendor refused the provider whole: no key's row carries that rest
+const blocked = {
+  id: "blocked", name: "Blocked", icon: "generic", chat: "", responses: "", anthropic: "", catalog: "",
+  models: [], agents: [], fallback: [], headers: {}, key: { set: true, masked: "sk-…b" },
+  keyList: [{ id: "b1", name: "Only", masked: "sk-…b", on: true }],
+  rest: { why: "proxy", status: 0, until: soon(30), key: "blocked*" },
+  balanceToken: { takes: false, set: false }, proxy: "",
+};
+const PROVIDERS = [relay, acct, blocked];
 const now = Date.now();
 const ROWS = [
-  { t: new Date(now - 60e3).toISOString(), provider: "relay", providerName: "Relay", model: "gpt-6", status: 429, err_type: "rate_limit", err: "slow down" },
-  { t: new Date(now - 120e3).toISOString(), provider: "relay", providerName: "Relay", model: "gpt-6", status: 429, err_type: "rate_limit", err: "slow down" },
-  { t: new Date(now - 180e3).toISOString(), provider: "acct", providerName: "Account", model: "gpt-6", status: 401, err_type: "auth_error", err: "bad key" },
+  { t: new Date(now - 60e3).toISOString(), provider: "relay", providerName: "Relay", providerKeyName: "Main", model: "gpt-6", status: 429, err_type: "rate_limit", err: "slow down" },
+  { t: new Date(now - 120e3).toISOString(), provider: "relay", providerName: "Relay", providerKeyName: "Main", model: "gpt-6", status: 429, err_type: "rate_limit", err: "slow down" },
+  { t: new Date(now - 180e3).toISOString(), provider: "acct", providerName: "Account", providerAccount: "me@example.com", model: "gpt-6", status: 401, err_type: "auth_error", err: "bad key" },
 ];
 
-function server(lang, state, posts) {
+// picture is the providers list after the rests lifted so far: what the page
+// reads again once a probe answered
+function picture(state) {
+  return PROVIDERS.map((p) => {
+    const q = JSON.parse(JSON.stringify(p));
+    if (q.rest && state.lifted.has(q.rest.key)) delete q.rest;
+    for (const k of q.keyList) if (k.rest && state.lifted.has(k.rest.key)) delete k.rest;
+    for (const l of q.account?.logins || []) if (l.rest && state.lifted.has(l.rest.key)) delete l.rest;
+    return q;
+  });
+}
+
+function server(lang, state) {
   return async (route) => {
     const req = route.request(), url = new URL(req.url());
     const json = (data) => route.fulfill({ json: data });
     if (url.pathname === "/boot.js") return route.fulfill({ contentType: "text/javascript", body: `window.bootPrefs = {lang:"${lang}",theme:"light",web:true};` });
     if (url.pathname === "/wails/runtime.js") return route.fulfill({ contentType: "text/javascript", body: "export const Window = {};" });
     if (url.pathname === "/api/state") return json({ agents: [], profiles: [], settings: { lang, theme: "light" } });
-    if (url.pathname === "/api/providers") return json({ providers: [relay, acct], presets: [], excluded: [], gateway: { running: true } });
+    if (url.pathname === "/api/providers") {
+      state.reads++;
+      return json({ providers: picture(state), presets: [], excluded: [], gateway: { running: true } });
+    }
     if (url.pathname === "/api/usage/requests") return json({ rows: ROWS, total: ROWS.length, offset: 0 });
-    if (url.pathname === "/api/gateway/unrest") { posts.push(req.postDataJSON()); return json({}); }
+    if (url.pathname === "/api/gateway/unrest") {
+      const body = req.postDataJSON();
+      state.unrest.push({ ...body, at: Date.now() });
+      return json({ lifted: true });
+    }
+    if (url.pathname === "/api/gateway/probe") {
+      const body = req.postDataJSON();
+      state.probes.push({ ...body, at: Date.now() });
+      state.lifted.add(body.key); // the vendor answered: the rest is no more
+      return json({ probed: true, lifted: true });
+    }
     if (url.pathname === "/api/plugins") return json({ plugins: [] });
     if (url.pathname === "/api/usage/quotas") return json([]);
     if (url.pathname === "/api/groups") return json({ groups: [] });
@@ -60,59 +101,150 @@ function server(lang, state, posts) {
 }
 
 const L = {
-  en: { title: "Doctor", sub: "Who is resting, why, and what failed lately", rest: "Resting now", fail: "Failed lately", try: "Try now", open: "Open provider", asked: "It is asked again now", none: "Nothing is resting now.", nofail: "Nothing failed lately." },
-  zh: { title: "医生", sub: "谁在休息、为什么，以及最近哪些请求失败", rest: "正在休息", fail: "最近的失败", try: "Try now", open: "打开供应商", asked: "已立刻再问它一次", none: "现在没有 key 或账号在休息。", nofail: "最近没有失败的请求。" },
+  en: {
+    title: "Doctor", sub: "Who is resting, why, and what failed lately", rest: "Resting now", fail: "Failed lately",
+    try: "Try now", probe: "Probe and recover", all: "Try all", open: "Open provider", asked: "It is asked again now",
+    lifted: "It answered: the rest is lifted", every: "Every rest was tried",
+    none: "Nothing is resting now.", nofail: "Nothing failed lately.",
+    idle: "Not in use", idleCount: "Signed out 1 · Paused 1 · turned off 1",
+    restricted: "account restricted by the vendor", appeal: "Appeal with the vendor, then try it again here",
+    signin: "Sign in again, then try it again here", top: "Top up the account, then try it again here",
+    proxy: "proxy not reachable", signedout: "Signed out", paused: "Paused", off: "turned off",
+    keysub: "Key Main", acctsub: "account me@example.com",
+  },
+  zh: {
+    title: "医生", sub: "谁在休息、为什么，以及最近哪些请求失败", rest: "正在休息", fail: "最近的失败",
+    try: "Try now", probe: "探活并恢复", all: "全部试一遍", open: "打开供应商", asked: "已立刻再问它一次",
+    lifted: "它已应答，暂停已解除", every: "全部试过了",
+    none: "现在没有 key 或账号在休息。", nofail: "最近没有失败的请求。",
+    idle: "未在使用", idleCount: "已退出登录 1 · 已暂停 1 · 已停用 1",
+    restricted: "账号被服务商限制", appeal: "找厂商申诉，解除后再来试",
+    signin: "重新登录后再来试", top: "充值后再来试",
+    proxy: "代理连不上", signedout: "已退出登录", paused: "已暂停", off: "已停用",
+    keysub: "密钥 Main", acctsub: "账号 me@example.com",
+  },
 };
 const KEYS = ["Read again", "Resting now", "Failed lately", "Nothing is resting now.", "Nothing failed lately.",
   "Resting is magpie passing a key or account over until its time. Try now asks it again at once; refused again, it rests again.",
-  "providers on", "resting", "failed lately", "{n} keys and accounts", "{n} requests", "It is asked again now", "Open provider", "Read {time}"];
+  "providers on", "resting", "failed lately", "not taking requests", "{n} keys and accounts", "{n} requests",
+  "It is asked again now", "Open provider", "Read {time}",
+  "Probe and recover", "Try all", "It answered: the rest is lifted", "Its rest stands", "Every rest was tried",
+  "Not in use", "account restricted by the vendor", "Appeal with the vendor, then try it again here",
+  "Verify the account with the vendor, then try it again", "Top up the account, then try it again here",
+  "Sign in again, then try it again here", "Replace the key, then try it again here"];
+
+// wrap setInterval before the page's own scripts run, so the 45-second read
+// can be fired at once instead of waited for
+const ticker = () => {
+  window.__ticks = [];
+  const set = window.setInterval;
+  window.setInterval = function (fn, ms, ...rest) {
+    if (ms === 45000) window.__ticks.push(fn);
+    return set.call(window, fn, ms, ...rest);
+  };
+};
 
 for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
   for (const lang of ["en", "zh"]) {
     const w = L[lang];
-    test(`${engine} ${lang}: the Doctor page says who rests, why, and what failed`, async (t) => {
+    test(`${engine} ${lang}: the Doctor page names the key, what to do, and recovers`, async (t) => {
       const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
-      const page = await (await browser.newContext({ viewport: { width: 1000, height: 820 }, reducedMotion: "reduce", locale: lang === "zh" ? "zh-CN" : "en-US" })).newPage();
+      const page = await (await browser.newContext({ viewport: { width: 1000, height: 900 }, reducedMotion: "reduce", locale: lang === "zh" ? "zh-CN" : "en-US" })).newPage();
       t.after(() => browser.close());
       page.setDefaultTimeout(5000);
       page.setDefaultNavigationTimeout(60000);
-      const errors = [], posts = [];
+      const errors = [];
+      const state = { unrest: [], probes: [], lifted: new Set(), reads: 0 };
       page.on("pageerror", (e) => errors.push(e.message));
-      await page.route("http://magpie.test/**", server(lang, {}, posts));
+      await page.addInitScript(ticker);
+      await page.route("http://magpie.test/**", server(lang, state));
       await page.goto("http://magpie.test/");
       await page.locator('[data-view="doctor"]').click();
       await page.locator("#view-doctor").waitFor();
-      await page.waitForFunction((want) => document.querySelector("#drRestCount")?.textContent.includes("3"), 3);
+      await page.waitForFunction(() => document.querySelector("#drRestCount")?.textContent.includes("5"));
       // what the page is, and the counts
       assert.equal((await page.locator("#drTitle").textContent()).trim(), w.title);
       assert.equal((await page.locator("#drSub").textContent()).trim(), w.sub);
       const cards = await page.locator("#drCards .dr-card b").allTextContents();
-      assert.deepEqual(cards, ["2", "3", "3"], "providers on, resting, failed");
+      assert.deepEqual(cards, ["3", "5", "3", "3"], "providers on, resting, failed, not in use");
       assert.equal((await page.locator("#drRestHead").textContent()).trim(), w.rest);
       assert.equal((await page.locator("#drFailHead").textContent()).trim(), w.fail);
-      // each resting key or account, its why and when
+      // each resting key or account, its why and when — the provider bird's
+      // own rest first, as no key's row carries it
       const rests = page.locator("#drRests .dr-rest");
-      assert.equal(await rests.count(), 3);
+      assert.equal(await rests.count(), 5);
       const subs = await rests.locator(".sub").allTextContents();
-      assert.deepEqual(subs, ["Backup · " + (lang === "zh" ? "密钥" : "Key"), "Dead · " + (lang === "zh" ? "密钥" : "Key"), "Work · " + (lang === "zh" ? "账号" : "account")]);
+      assert.deepEqual(subs, ["Backup · " + (lang === "zh" ? "密钥" : "Key"), "Dead · " + (lang === "zh" ? "密钥" : "Key"),
+        "Locked · " + (lang === "zh" ? "密钥" : "Key"), "Work · " + (lang === "zh" ? "账号" : "account"),
+        lang === "zh" ? "供应商" : "Provider"]);
       const why = await rests.locator(".dr-why").allTextContents();
       assert(why[0].includes("429") && why[0].length > 4, why[0]);
       assert(why[1].includes("401"), why[1]);
-      assert(why[2].includes("429"), why[2]);
-      // a key refused outright is marked bad
+      assert(why[2].includes("403") && why[2].includes(w.restricted), why[2]);
+      assert(why[3].includes("429"), why[3]);
+      assert.equal(why[4].trim(), w.proxy);
+      // a key refused outright is marked bad; a restricted one rests amber
+      // with its word, as the Providers page marks it
       assert.equal(await rests.nth(1).evaluate((e) => e.classList.contains("bad")), true);
-      // the failed requests, grouped, the most frequent first
+      assert.equal(await rests.nth(2).evaluate((e) => e.classList.contains("bad")), false);
+      const shade = (i) => rests.nth(i).locator(".dr-why").evaluate((e) => getComputedStyle(e).color);
+      const amber = await shade(0), red = await shade(1), restricted = await shade(2);
+      assert.equal(restricted, amber, "restricted is amber, as a rate limit is");
+      assert.notEqual(red, amber, "a refused sign-in is red");
+      // what to do, by why and by
+      assert.equal(await rests.nth(0).locator(".dr-advice").count(), 0, "a rate limit lifts by itself");
+      assert.equal((await rests.nth(1).locator(".dr-advice").textContent()).trim(), w.signin);
+      assert.equal((await rests.nth(2).locator(".dr-advice").textContent()).trim(), w.appeal);
+      assert.equal((await rests.nth(3).locator(".dr-advice").textContent()).trim(), w.top);
+      // signed out, paused and off, counted and named
+      assert.equal((await page.locator("#drIdleHead").textContent()).trim(), w.idle);
+      assert.equal((await page.locator("#drIdleCount").textContent()).trim(), w.idleCount);
+      const idle = page.locator("#drIdle .dr-idle");
+      assert.equal(await idle.count(), 3);
+      assert.deepEqual(await idle.locator(".name").allTextContents(), ["Relay", "Account", "Account"]);
+      const states = await idle.locator(".dr-why").allTextContents();
+      assert.deepEqual(states, [w.off, w.signedout, w.paused]);
+      // the failed requests, grouped, naming the key or account that failed
       const fails = page.locator("#drFails .dr-fail");
       assert.equal(await fails.count(), 2);
       assert.equal((await fails.nth(0).locator(".name").textContent()).trim(), "Relay");
       assert.equal((await fails.nth(0).locator(".dr-why").textContent()).trim(), "rate_limit");
       assert.equal((await fails.nth(0).locator(".dr-count").textContent()).trim(), "2×");
+      assert((await fails.nth(0).locator(".sub").textContent()).includes(w.keysub), await fails.nth(0).locator(".sub").textContent());
       assert.equal((await fails.nth(1).locator(".name").textContent()).trim(), "Account");
+      assert((await fails.nth(1).locator(".sub").textContent()).includes(w.acctsub), await fails.nth(1).locator(".sub").textContent());
       // Try now ends the rest, as the provider's button does
       await rests.nth(0).locator(".dr-try").click();
-      for (let i = 0; i < 60 && !posts.length; i++) await page.waitForTimeout(50);
-      assert.deepEqual(posts, [{ key: "relay#k2" }]);
+      for (let i = 0; i < 60 && !state.unrest.length; i++) await page.waitForTimeout(50);
+      assert.deepEqual(state.unrest.map(({ key }) => ({ key })), [{ key: "relay#k2" }]);
       await page.waitForFunction((want) => document.querySelector("#status")?.textContent === want, w.asked);
+      // Probe and recover asks the vendor first, and the row goes once it
+      // answered
+      await rests.nth(2).locator(".dr-probe").click();
+      for (let i = 0; i < 60 && !state.probes.length; i++) await page.waitForTimeout(50);
+      assert.deepEqual(state.probes.map(({ key }) => ({ key })), [{ key: "relay#k5" }]);
+      await page.waitForFunction((want) => document.querySelector("#status")?.textContent === want, w.lifted);
+      await page.waitForFunction(() => document.querySelector("#drRestCount")?.textContent.includes("4"));
+      assert.equal(await page.locator("#drRests .dr-rest .name").filter({ hasText: /^Locked$/ }).count(), 0);
+      // Try all ends each rest in turn, a fifth of a second apart
+      await page.locator("#drTryAll").click();
+      for (let i = 0; i < 120 && state.unrest.length < 5; i++) await page.waitForTimeout(50);
+      assert.deepEqual(state.unrest.slice(1).map(({ key }) => key), ["relay#k2", "relay#k3", "codex@work", "blocked*"]);
+      const gaps = state.unrest.slice(2).map((x, i) => x.at - state.unrest[i + 1].at);
+      assert(gaps.every((ms) => ms >= 150), `try all waits between rests: ${gaps}`);
+      await page.waitForFunction((want) => document.querySelector("#status")?.textContent === want, w.every);
+      // the page reads itself again every 45 seconds while it is in sight.
+      // Wait on the read's own timestamp, not a fixed number of polls: a
+      // loaded runner with the whole suite in WebKit can outlast 60×50ms.
+      assert.equal(await page.evaluate(() => window.__ticks.length), 1, "one interval, at 45 seconds");
+      const before = (await page.locator("#drRead").textContent()).trim();
+      await page.evaluate(() => window.__ticks[0]());
+      await page.waitForFunction((old) => {
+        const now = document.querySelector("#drRead")?.textContent.trim();
+        return now && now !== old && !now.includes("Reading…");
+      }, before, { timeout: 15000 });
+      assert(state.reads > 0, "the 45-second read reads the providers again");
+      assert.notEqual((await page.locator("#drRead").textContent()).trim(), "", "quietly: it still says when");
       // Open provider goes to it
       await page.locator("#drFails .dr-fail").first().locator(".dr-open").click();
       await page.waitForFunction(() => !document.querySelector("#view-providers")?.hidden);

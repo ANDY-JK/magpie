@@ -568,17 +568,28 @@ new ResizeObserver(fitChartLabels).observe($("#view-usage"));
 // The Overview's lists — Agents, Models, Accounts, Gateway keys — each fold
 // away under their heading (#2378: 日常看账号维度较多，都要拉到最底下), and
 // stay folded across a reload (magpie.usageFolded, the folded ones' names).
+// The Requests' two tall boxes fold the same way, under a heading of their
+// own (the owner, 11-10, 诉求 4: the trend and the 53 weeks' heatmap stood
+// between the top of the page and the table).
 let usageFolded = new Set();
 try { usageFolded = new Set(JSON.parse(localStorage.getItem("magpie.usageFolded") || "[]")); } catch {}
-const USAGE_FOLDS = { agents: ["usageAgents", "usageAgentsHid"], models: ["usageModels"], accounts: ["usageAccounts"], keys: ["usageKeys"] };
+const USAGE_FOLDS = {
+  agents: ["usageAgents", "usageAgentsHid"], models: ["usageModels"], accounts: ["usageAccounts"], keys: ["usageKeys"],
+  trend: ["ledBar", "ledBody"], heat: ["ledHeatBody"],
+};
 const USAGE_FOLD_TITLES = {
   agents: ["Show the agents", "Fold the agents away"],
   models: ["Show the models", "Fold the models away"],
   accounts: ["Show the accounts", "Fold the accounts away"],
   keys: ["Show the gateway keys", "Fold the gateway keys away"],
+  trend: ["Show the trend", "Fold the trend away"],
+  heat: ["Show the heatmap", "Fold the heatmap away"],
 };
+// the Overview's folds, and the Requests' two: the trend's heading is a
+// row-head's, the heatmap's keeps its own two lines in the bar that held them
+const USAGE_FOLD_BUTTONS = "#usagePane .row-head .fold[data-fold], #ledgerPane :is(.row-head, .led-bar) .fold[data-fold]";
 function mountUsageFolds() {
-  for (const b of $$("#usagePane .row-head .fold[data-fold]")) {
+  for (const b of $$(USAGE_FOLD_BUTTONS)) {
     b.prepend(svg(CHEV_R, 11, 1.6));
     b.onclick = () => {
       const id = b.dataset.fold;
@@ -593,12 +604,26 @@ function mountUsageFolds() {
 // a folded list is out of sight by its class, so the page's own hidden
 // (no calls, no accounts) is left as it is
 function showUsageFolds() {
-  for (const b of $$("#usagePane .row-head .fold[data-fold]")) {
+  for (const b of $$(USAGE_FOLD_BUTTONS)) {
     const id = b.dataset.fold, folded = usageFolded.has(id);
     b.setAttribute("aria-expanded", String(!folded));
     b.title = t(USAGE_FOLD_TITLES[id][folded ? 0 : 1]);
     for (const box of USAGE_FOLDS[id]) $("#" + box)?.classList.toggle("folded", folded);
   }
+}
+// Two boxes this page puts out of sight by a class of their own, which
+// app.css has no rule for: the Requests' trend and heatmap folded away (the
+// Overview's lists are the only .folded boxes there), and the Sessions'
+// groups a tab leaves out (sessTabApply, below). The page's look stays with
+// the page — app.css is the window's, and usage is a plugin (the window's
+// own featureStyle and omarchy-theme are made the same way). The heatmap's
+// title keeps the weight it has in the card, not the fold's dimmed words.
+{
+  const st = document.createElement("style");
+  st.id = "usageFoldStyle";
+  st.textContent = "#ledgerPane .folded,#sessionsPane .sess-off{display:none!important}" +
+    "#ledgerPane .fold .heat-title b{color:var(--fg)}";
+  document.head.append(st);
 }
 
 // usageParts: a line of counts, each kept whole in a span of its own and
@@ -1319,6 +1344,12 @@ const rankSpeed = (x) => x.decode_ms > 0 ? rankInt(x.decode_out / (x.decode_ms /
 const rankWait = (x) => x.timed > 0 ? rankInt(x.ttft_ms / x.timed) : "";
 const rankDate = (when) => when ? new Date(when).toLocaleDateString(intlLang(), { month: "short", day: "numeric" }) : "";
 const rankKey = () => period + "|" + usageZone();
+// the standings' own sub-switch: by provider, as it always was, or by model
+// over the providers (the same model two providers served is one row there).
+// A pick remembered, as the Sessions pane's tabs are (magpie.rankBy)
+const RANK_BY = [["provider", "By provider"], ["model", "By model"]];
+let rankBy = "provider";
+try { const k = localStorage.getItem("magpie.rankBy"); if (RANK_BY.some(([id]) => id === k)) rankBy = k; } catch {}
 let rankFlight = null;
 const rankRead = () => {
   const at = rankKey();
@@ -1340,7 +1371,12 @@ const rankPart = (p) => {
 };
 const rankMetrics = (x) => {
   const box = el("div", "rank-metrics");
-  const add = (label, value) => { if (value !== "" && value != null) box.append(el("span", "rank-metric", `${t(label)} ${value}`)); };
+  const add = (label, value, tip) => {
+    if (value === "" || value == null) return;
+    const s = el("span", "rank-metric", `${t(label)} ${value}`);
+    if (tip) s.title = tip;
+    box.append(s);
+  };
   add("Requests", rankNum(x.calls));
   add("Failed", `${rankNum(x.errors)} · ${rankPct(x.errors, x.calls)}`);
   add("Retried", rankNum(x.retried));
@@ -1348,6 +1384,18 @@ const rankMetrics = (x) => {
   if (rankSpeed(x)) add("Speed", t("{n} tok/s", { n: rankSpeed(x) }));
   if (x.cost) add("Cost", fmtCost(x));
   if (x.unpriced) add("No prices", rankNum(x.unpriced));
+  // what one request cost here on average, the unpriced left in the "+" as
+  // the Cost beside it is
+  if (x.cost && x.calls) add("Cost per request", fmtCost({ cost: x.cost / x.calls, unpriced: x.unpriced }));
+  // the cache's share of the prompt, shown only while every call counted
+  // its cache: one whose vendor counted none (CacheUnknownCalls) leaves the
+  // share unknown, not zero (#3464)
+  const prompt = (x.input || 0) + (x.cache_read || 0) + (x.cache_write || 0);
+  if (!x.cache_unknown_calls && prompt > 0) add("Cache hit", Math.round(100 * (x.cache_read || 0) / prompt) + "%");
+  // whether it still fails now, not only over the period: the share of the
+  // tier's last days that failed, the days and their counts on hover
+  if (x.recentCalls) add("Failure rate, last 7 days", Math.round(100 * (x.recentErrors || 0) / x.recentCalls) + "%",
+    t("Last {days} days: {calls} requests, {errors} failed", { days: rank?.tier.still || 7, calls: rankNum(x.recentCalls), errors: rankNum(x.recentErrors) }));
   return box;
 };
 const rankBadge = (word, tone = "info") => el("span", `badge rank-tag ${tone}`, word);
@@ -1376,7 +1424,6 @@ const rankDetails = (x, name) => {
   if (x.accounts?.length) box.append(el("p", "rank-note", t("Accounts seen: {names}", { names: x.accounts.join(" · ") })));
   const when = x.first && x.last ? t("Used {days} days, {from} – {to}", { days: x.days || 0, from: rankDate(x.first), to: rankDate(x.last) }) : "";
   if (when) box.append(el("p", "rank-note", when));
-  if (x.recentCalls) box.append(el("p", "rank-note", t("Last {days} days: {calls} requests, {errors} failed", { days: rank?.tier.still || 7, calls: rankNum(x.recentCalls), errors: rankNum(x.recentErrors) })));
   if (x.drop) box.append(el("p", "rank-advice", t("{name} has been used for a long time and is still failing. Review its accounts, then remove it if you no longer need it.", { name })));
   if (x.removable && !x.removed) {
     const b = el("button", "text danger-fill", t("Remove this provider"));
@@ -1389,8 +1436,13 @@ const rankDetails = (x, name) => {
 const rankModel = (m) => {
   const row = el("details", "rank-model");
   const head = el("summary", "rank-model-head");
-  head.append(el("span", "rank-model-name", m.model), el("span", "grade " + m.grade.toLowerCase(), m.grade), el("span", "rank-model-score", t("{n} points", { n: rankNum(m.score) })), el("span", "rank-metric", t("{n} requests", { n: rankNum(m.calls) })));
-  row.append(head, rankDetails(m, m.model));
+  // the name the user calls it by, the backend's (Group.ModelName, the
+  // bigger share's when two providers name it); the id the log keeps on
+  // hover when the page says another
+  const name = el("span", "rank-model-name", m.name || m.model);
+  if (m.name && m.name !== m.model) name.title = m.model;
+  head.append(name, el("span", "grade " + m.grade.toLowerCase(), m.grade), el("span", "rank-model-score", t("{n} points", { n: rankNum(m.score) })), el("span", "rank-metric", t("{n} requests", { n: rankNum(m.calls) })));
+  row.append(head, rankDetails(m, m.name || m.model));
   return row;
 };
 const rankCard = (x) => {
@@ -1415,12 +1467,41 @@ function renderRank() {
   $("#usageCost").replaceChildren();
   pane.replaceChildren();
   if (!rank) return;
+  // the sub-switch, there only while the period has models to rank; a pick
+  // whose models went away draws the providers again, the pick itself kept
+  const byModel = rankBy === "model" && !!rank.models?.length;
+  if (rank.models?.length) {
+    const strip = el("div", "row-head");
+    const seg = el("div", "segs");
+    seg.setAttribute("role", "tablist");
+    seg.setAttribute("aria-label", t("Standings"));
+    for (const [id, name] of RANK_BY) {
+      const on = byModel === (id === "model");
+      const b = el("button", "opt" + (on ? " on" : ""), t(name));
+      b.type = "button";
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", String(on));
+      b.onclick = () => {
+        if (rankBy === id) return;
+        rankBy = id;
+        try { localStorage.setItem("magpie.rankBy", id); } catch {}
+        renderRank();
+      };
+      seg.append(b);
+    }
+    strip.append(seg);
+    pane.append(strip);
+    slide(seg, "rankBy");
+  }
   const head = el("div", "rank-intro");
   head.append(el("p", "usage-note", t("Standings come from gateway calls in this period. A provider needs {needs} requests; the four parts are answered, first try, writing pace and first token.", { needs: rank.tier.needs })));
-  head.append(el("p", "usage-note", t("A provider is named for removal only after {days} days of use, {calls} requests, and {errors}% failures both over the period and in its last {still} days.", { days: rank.tier.days, calls: rank.tier.calls, errors: Math.round(100 * rank.tier.errors), still: rank.tier.still })));
+  const dropRule = el("p", "usage-note", t("A provider is named for removal only after {days} days of use, {calls} requests, and {errors}% failures both over the period and in its last {still} days.", { days: rank.tier.days, calls: rank.tier.calls, errors: Math.round(100 * rank.tier.errors), still: rank.tier.still }));
+  dropRule.hidden = byModel; // the removal rule holds the providers, not the models
+  head.append(dropRule);
   pane.append(head);
   const list = el("div", "rank-list");
-  for (const x of rank.providers || []) list.append(rankCard(x));
+  if (byModel) for (const m of rank.models) list.append(rankModel(m));
+  else for (const x of rank.providers || []) list.append(rankCard(x));
   if (!list.childElementCount) pane.append(el("p", "rank-empty", t("No provider has enough gateway calls in this period.")));
   else pane.append(list);
   const others = [];
@@ -1546,6 +1627,10 @@ function ledDetail(r, cols) {
   if (r.computerName) add("Computer", r.computerName);
   // the client's own name, for one the user counts as an agent (#1958)
   add("Client", r.client);
+  // the key and the account of the provider's the request went out on:
+  // which of them failed is the first thing to check on a failed row
+  add("Key", r.providerKeyName);
+  add("Account", r.providerAccount);
   // the columns a narrow window leaves out, shown only while it does (#860)
   const opt = (name, value) => {
     if (!value) return;
@@ -2404,10 +2489,35 @@ function ledProviderMore(p) {
   };
 }
 
+// the user's names for the providers' models, for the Sent column: the same
+// words the standings' model rows carry from the backend (Group.ModelName,
+// provider.ModelName), read here off /api/providers — a model's default is
+// set only when the user gave it a name of its own, and name is that name.
+// The shell holds the list only once its Providers page has opened, so the
+// page reads its own (doctor's does), once, and uses the shell's whenever
+// it holds one; a read that lands after a draw draws the names in.
+let ledNamesReadP = null, ledNames = null;
+const ledModelNames = () => {
+  const map = new Map();
+  for (const p of providers?.providers || ledNames?.providers || []) {
+    for (const m of p.models || []) if (m.default && m.name) map.set(p.id + "/" + m.id, m.name);
+  }
+  return map;
+};
+const ledNamesRead = () => {
+  if (ledNamesReadP || ledNames || providers?.providers) return;
+  ledNamesReadP = api("providers").then((s) => {
+    ledNames = s;
+    if (ledger && view === "usage" && usageTab === "requests") renderLedger();
+  }).catch(() => {}).finally(() => { ledNamesReadP = null; });
+};
+
 function renderLedger() {
   const l = ledger;
   const callers = l.callerKeys || [];
   const providers = l.providers || [];
+  ledNamesRead();
+  const modelNames = ledModelNames();
   const missingAgent = ledAgent && !l.agents.some((a) => a.id === ledAgent);
   const missingProvider = ledProvider && !providers.some((p) => p.id === ledProvider);
   const accounts = l.accounts || [];
@@ -2624,7 +2734,10 @@ function renderLedger() {
     const where = local ? (r.session_account || r.session_provider || t("Local session"))
       : mcp ? [r.providerName && t(r.providerName), r.host].filter(Boolean).join(" · ") || "—"
       : search ? [r.providerName && t(r.providerName), r.host, r.providerKeyName].filter(Boolean).join(" · ") || "—"
-      : t(r.providerName) + (r.host ? " · " + r.host : "");
+      : t(r.providerName) + (r.host ? " · " + r.host : "")
+        // a failed request names the key it went out on, as a search row
+        // names its own: which of the provider's failed is what to check
+        + (bad && r.providerKeyName ? " · " + r.providerKeyName : "");
     // the provider's logo before its name, as on the Routing page (Jiabubu
     // on Discord); a session file's record names none for sure
     const face = !local && providers.find((p) => p.id === r.provider);
@@ -2681,7 +2794,10 @@ function renderLedger() {
     if (badges.childElementCount) wc.append(badges);
     // the model sent is what the gateway sent the vendor: a session file has none
     // The log names a model, but does not capture the outbound HTTP request.
-    td(r.model || "—", "model " + (r.model ? "model-value" : "faint"), r.source === "log" && r.model ? t("Model recorded in the local session log; the outbound HTTP request was not captured.") : r.model);
+    // The user's name for it when there is one, the id the log keeps on hover
+    const sentName = r.model && r.provider ? modelNames.get(r.provider + "/" + r.model) : "";
+    td(sentName || r.model || "—", "model " + (r.model ? "model-value" : "faint"),
+      [sentName ? r.model : "", r.source === "log" && r.model ? t("Model recorded in the local session log; the outbound HTTP request was not captured.") : ""].filter(Boolean).join(" · ") || r.model);
     td(ledServed(r), "model");
     td(r.effort || "—", r.effort ? "" : "faint");
     td(ledNum(r.in), "n");
@@ -2959,6 +3075,88 @@ let sessOverLoading = "";
 let sessTopOpen = ""; // the top session opened to its details
 let sessListOpen = ""; // with the Sessions page switched off, the listed session opened here to its details (#2311)
 const sessFull = new Map(); // a top session's key → the session read whole, or "…" while it is read
+
+// The Sessions pane's own tabs (the owner, 11-10, 诉求 4: 拆二级 tab，避免滚动
+// 很久 — seven cards ran two or three screens past the figures). All, the
+// pane as it was; Distribution, the chart and the cards that say what the
+// sessions were made of; Ranking, the sessions, tools and skills that came
+// top. The figures (#sessStats) and the list (#sessListHead, #sessList) stay
+// under every pick, a group with nothing in this range has no tab, and the
+// pick is remembered (magpie.sessTab), as Allowances' are (app.js's
+// allowTab — a copy, not an import: plugins don't lean on each other).
+const SESS_TABS = ["all", "dist", "rank"];
+const SESS_TAB_NAMES = { all: "All", dist: "Distribution", rank: "Ranking" };
+const SESS_PARTS = {
+  dist: ["sessChart", "sessProjects", "sessModels", "sessHours", "sessShape"],
+  rank: ["sessTop", "sessTools", "sessSkills"],
+};
+let sessTab = "all";
+try { const k = localStorage.getItem("magpie.sessTab"); if (SESS_TABS.includes(k)) sessTab = k; } catch {}
+let sessTabStrip = null;
+const sessTabBoxes = () => {
+  const out = {};
+  for (const g of ["dist", "rank"]) out[g] = SESS_PARTS[g].map((id) => $("#" + id)).filter(Boolean);
+  return out;
+};
+// a group's boxes go out of the way by a class of their own: what the page
+// hides itself (a chart with no days, a grid with no sessions) says "nothing
+// in this range" and is left as it is
+function sessTabApply(key = sessTab) {
+  const parts = sessTabBoxes();
+  for (const g of ["dist", "rank"]) for (const n of parts[g]) n.classList.toggle("sess-off", key !== "all" && key !== g);
+}
+// whether a box has anything to show: not hidden by the page (nor by a box
+// over it), and not saying it has nothing — a card with no bars says so in a
+// .sess-none, the chart with no days is hidden. Not the tab's own class: a
+// box the pick put away still counts as the group's (a group is not empty
+// because it is not the one shown).
+function sessTabHas(n) {
+  for (let e = n; e && e.id !== "sessionsPane"; e = e.parentElement) if (e.hidden) return false;
+  return !n.querySelector(".sess-none");
+}
+function sessTabSync() {
+  const strip = sessTabStrip;
+  if (!strip) return;
+  const parts = sessTabBoxes();
+  const ok = { all: true, dist: parts.dist.some(sessTabHas), rank: parts.rank.some(sessTabHas) };
+  // a pick whose group has nothing goes back to All, the pick itself kept
+  // for the range that has it (the stored one is not overwritten)
+  if (sessTab !== "all" && !ok[sessTab]) sessTab = "all";
+  let shown = 0;
+  for (const b of strip.querySelectorAll("button[data-stab]")) {
+    const on = b.dataset.stab === sessTab;
+    b.hidden = !ok[b.dataset.stab];
+    if (!b.hidden) shown++;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", String(on));
+    b.tabIndex = on ? 0 : -1;
+  }
+  // one group at all: nothing to pick between, so All is what it is
+  strip.hidden = shown < 2;
+  slide(strip, "sessTab");
+  sessTabApply(shown < 2 ? "all" : sessTab);
+}
+function setSessTab(key) {
+  if (!SESS_TABS.includes(key)) return;
+  sessTab = key;
+  try { localStorage.setItem("magpie.sessTab", key); } catch {}
+  sessTabSync();
+}
+{
+  const strip = $("#sessTabs");
+  if (strip) {
+    for (const key of SESS_TABS) {
+      const b = el("button", "opt", t(SESS_TAB_NAMES[key]));
+      b.type = "button";
+      b.setAttribute("role", "tab");
+      b.dataset.stab = key;
+      b.onclick = () => setSessTab(key);
+      strip.append(b);
+    }
+    sessTabStrip = strip;
+    sessTabApply();
+  }
+}
 
 function renderUsageTab() {
   const seg = $("#usageTab");
@@ -3507,6 +3705,10 @@ function renderSessions() {
   }
   if (dirs) parts.push(dirs);
   $("#sessNote").textContent = parts.join(" · ");
+  // the cards are drawn again by this read, and drawing one changes what it
+  // says it holds: the tabs are worked out again after every draw, or a
+  // redraw would put the page back to All (sessTabSync)
+  sessTabSync();
 }
 
 // sessSums adds up usage rows by one of their fields, the most tokens first
