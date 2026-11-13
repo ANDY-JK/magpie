@@ -15,6 +15,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 const { reach } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
@@ -78,7 +79,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       page.on("pageerror", (e) => errors.push(e.message));
       await page.route("**/*", serve(lang, posts));
       await page.goto("http://magpie.test/?view=routing");
-      const tr = (k, v = {}) => page.evaluate(([lang, k, v]) => (lang === "en" ? k : I18N[lang][k] || k).replace(/\{(\w+)\}/g, (_, n) => v[n]), [lang, k, v]);
+      const All = allStrings().I18N, I = All[lang] || {};
+      const tr = (k, v = {}) => (lang === "en" ? k : I[k] || k).replace(/\{(\w+)\}/g, (_, n) => v[n]);
       const card = page.locator(".rt-group", { hasText: "Sol" });
       await card.waitFor();
       await card.locator("button", { hasText: await tr("Edit") }).click();
@@ -175,11 +177,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.deepEqual(sent.body.weights, { "oa/gpt-6.1-sol:high": 3, "rl/glm-5": 6, "rl/kimi-k2.6": 2 });
       assert.deepEqual(sent.body.members, ["rl/glm-5", "oa/gpt-6.1-sol:high", "rl/kimi-k2.6", "rl/o4-mini"], "the sorted order is saved");
 
-      const missing = await page.evaluate(() => [
+      const missing = [
         "By weight", "Sort by weight", "Heaviest first. When a model fails, the next one in this order takes over", "Weight {n}", "Weight {n} · {share}%", "Weight of {name}", "A weight is 1 to 1000",
         "Its share of the requests: a model weighing 3 takes three for every one a model weighing 1 takes",
         "By weight: each model takes its share of the requests by the weight set beside it — one weighing 3 three for every one a model weighing 1 takes, spread out rather than in bursts. One resting after a failure leaves the round and the others share its requests; the next model is the fallback when one fails.",
-      ].filter((k) => !I18N.zh[k] || !I18N["zh-TW"][k] || !I18N.ja[k] || !I18N.de[k]));
+      ].filter((k) => !All.zh[k] || !All["zh-TW"][k] || !All.ja[k] || !All.de[k]);
       assert.deepEqual(missing, [], "every string has its translations");
       assert.deepEqual(errors, []);
     });

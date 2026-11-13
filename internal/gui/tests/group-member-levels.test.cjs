@@ -15,6 +15,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
+const { strings: allStrings } = require("./strings.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [
@@ -151,7 +152,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         const fits = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
         assert(fits, "no sideways scroll");
 
-        const missing = await page.evaluate((keys) => keys.filter((k) => !I18N.zh[k] || !I18N["zh-TW"][k] || !I18N.ja[k] || !I18N.de[k]), keys);
+        const I = allStrings().I18N;
+        const missing = keys.filter((k) => !I.zh[k] || !I["zh-TW"][k] || !I.ja[k] || !I.de[k]);
         assert.deepEqual(missing, [], "every string has each language");
 
         await save(page, w);
