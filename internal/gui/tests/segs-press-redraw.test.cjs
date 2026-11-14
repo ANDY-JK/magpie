@@ -10,7 +10,9 @@
 // click comes, as a draw that asks for its state draws once more with the
 // answer (Browser access, #3922), the newest On is saved once. Every segs
 // control on every Settings tab is pressed the same way and its new self
-// clicked once. Chromium and WebKit, in English,
+// clicked once; one disabled (the search row with nothing magpie can
+// search with) sends no click at all, and is only swept. Chromium and
+// WebKit, in English,
 // Chinese, Japanese and German, in a wide and a narrow window, the API faked.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
@@ -249,10 +251,28 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
             const opts = box.locator(":scope > .opt");
             const now = await opts.evaluateAll((os) => os.findIndex((o) => o.classList.contains("on")));
             const i = (now + 1) % await opts.count();
+            // a disabled option is clicked by no one: the browser sends no
+            // click on a disabled button, and the redraw's click on the new
+            // self no-ops on one (the search row with nothing magpie can
+            // search with, its buttons off till it can). Swept, not pressed
+            if (await opts.nth(i).evaluate((o) => o.disabled)) continue;
             await page.mouse.move(...mid(await reveal(page, opts.nth(i))));
             await page.evaluate(() => { optClicks.length = 0; });
             await page.mouse.down();
-            const swapped = await box.evaluate((x) => { renderSettings(); return !x.isConnected; });
+            // one control is filled after renderSettings, in a microtask
+            // (the tray number's segs, whose drawing comes by import): the
+            // pressed button is given some 400ms to have been replaced, else
+            // the sweep reports it left in place
+            const swapped = await box.evaluate((x) => new Promise((ok) => {
+              renderSettings();
+              const t0 = performance.now();
+              const look = () => {
+                if (!x.isConnected) return ok(true);
+                if (performance.now() - t0 > 400) return ok(false);
+                setTimeout(look, 20);
+              };
+              look();
+            }));
             if (!swapped) { await page.mouse.up(); missed.push(place); continue; }
             await page.mouse.up();
             await settle(page);

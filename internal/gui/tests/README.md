@@ -939,7 +939,11 @@ On is posted once. It then
 presses every option control on every Settings tab (49 in English, the
 warm-up, check-in, sync and local network ones included) the same way and
 checks that the control drawn in its place is clicked once on the same
-option. Without the fix no click comes at all. A tap through the redraw is
+option; one pressed option is disabled (the search row with nothing magpie
+can search with) and no browser sends a click on a disabled button, so it
+is swept but not pressed, and the tray number's control is filled after
+the redraw, in a microtask, and is given time to have been replaced.
+Without the fix no click comes at all. A tap through the redraw is
 posted once, not twice (Chromium only: Playwright can't hold a tap in
 WebKit). A list of rows, each with its control, drawn again with a row gone,
 come in or moved above the pressed one picks nothing, whether its rows have
@@ -2310,6 +2314,24 @@ accent, and no such row on a browser's page (`web`). English and Chinese,
 Chromium and WebKit, with `/api/settings` faked:
 node --test internal/gui/tests/lightweight.test.cjs
 ```
+
+`provider-caps.test.cjs` checks a provider's Test capabilities beside Test
+models: each answering model is asked to call a tool, to take a picture and
+to stream, and its chip says T, V and S — green for the endpoint's yes, red
+for its no, nothing where it said nothing — with the words on hover, the
+footer counts them, and a chip's right-click tests that model alone. What a
+run settled is posted to the provider's caps action (`capsResults`), so the
+letters are kept in providers.json and the pickers' rows and the Routing
+page's members say them after a restart; a run of one model posts its word
+alone, and Test models posts nothing. English and Chinese, both engines.
+
+`agent-models-caps.test.cjs` checks what was kept shows on the Agents page's
+model list: a tested model's row says the letters (the editor chip's), a
+model not tested says none. English and Chinese, both engines.
+
+`group-member-caps.test.cjs` checks the Routing page's group editor says
+them on the member's row the same way; a member not tested says none.
+English and Chinese, both engines.
 
 ## Mobile Web
 
