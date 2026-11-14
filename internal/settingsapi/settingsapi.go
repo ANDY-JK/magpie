@@ -46,7 +46,7 @@ var Keys = []string{
 	"workbuddyCheckin", "traeCheckin", "minimaxCheckin", "qoderCheckin",
 	// models: replies, vision, images, search
 	"replyModel", "noLoopGuard", "claudeLeanPrompt", "claudePrintMode", "refusalRetries",
-	"noHealthDemotion",
+	"noHealthDemotion", "autoContinue",
 	"vision", "visionEffort", "imageGen", "imageTimeout", "classifyTimeout",
 	"searcher", "searcherThen", "searcherEffort", "searchFirst",
 	// updates
@@ -240,6 +240,18 @@ func Merge(body []byte, cur settings.Settings, web bool) (settings.Settings, err
 	// nor whether a value masked for the first time is told (Must2333)
 	if _, sent := fields["maskAlert"]; !sent {
 		in.MaskAlert = cur.MaskAlert
+	}
+	// nor whether unstable models are left in the order they were set (the
+	// Models tab's toggle, noHealthDemotion): the toggle's own save sends
+	// it, the page's other saves keep it
+	if _, sent := fields["noHealthDemotion"]; !sent {
+		in.NoHealthDemotion = cur.NoHealthDemotion
+	}
+	// nor whether replies stopped at their output limit go on (autoContinue,
+	// Models' reply row): that row's own save sends it, the page's others
+	// keep it
+	if _, sent := fields["autoContinue"]; !sent {
+		in.AutoContinue = cur.AutoContinue
 	}
 	in.AgentOrder, in.AgentsHidden, in.AgentsShown, in.AgentsHere = cur.AgentOrder, cur.AgentsHidden, cur.AgentsShown, cur.AgentsHere
 	in.Window, in.WindowMaximised, in.WindowAt = cur.Window, cur.WindowMaximised, cur.WindowAt // the window's own, as it was last resized and moved

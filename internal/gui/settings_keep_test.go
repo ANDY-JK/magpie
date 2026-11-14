@@ -206,6 +206,8 @@ func TestSettingsSaveKeepsWhatItDoesNotSend(t *testing.T) {
 	was.SearcherThen = []string{"fake/m1", "fake/m2"} // set in its own row
 	was.RouterNote = "Los Angeles"                    // the Library's servers/hub-note
 	was.BusyLoad = 150                                // the Routing page's busy-load
+	was.NoHealthDemotion = true                       // the Routing page's Unstable models, kept with the page's save
+	was.AutoContinue = true                           // the gateway's own, kept with every page's save
 	if err := settings.Save(was); err != nil {
 		t.Fatal(err)
 	}
