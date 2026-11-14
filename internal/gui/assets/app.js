@@ -22131,7 +22131,13 @@ function renderReplies(s, keep) {
   const u = segRow("claudeTuiRow", t("Claude Code's interactive mode"),
     t("A Claude subscription runs Claude Code as a person does, in its interactive mode, where the plan counts a request at about half of what -p uses. On, no request ever runs as -p. Off runs every request as claude -p"),
     onOff, s.claudePrintMode ? "off" : "on", (v) => { claudeMode = null; savePrefs({ ...keep, claudePrintMode: v === "off" }); });
-  box.append(r, l, f, k, c, u);
+  // an intermittently failing model tried after the steady ones of its
+  // plan (gateway health.go): off leaves the routing order as the user
+  // set it
+  const h = segRow("healthDemotionRow", t("Unstable models after the steady ones"),
+    t("A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set"),
+    onOff, s.noHealthDemotion ? "off" : "on", (v) => savePrefs({ ...keep, noHealthDemotion: v === "off" }));
+  box.append(r, l, f, k, c, u, h);
 }
 
 // renderDisabledModels: models turned off for every request (#1867), a row per pattern

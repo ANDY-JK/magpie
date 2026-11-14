@@ -5,6 +5,7 @@
 // English.
 magpie.strings({
   zh: {
+    "flaky lately · tried after the steady ones": "最近不稳定 · 排在稳定模型之后",
     "sign-in refused (answered since)": "登录曾被拒（之后已应答）",
     "Free first uses it before paid ones, and Cheapest first counts it as costing nothing": "免费优先会先用它再用付费的，最便宜优先把它算作不花钱",
     "{name}, {n} accounts: {windows}": "{name}（{n} 个账号）：{windows}",

@@ -46,6 +46,7 @@ var Keys = []string{
 	"workbuddyCheckin", "traeCheckin", "minimaxCheckin", "qoderCheckin",
 	// models: replies, vision, images, search
 	"replyModel", "noLoopGuard", "claudeLeanPrompt", "claudePrintMode", "refusalRetries",
+	"noHealthDemotion",
 	"vision", "visionEffort", "imageGen", "imageTimeout", "classifyTimeout",
 	"searcher", "searcherThen", "searcherEffort", "searchFirst",
 	// updates

@@ -4536,5 +4536,7 @@ I18N.de = Object.assign(I18N.de || {}, {
     "Not asked, or it didn't say": "Nicht gefragt, oder ohne Antwort",
     "Wire as": "Senden als",
     "The name the request to the vendor carries for {id}; agents and magpie still list it as {id}. Empty: the vendor's own id": "Der Name, unter dem Anfragen an den Anbieter {id} tragen; Agenten und magpie listen es weiter als {id}. Leer: die eigene ID des Anbieters",
+    "Unstable models after the steady ones": "Instabile Modelle nach den stabilen",
+    "A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set": "Ein Modell, das zeitweise ausfällt, wird bis es wieder zuverlässig antwortet nach den stabilen seines Plans probiert; aus lässt die Routing-Reihenfolge wie gesetzt",
 });
 localeWordsHere.add("de");

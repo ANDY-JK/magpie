@@ -5,6 +5,7 @@
 // English.
 magpie.strings({
   de: {
+    "flaky lately · tried after the steady ones": "Zuletzt unzuverlässig · nach den stabilen probiert",
     "sign-in refused (answered since)": "Anmeldung abgelehnt (seitdem beantwortet)",
     "Free first uses it before paid ones, and Cheapest first counts it as costing nothing": "„Kostenlos zuerst“ nutzt es vor bezahlten, „Günstigste zuerst“ zählt es als kostenlos",
     "{name}, {n} accounts: {windows}": "{name}, {n} Konten: {windows}",

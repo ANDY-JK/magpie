@@ -4534,5 +4534,7 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "Not asked, or it didn't say": "沒問，或沒問出來",
     "Wire as": "傳送為",
     "The name the request to the vendor carries for {id}; agents and magpie still list it as {id}. Empty: the vendor's own id": "發給廠商的請求裡 {id} 用的名字；Agent 與 magpie 仍把它列為 {id}。留空即廠商自己的 id",
+    "Unstable models after the steady ones": "不穩定的模型排在穩定模型之後",
+    "A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set": "時好時壞的模型會被排到同一計畫裡穩定模型之後，直到它重新穩定應答；關閉則路由順序照你設置的原樣",
 });
 localeWordsHere.add("zh-TW");

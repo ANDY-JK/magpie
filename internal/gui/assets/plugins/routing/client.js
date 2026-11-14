@@ -2731,6 +2731,9 @@ function routingPage(part) {
       else if (w.aside) s = t("{api} only · after the others", { api: API[w.speaks] || w.speaks || t("any API") });
       else if (w.speaks) s = t("{api} only", { api: API[w.speaks] || w.speaks });
       else s = w.kind === "key" ? t("API key") : t("one key");
+      // an unstable model is tried after the steady ones until it answers
+      // well again (gateway health.go): say so beside whatever else it says
+      if (w.health && w.health < 0.5) s = s ? s + " · " + t("flaky lately · tried after the steady ones") : t("flaky lately · tried after the steady ones");
       // when a known allowance renews stays on its row whatever the row is
       // doing (dzxx0496 on Discord): answering, kept for last, passed over.
       // A resting row says when it is back instead, a free one has nothing

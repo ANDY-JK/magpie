@@ -5,6 +5,7 @@
 // English.
 magpie.strings({
   ja: {
+    "flaky lately · tried after the steady ones": "最近不安定 · 安定なモデルの後に試す",
     "sign-in refused (answered since)": "サインイン拒否（その後は応答あり）",
     "Free first uses it before paid ones, and Cheapest first counts it as costing nothing": "無料優先は有料より先にこれを使い、最安優先はこれを費用ゼロとして数えます",
     "{name}, {n} accounts: {windows}": "{name}（{n} アカウント）：{windows}",

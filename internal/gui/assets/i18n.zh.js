@@ -4549,5 +4549,7 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "Not asked, or it didn't say": "没问，或没问出来",
     "Wire as": "发送为",
     "The name the request to the vendor carries for {id}; agents and magpie still list it as {id}. Empty: the vendor's own id": "发给厂商的请求里 {id} 用的名字；Agent 与 magpie 仍把它列为 {id}。留空即厂商自己的 id",
+    "Unstable models after the steady ones": "不稳定的模型排在稳定模型之后",
+    "A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set": "时好时坏的模型会被排到同一计划里稳定模型之后，直到它重新稳定应答；关闭则路由顺序照你设置的原样",
 });
 localeWordsHere.add("zh");
