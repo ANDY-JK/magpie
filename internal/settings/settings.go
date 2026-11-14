@@ -711,6 +711,11 @@ type Settings struct {
 	// what OpenAI does with its own models, 272K though they can take
 	// more, and Anthropic with its, 200K unless a [1m] one is picked.
 	FullContext bool `json:"fullContext,omitempty"`
+	// NoHealthDemotion leaves the routing order alone when a model's
+	// answers have been intermittent (gateway health.go): on, as before
+	// the health score existed, the order the user set is tried as it
+	// stands and an unstable model is not moved behind the steady ones
+	NoHealthDemotion bool `json:"noHealthDemotion,omitempty"`
 	// DesktopLongest has Claude Desktop list a model of 1M tokens or more
 	// once, as its 1M entry (its id with Claude Code's "[1m]"), instead of
 	// twice (#1272): Desktop adds a "1M context window" entry beside any

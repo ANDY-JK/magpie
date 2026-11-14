@@ -398,6 +398,10 @@ type Weighed struct {
 	// back of an order that sinks (sink.go); nil when it didn't, or the
 	// order doesn't sink
 	Sunk *time.Time `json:"sunk,omitempty"`
+	// Health: its model's stability (health.go), below 1 only while it is
+	// answering badly now and then; below 0.5 the order tries it after
+	// the steady ones
+	Health float64 `json:"health,omitempty"`
 }
 
 // Try is one candidate trying the request.
@@ -580,6 +584,11 @@ func weighed(c candidate, p provider.Provider, wg weighing, fallback bool, from 
 	}
 	if pr, ok := wg.price[c.restID()]; ok {
 		w.Price = &SeatPrice{Input: pr.in, Output: pr.out, CacheRead: pr.cache, Peak: pr.peak}
+	}
+	// an unstable model is said so: the Routing page's story tells why it
+	// was tried late (health.go)
+	if h := healthOf(c.restID(), time.Now()); h < 0.999 {
+		w.Health = h
 	}
 	if sinks(p.Sink, p.Routing) {
 		markSunk(&w, c)

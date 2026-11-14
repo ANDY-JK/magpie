@@ -105,6 +105,7 @@ func noRests() {
 	restingUntil.m = map[string]time.Time{}
 	restingUntil.note = map[string]Rest{}
 	restingUntil.Unlock()
+	resetHealth()
 }
 
 func post(t *testing.T, path, body string) (int, string) {

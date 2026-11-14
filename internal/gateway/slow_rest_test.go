@@ -118,18 +118,31 @@ func TestSlowStartsRestTheModelOnItsAccount(t *testing.T) {
 		t.Fatalf("another model on the key: first %s", up.first())
 	}
 
-	// a third slow start (asked again once its rest is over) rests longer
+	// a third slow start (asked again once its rest is over) rests longer.
+	// Its health record is cleared first: on this line a slow start also
+	// marks its model's health, and three losses leave it demoted behind
+	// k2/m, which would answer before it is ever asked — the health side
+	// has its own tests
 	restingUntil.Lock()
 	restingUntil.m[k1m] = time.Now().Add(-time.Second)
 	restingUntil.Unlock()
+	modelHealth.Lock()
+	delete(modelHealth.m, k1m)
+	modelHealth.Unlock()
 	tr = ask("group/g")
 	if tr.Rest == nil || tr.Rest.By != "backoff" || tr.Rest.Failures != 3 || time.Until(tr.Rest.Until) <= fallbackCooldown {
-		t.Fatalf("again: %+v (rest %+v)", tr, tr.Rest)
+		up.mu.Lock()
+		asked := append([]string(nil), up.asked...)
+		up.mu.Unlock()
+		t.Fatalf("again: %+v (rest %+v, asked %v)", tr, tr.Rest, asked)
 	}
 	// and an answer ends it
 	restingUntil.Lock()
 	restingUntil.m[k1m] = time.Now().Add(-time.Second)
 	restingUntil.Unlock()
+	modelHealth.Lock()
+	delete(modelHealth.m, k1m)
+	modelHealth.Unlock()
 	up.slow.Store(false)
 	ask("group/g")
 	up.slow.Store(true)

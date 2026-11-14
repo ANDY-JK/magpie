@@ -125,6 +125,9 @@ func quietGroup(t *testing.T) (thinks, quiet *quietUp, reset func(fail int)) {
 		sticks.Lock()
 		sticks.m = map[string]stick{}
 		sticks.Unlock()
+		// this test is about effort, not about the health-weighted order a
+		// member's failure earns: each phase starts with clean scores
+		resetHealth()
 		thinks.mu.Lock()
 		thinks.fail = fail
 		thinks.mu.Unlock()

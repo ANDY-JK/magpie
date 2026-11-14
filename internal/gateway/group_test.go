@@ -46,6 +46,7 @@ func fresh(t *testing.T) {
 	sticks.Lock()
 	sticks.m = map[string]stick{}
 	sticks.Unlock()
+	resetHealth()
 	refusedSeals.Lock()
 	refusedSeals.m = map[string]sealsRefused{}
 	refusedSeals.Unlock()

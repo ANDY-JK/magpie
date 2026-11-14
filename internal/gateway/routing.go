@@ -91,6 +91,8 @@ func served(rest, key string, tokens int) {
 // when it has one, the candidate's model-specific rest.
 func servedCandidate(c candidate, tokens int) {
 	served(c.restKey(), c.restKey(), tokens)
+	// one answer: its model's health climbs back (health.go)
+	noteStable(c)
 	// an answer from any key or account of it says the address isn't the
 	// one a firewall is blocking: the provider's whole-block rest ends at
 	// once, not when its three minutes are up
@@ -1598,6 +1600,13 @@ func (s *Server) restAfterMarked(c candidate, status int, header http.Header, bo
 		if c.p.NoFailRest() && why == failOther && !unserved && status != http.StatusUnauthorized && status != http.StatusForbidden && (c.p.Account == nil || c.full(now).IsZero()) {
 			r.By, r.Until = "off", now
 			return r
+		}
+		// an intermittent failure of the model counts against its health,
+		// for routing to try the steady ones first; a model its plan
+		// doesn't serve is a setting, not instability (its rest says so),
+		// and an overload has its own cooldown, counting nothing
+		if why == failOther && !unserved && !overloaded {
+			noteUnstable(c)
 		}
 		if overloaded {
 			// the vendor's servers too busy for anyone (celestial_eagle_99230

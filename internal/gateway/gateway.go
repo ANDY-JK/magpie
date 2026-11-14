@@ -2697,6 +2697,11 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 	// key or account added while the conversation runs doesn't take it over
 	// (#63): its reasoning, sealed by the account that wrote it, is refused
 	// by another.
+	// a model whose answers have been intermittent is tried after the
+	// steady ones of its plan, the user's order kept on both sides and a
+	// resting one last of all (health.go); a rule's choice and the
+	// conversation's own still stand over this
+	cands, pl = demoteUnstable(cands, pl)
 	before := len(cands)
 	inOrder := isGroup && routingOf(g.Routing) == provider.Ordered
 	cands, pl, aff, stuck := affine(scope, mode, rotate, spread, inOrder, r.Header, from, body, plain, cands, pl)
@@ -3696,6 +3701,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			// began 35 answers past 30s on 11-07, each a 30s timeout, and
 			// was weighed fast because only its answers were timed
 			noteSpeed(c, int64(firstToken)*1000, 0, 0, time.Now())
+			// slow to begin here too: one more mark against its model's
+			// health, the next members of the plan tried first
+			noteUnstable(c)
 			call.TTFT, call.FirstText, call.Flow, call.FirstReasoning = 0, 0, 0, 0
 			watched.attempt(call, try, c.p.ID, sent, hw, capture)
 			s.trace.update(tr, func(t *Route) { t.Tries[len(t.Tries)-1] = try })
@@ -4181,6 +4189,10 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			// request, not the account (#1221): the account doesn't rest,
 			// and mates of the same model, likely to end empty too, are
 			// asked last
+			// the same model on another account would answer as empty: it
+			// is the model's instability, not the account's, and its
+			// health carries it (health.go)
+			noteUnstable(c)
 			if other == nil {
 				other = &Try{Status: call.Status, Error: call.Error}
 			}
