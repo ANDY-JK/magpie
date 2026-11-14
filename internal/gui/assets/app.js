@@ -22163,7 +22163,13 @@ function renderReplies(s, keep) {
   const h = segRow("healthDemotionRow", t("Unstable models after the steady ones"),
     t("A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set"),
     onOff, s.noHealthDemotion ? "off" : "on", (v) => savePrefs({ ...keep, noHealthDemotion: v === "off" }));
-  box.append(r, l, f, k, c, u, h);
+  // a reply stopped at the vendor's output limit goes on from what it has
+  // said, at most two more segments (gateway continuation.go); off ends it
+  // as before, its stop saying so
+  const a = segRow("autoContinueRow", t("Reply cut at the output limit continues"),
+    t("A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply; off ends it as before, its stop saying it was cut"),
+    onOff, s.autoContinue ? "on" : "off", (v) => savePrefs({ ...keep, autoContinue: v === "on" }));
+  box.append(r, l, f, k, c, u, h, a);
 }
 
 // renderDisabledModels: models turned off for every request (#1867), a row per pattern

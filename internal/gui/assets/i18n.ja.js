@@ -4538,5 +4538,7 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "The name the request to the vendor carries for {id}; agents and magpie still list it as {id}. Empty: the vendor's own id": "ベンダーへのリクエストで {id} に使う名前。エージェントと magpie の一覧では {id} のままです。空欄はベンダー自身の id",
     "Unstable models after the steady ones": "不安定なモデルは安定なモデルの後ろへ",
     "A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set": "途切れがちなモデルは、再び安定して応答するようになるまで、同じプランの安定なモデルの後ろで試されます。オフにするとルーティング順は設定どおりのままです",
+    "Reply cut at the output limit continues": "出力上限で打ち切られた応答の続きを書く",
+    "A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply; off ends it as before, its stop saying it was cut": "ベンダーが出力上限で応答を打ち切ったとき、すでに述べた内容の続きを最大2回まで書き続き、ひとつの完全な応答につなぎ戻します。オフにするとこれまでどおり打ち切りのまま終わり、停止理由にそれが示されます",
 });
 localeWordsHere.add("ja");

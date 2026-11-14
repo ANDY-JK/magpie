@@ -31,6 +31,7 @@ import (
 	"unicode"
 
 	"github.com/yetone/magpie/internal/provider"
+	"github.com/yetone/magpie/internal/settings"
 )
 
 // streamRetries is how many times a cut reply is asked to go on before it
@@ -66,6 +67,24 @@ const loopReasks = 1
 // the next member is (#2873): the parser reads the same, the cut doesn't
 // come again.
 const cutReasks = 1
+
+// autoContinues is how many times a reply the vendor stopped at its output
+// limit is asked to go on, at most, before it ends where the limit stopped
+// it, as it always has: two, so a limit that comes again and again doesn't
+// ask for ever (settings.AutoContinue).
+const autoContinues = 2
+
+// limitStop says a reply ended because it ran out of room to say more, the
+// vendor's output cap reached, not its turn's end. Each protocol's decoder
+// says its own shape of that by "length": Anthropic's stop_reason
+// "max_tokens" (and a Chat-shaped relay's "length", Gemini's finishReason
+// "MAX_TOKENS", stopFromAnthropic), the OpenAI family's finish_reason
+// "length" — DeepSeek's and Kimi's among them (stopFromChat) — and a
+// Responses reply's status "incomplete" whose reason is its output cap,
+// "max_output_tokens" (responses.go). That one word is all this reads.
+func limitStop(stop string) bool {
+	return stop == "length"
+}
 
 // errStreamCut ends a reply's read once its error event is in hand,
 // without waiting on a vendor that keeps the connection open after it.
@@ -313,6 +332,17 @@ func (c *continuation) again(status int, code string, again int, ctx context.Con
 	return true
 }
 
+// againAtLimit readies a reply the vendor stopped at its output limit for
+// its next ask, as again does a cut one's: had counts the asks of this
+// kind the reply has had, up to autoContinues, and it can go on.
+func (c *continuation) againAtLimit(had int, ctx context.Context) bool {
+	if had >= autoContinues || ctx.Err() != nil || !c.possible() {
+		return false
+	}
+	c.resume, c.echo, c.seen = true, c.prefillText(), ""
+	return true
+}
+
 // prefillText is the reply's text as the prefill carries it: trailing
 // whitespace trimmed, which an Anthropic upstream turns the whole request
 // away for (400 "final assistant content cannot end with trailing
@@ -390,6 +420,48 @@ func (c *continuation) unecho(s string) string {
 	return s
 }
 
+// journalReply hands a whole reply's parts to a continuation, as the
+// events of a streamed one are journaled (add): its thinking and text go
+// back in the prefill, a call of it ends the going-on. Sealed thinking
+// isn't carried, as a streamed one's isn't.
+func journalReply(res Result, c *continuation) {
+	for _, p := range res.Parts {
+		switch p.Kind {
+		case Thinking:
+			if p.Sealed != nil {
+				continue
+			}
+			c.add(Event{Kind: KThink, Text: p.Text})
+		case Text:
+			c.add(Event{Kind: KText, Text: p.Text})
+		case ToolCall:
+			c.add(Event{Kind: KToolStart})
+		}
+	}
+}
+
+// joinReply appends a continuation's say to the whole reply it went on
+// from: its text, calls, searches and images follow what was said, its
+// fresh thinking is dropped (the client's reply keeps the thinking the
+// prefill carried back, as a streamed continuation's isn't shown again),
+// and the model that answered last names the reply.
+func joinReply(res, more Result) Result {
+	for _, p := range more.Parts {
+		if p.Kind == Thinking {
+			continue
+		}
+		res.Parts = append(res.Parts, p)
+	}
+	if more.Model != "" {
+		res.Model = more.Model
+	}
+	if more.ID != "" {
+		res.ID = more.ID
+	}
+	res.Stop = more.Stop
+	return res
+}
+
 // streamTranslated relays a translated reply's events to the client as
 // they come. A reply the upstream's stream cut off mid-way is asked of
 // the same conversation again, going on from what the client has, up to
@@ -420,6 +492,11 @@ func (s *Server) streamTranslated(w http.ResponseWriter, r *http.Request, p prov
 	var spoke, relooped bool
 	var summaryUpstream bool
 	reasks := 0
+	// a reply the vendor stopped at its output limit goes on only when the
+	// user asked it to (settings.AutoContinue), at most autoContinues times
+	// of this reply
+	auto := settings.Load().AutoContinue
+	limitAsks := 0
 	if h, ok := w.(*holdWriter); ok {
 		h.onLoop(func(t loopTrip) bool {
 			// only reasoning nobody acts on: a text or a call the agent
@@ -670,6 +747,27 @@ func (s *Server) streamTranslated(w http.ResponseWriter, r *http.Request, p prov
 				// go on from, so it isn't continued
 				failed = p.Name + ": " + emptyReply
 				break
+			}
+			if auto && limitStop(stop) && cont.againAtLimit(limitAsks, r.Context()) {
+				// the vendor stopped the reply at its output limit (stop
+				// "length": Anthropic's stop_reason "max_tokens", the OpenAI
+				// family's finish_reason "length", a Responses reply's
+				// incomplete "max_output_tokens"): asked again with what it
+				// has said as the prefill, the tries' usage summed into the
+				// reply's, as a cut one's are. At most autoContinues times;
+				// still stopped at the limit then, it ends as it always has,
+				// its stop saying so. The tries before it are billed first,
+				// and what a reply that said nothing held back (kept) goes
+				// only with the ending try's.
+				limitAsks++
+				before, this = before.plus(this, false), Usage{}
+				kept, stop = nil, ""
+				enc.keepalive() // the client waits while the reply is asked to go on
+				select {
+				case <-time.After(retryPause << limitAsks):
+				case <-r.Context().Done():
+				}
+				continue
 			}
 			for _, ev := range kept {
 				enc.event(ev)

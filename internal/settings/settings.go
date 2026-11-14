@@ -374,6 +374,14 @@ type Settings struct {
 	// is stuck in a loop of the same few lines (#1359). Off, as by
 	// default, the gateway ends such a reply with an error.
 	NoLoopGuard bool `json:"noLoopGuard,omitempty"`
+	// AutoContinue has a reply the vendor stopped at its output limit
+	// (Anthropic's stop_reason "max_tokens", the OpenAI family's
+	// finish_reason "length", a Responses reply's incomplete
+	// "max_output_tokens") asked to go on from what it has said, up to two
+	// more asks of the same reply, spliced into it as one. Off, as by
+	// default, such a reply ends where the limit stopped it, as it always
+	// has.
+	AutoContinue bool `json:"autoContinue,omitempty"`
 	// ClaudeLeanPrompt starts a Claude subscription's Claude Code run with
 	// the caller's own instructions as its system prompt
 	// (--system-prompt-file), in place of Claude Code's (about 1.1K tokens

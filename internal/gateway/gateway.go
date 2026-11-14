@@ -7858,15 +7858,6 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request, p provider.Pr
 		}
 		return writeVendorError(w, from, res.StatusCode, msg, b), msg
 	}
-	dec := carryReasoning(decoderFor(p, actual, request.Tools), from, actual)
-	rd, sse := eventStream(res)
-	if !sse {
-		// the provider ignored stream:true; read the whole reply as one
-		// event stream would be wrong, so give up cleanly
-		b, _ := io.ReadAll(io.LimitReader(rd, 1<<20))
-		msg := p.Name + " " + didNotStream + ": " + provider.APIError(b, "unexpected reply")
-		return writeError(w, from, 502, msg), msg
-	}
 	// a Gemini reply that says nothing is a failure, not a turn's end
 	// (#667)
 	empty := emptyFails(actual)
@@ -7879,28 +7870,58 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request, p provider.Pr
 		t := &textCallSee{names: names, see: see}
 		return t.event, t.release
 	}
-	var col collector
-	ended := false // the upstream said its reply ended
-	var tail chatTail
-	var found searchTally // the searches it ran by itself
-	see, held := written(zenSee(zen, col.add))
-	err = readSSE(rd, func(_, data string) error {
-		tail.see([]byte(data))
-		found.see(actual, []byte(data))
-		u.add(Usage{Upstream: upstreamOf([]byte(data)), Tier: upstreamTier([]byte(data)), searches: found.count()})
-		ended = ended || replyEnds(actual, data, upstreamStop([]byte(data)))
-		return dec(data, see)
-	})
-	if fin := tail.finish(); err == nil && !ended && actual == provider.Chat && fin != "" && saysItsEnd(p, actual, model) {
-		// Gemini's OpenAI-compatible API lost only the finish_reason
-		// after its generation was done (chatTail)
-		ended, err = true, dec(string(finishChunk(fin)), see)
+	// one try of the whole reply, read as the stream it is asked as: the
+	// first's body, and a continuation's each (autoContinue, whose full
+	// echo of what it was prefilled with is dropped, as a streamed one's
+	// is). It says whether the upstream said the reply ended, and what
+	// failed reading it. The response's body is closed here.
+	ask := func(res *http.Response, actual provider.Protocol, cont *continuation) (c collector, complete bool, failed string) {
+		dec := carryReasoning(decoderFor(p, actual, request.Tools), from, actual)
+		rd, sse := eventStream(res)
+		if !sse {
+			// the provider ignored stream:true; read the whole reply as
+			// one event stream would be wrong, so give up cleanly
+			b, _ := io.ReadAll(io.LimitReader(rd, 1<<20))
+			res.Body.Close()
+			return c, false, p.Name + " " + didNotStream + ": " + provider.APIError(b, "unexpected reply")
+		}
+		into := c.add
+		if cont != nil {
+			into = func(ev Event) {
+				if ev.Kind == KText {
+					if ev.Text = cont.unecho(ev.Text); ev.Text == "" {
+						return
+					}
+				}
+				c.add(ev)
+			}
+		}
+		var tail chatTail
+		var found searchTally // the searches it ran by itself
+		see, held := written(zenSee(zen, into))
+		rerr := readSSE(rd, func(_, data string) error {
+			tail.see([]byte(data))
+			found.see(actual, []byte(data))
+			u.add(Usage{Upstream: upstreamOf([]byte(data)), Tier: upstreamTier([]byte(data)), searches: found.count()})
+			complete = complete || replyEnds(actual, data, upstreamStop([]byte(data)))
+			return dec(data, see)
+		})
+		if fin := tail.finish(); rerr == nil && !complete && actual == provider.Chat && fin != "" && saysItsEnd(p, actual, model) {
+			// Gemini's OpenAI-compatible API lost only the finish_reason
+			// after its generation was done (chatTail)
+			complete, rerr = true, dec(string(finishChunk(fin)), see)
+		}
+		held()
+		res.Body.Close()
+		if rerr != nil {
+			failed = p.Name + ": " + rerr.Error()
+		}
+		return c, complete, failed
 	}
-	held()
-	if err != nil {
+	col, ended, failed := ask(res, actual, nil)
+	if failed != "" {
 		// a partial answer is not an answer
-		msg := p.Name + ": " + err.Error()
-		return writeError(w, from, 502, msg), msg
+		return writeError(w, from, 502, failed), failed
 	}
 	// a reply the vendor refused part way is no answer either: handed
 	// whole, its words so far went as a finished turn and the refusal as
@@ -7954,6 +7975,92 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request, p provider.Pr
 		zen.end(col.add)
 	}
 	res2 := col.finish()
+	// a reply the vendor stopped at its output limit (stop "length") goes
+	// on from what it has said when the user turned AutoContinue on
+	// (settings): asked again with it as the prefill, at most
+	// autoContinues times, as a streamed reply is (streamTranslated). A
+	// continuation that fails asking ends the reply with the failure, as
+	// one that can't be read ends the first try; its usage sums into the
+	// reply's, and what it says goes after what was said.
+	auto := settings.Load().AutoContinue
+	for asks := 0; asks < autoContinues; asks++ {
+		if !auto || !limitStop(res2.Stop) || r.Context().Err() != nil {
+			break
+		}
+		cont := &continuation{mode: prefillHow(p, to, model)}
+		if !s.fits(p.ID, prefillRefused(model), to) {
+			cont.mode = ""
+		}
+		journalReply(res2, cont)
+		if !cont.againAtLimit(asks, r.Context()) {
+			break
+		}
+		res, actual, err = s.forwardTranslated(r.Context(), p, to, cont.request(request), model, r.Header)
+		if err != nil {
+			return writeError(w, from, 502, p.Name+": "+err.Error()), err.Error()
+		}
+		if res.StatusCode >= 400 {
+			b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+			res.Body.Close()
+			if refusesPrefill(res.StatusCode, b) {
+				// a model that takes no prefill (forwardTranslated
+				// remembers it): the reply stays where the limit stopped
+				// it, not the refusal of an ask the client never made
+				// (#1447)
+				break
+			}
+			msg := p.Explain(p.Name+": "+provider.APIError(b, res.Status), res.StatusCode, b)
+			if wrongEndpoint(res.StatusCode, b) {
+				msg += wrongAPINote(p, model, res, b)
+			}
+			turnedAway := res.StatusCode == http.StatusTooManyRequests && antigravityTurnedAway(p, request.System, string(b))
+			if turnedAway {
+				msg += " — " + antigravityHint(request.System)
+				markAntigravityTurnsAway(w, request.System)
+			}
+			if p.Preset == "openrouter" && openRouterSharedPool(b) {
+				markOpenRouterSharedPool(w)
+			}
+			keepRetry(w.Header(), res.Header, b)
+			u.ErrType = provider.ErrorType(b)
+			if turnedAway {
+				u.ErrType = turnedAwayErrType
+			}
+			return writeVendorError(w, from, res.StatusCode, msg, b), msg
+		}
+		more, complete, failed := ask(res, actual, cont)
+		if failed != "" {
+			return writeError(w, from, 502, failed), failed
+		}
+		if more.err != "" && (!saidAnything(more.res.Parts) || more.errSaid != nil) {
+			// a reply the vendor refused part way is no answer either, as
+			// the first try's isn't (#3274)
+			said := more.err
+			if markAntigravityRefused(w, p, request.System, said) {
+				said += " — " + antigravityHint(request.System)
+				u.ErrType = turnedAwayErrType
+			}
+			if code := gjson.GetBytes(more.errSaid, "error.code").String(); code != "" {
+				e, _ := json.Marshal(map[string]string{"code": code, "message": more.err})
+				if note, ok := policyRefusal(e); ok {
+					w.Header().Set(refusedHeader, note)
+				}
+			}
+			return writeVendorError(w, from, cmp.Or(more.errStatus, streamStatus(said)), p.Name+": "+said, more.errSaid), said
+		}
+		if more.err == "" && !complete && saysItsEnd(p, actual, model) && r.Context().Err() == nil {
+			// a continuation that just stopped, as a first try would be
+			// told (streamTranslated)
+			msg := p.Name + ": " + errEndedShort.Error()
+			return writeError(w, from, 502, msg), msg
+		}
+		more2 := more.finish()
+		if more.err != "" {
+			col.err = more.err // what it said stands, the error said after
+		}
+		res2.Usage = res2.Usage.plus(more2.Usage, false)
+		res2 = joinReply(res2, more2)
+	}
 	u.add(res2.Usage)
 	u.add(Usage{Served: res2.Model})
 	out := renderUsage(from, res2, request, u)
