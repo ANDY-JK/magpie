@@ -3600,10 +3600,12 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
 .mchip .tdot.wait { animation: tdot 1s ease-in-out infinite alternate; }
 @keyframes tdot { to { opacity: .25; } }
 /* what a model can do besides answer, after its name: T tools, V vision,
-   S streaming, green when the endpoint said yes and red when it said no */
-.mchip .badge.cap { flex: none; margin-left: 2px; padding: 0 3px; font-size: 9px; line-height: 13px; letter-spacing: 0; }
-.mchip .badge.cap.ok { background: var(--green-soft); color: var(--green); }
-.mchip .badge.cap.bad { background: var(--red-soft); color: var(--red); }
+   S streaming, green when the endpoint said yes and red when it said no.
+   The agent pickers' rows and the Routing page's member rows say what was
+   kept of it (providers.json) in the same letters */
+.mchip .badge.cap, .am-mr .badge.cap, .rt-gedit .fbrow .badge.cap { flex: none; margin-left: 2px; padding: 0 3px; font-size: 9px; line-height: 13px; letter-spacing: 0; }
+.mchip .badge.cap.ok, .am-mr .badge.cap.ok, .rt-gedit .fbrow .badge.cap.ok { background: var(--green-soft); color: var(--green); }
+.mchip .badge.cap.bad, .am-mr .badge.cap.bad, .rt-gedit .fbrow .badge.cap.bad { background: var(--red-soft); color: var(--red); }
 .cap-legend[hidden] { display: none; }
 .mchips .hint, .mfoot .hint { font-size: 11px; color: var(--faint); align-self: center; line-height: 27px; }
 /* the foot of a long list: draws the models left out of it (#685) */

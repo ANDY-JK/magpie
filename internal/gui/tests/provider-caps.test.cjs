@@ -5,8 +5,12 @@
 // says T, V and S — green for the endpoint's yes, red for its no, nothing
 // where it said nothing — with the words on hover, and the footer counts them.
 // A chip's right-click tests that model's capabilities alone. Test models
-// still sends no capability work. English and Chinese, both engines; no
-// backend, the API is faked.
+// still sends no capability work. What a run settled is posted to the
+// provider's caps action, so the letters are kept with the provider
+// (providers.json) and the agent pickers' rows and the Routing page's
+// members say them after a restart too; a model the run settled nothing of
+// is sent none, and keeps what was kept of it. English and Chinese, both
+// engines; no backend, the API is faked.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -28,7 +32,7 @@ const relay = {
   balanceToken: { takes: false, set: false }, proxy: "",
 };
 
-function serve(lang, tests) {
+function serve(lang, tests, capsPosts) {
   const providers = { providers: [relay], presets: [], excluded: [], gateway: { running: true, window: true } };
   const state = { agents: [], profiles: [], settings: { lang, theme: "light" } };
   return async (route) => {
@@ -43,6 +47,10 @@ function serve(lang, tests) {
       const body = route.request().postDataJSON();
       tests.push(body);
       return json({ results: body.test.map((id) => ({ protocol: "chat", ok: true, ms: 12, model: id, ...(body.caps ? { caps: CAPS[id] } : {}) })) });
+    }
+    if (url.pathname === "/api/provider/caps") {
+      capsPosts.push(route.request().postDataJSON());
+      return json({});
     }
     if (url.pathname.startsWith("/api/")) return json({});
     const file = path.join(assets, url.pathname === "/" ? "index.html" : url.pathname);
@@ -83,15 +91,16 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       t.after(() => browser.close());
       page.setDefaultTimeout(5000);
       page.setDefaultNavigationTimeout(60000);
-      const errors = [], tests = [];
+      const errors = [], tests = [], capsPosts = [];
       page.on("pageerror", (e) => errors.push(e.message));
-      await page.route("**/*", serve(lang, tests));
+      await page.route("**/*", serve(lang, tests, capsPosts));
       await page.goto("http://magpie.test/?view=providers");
       await page.locator(".row.provider", { hasText: "Caps Relay" }).click();
       const ed = page.locator(".editor");
       await ed.locator(".mchips .mchip").first().waitFor();
       const chip = (id) => ed.locator(".mchips .mchip.pick", { hasText: id });
       const wait = async (n) => { for (let i = 0; i < 80 && tests.length < n; i++) await page.waitForTimeout(50); };
+      const capsWait = async (n) => { for (let i = 0; i < 80 && capsPosts.length < n; i++) await page.waitForTimeout(50); };
       const badges = async (id) => chip(id).locator(".badge.cap").evaluateAll((bs) => bs.map((b) => ({ text: b.textContent, cls: b.className, title: b.title })));
 
       // the press asks for capabilities of every model served
@@ -99,6 +108,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await wait(1);
       assert.deepEqual({ id: tests[0].id, test: tests[0].test, caps: tests[0].caps }, { id: "caps", test: ["m1", "m2"], caps: true });
       await page.waitForFunction((want) => document.querySelector("#status")?.textContent === want, w.count);
+      // what the run settled goes to the provider, to be kept in
+      // providers.json: each model's word whole, none for one the run
+      // settled nothing of
+      await capsWait(1);
+      assert.deepEqual(capsPosts[0], { id: "caps", capsResults: CAPS });
       // T, V and S, green for yes and red for no, the words on hover
       assert.deepEqual(await badges("m1"), [
         { text: "T", cls: "badge cap ok", title: w.tools },
@@ -114,7 +128,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert(await ed.locator(".cap-legend").isVisible());
       assert((await chip("m1").getAttribute("title")).includes(w.took), "the test's answer is in the hover beside the facts");
 
-      // one model's capabilities alone, from its right-click
+      // one model's capabilities alone, from its right-click: its word alone
+      // is posted, and what was kept of the others stands
       const n = tests.length;
       await chip("m2").click({ button: "right" });
       const menu = page.locator(".pop.row-menu");
@@ -122,14 +137,18 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await menu.getByRole("menuitem", { name: w.menu }).click();
       await wait(n + 1);
       assert.deepEqual({ id: tests.at(-1).id, test: tests.at(-1).test, caps: tests.at(-1).caps }, { id: "caps", test: ["m2"], caps: true });
+      await capsWait(2);
+      assert.deepEqual(capsPosts[1], { id: "caps", capsResults: { m2: CAPS.m2 } }, "the run of one model keeps what was kept of the others");
       await page.waitForTimeout(300);
       assert((await page.locator("#status").textContent()).includes("T✗ V✓"), await page.locator("#status").textContent());
 
-      // Test models still asks only whether they answer
+      // Test models still asks only whether they answer, and posts nothing
       const m = tests.length;
       await ed.locator(".mfoot").getByRole("button", { name: w.all, exact: true }).click();
       await wait(m + 1);
       assert.equal(tests.at(-1).caps, undefined, "Test models asks no capability");
+      await page.waitForTimeout(300);
+      assert.equal(capsPosts.length, 2, "Test models keeps no letters of its own");
       const missing = KEYS.filter((k) => !require("./strings.cjs").strings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every new word has its Chinese");
       assert.deepEqual(errors, []);

@@ -6493,6 +6493,10 @@ function routingPage(part) {
         // than text-only: magpie counts it text-only for a describer
         // (gateway.blindTo), which is not the same as its list saying so.
         if (chips) row.append(modelInfo({ ...chips, group: !!s, images: info?.images ?? chips.images, imagesUnknown: info?.imagesUnknown ?? chips.imagesUnknown }));
+        // what Test capabilities settled of its model (providers.json, the
+        // group's memberInfo), in the letters its editor's chip says: a
+        // model not tested, and a member that is itself a group, says none
+        if (!s) row.append(...capBadges(info?.caps));
         // the reasoning the model is sent at in this group: the group's
         // (blank), or one of its own whatever the agent asks. A group in
         // it reasons as it says.

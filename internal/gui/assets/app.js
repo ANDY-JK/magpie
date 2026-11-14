@@ -3696,7 +3696,10 @@ async function openAgentModels(a, anchor, ev) {
           } else lg = m.logo && !route ? icon(m.logo) : el("span", "ic");
           if (route && !m.icons?.length) lg.append(svg(FAN, 14, 1.5));
           lg.classList.add("lg");
-          r.append(lg, n, el("span", "x", ctxShort(m.context)), ck);
+          // what Test capabilities settled of it (providers.json): the
+          // letters its editor's chip says, beside the window; a model not
+          // tested says none
+          r.append(lg, n, ...capBadges(m.caps), el("span", "x", ctxShort(m.context)), ck);
           if (m.inUse) r.setAttribute("aria-disabled", "true");
           else r.onclick = () => {
             m.hidden = !m.hidden;
@@ -11127,6 +11130,33 @@ function capLine(caps) {
   return [["tools", "T"], ["vision", "V"], ["stream", "S"]].map(([k, l]) => caps?.[k] ? l + (caps[k] === "yes" ? "✓" : "✗") : "").filter(Boolean).join(" ");
 }
 
+// capBadges: the letters of one model's caps, as a chip's own: a badge
+// each, ticked green where the endpoint said yes and crossed red where it
+// said no, the words on hover; nothing for a capability it didn't settle,
+// and none at all for a model not tested
+function capBadges(caps) {
+  const out = [];
+  for (const [k, letter] of [["tools", "T"], ["vision", "V"], ["stream", "S"]]) {
+    const v = caps?.[k];
+    if (!v) continue;
+    const b = el("span", "badge cap " + (v === "yes" ? "ok" : "bad"), letter);
+    b.title = capWord(k, v === "yes");
+    out.push(b);
+  }
+  return out;
+}
+
+// saveCaps: what a Test capabilities run settled goes with the provider
+// (providers.json, POST provider/caps), so the agent pickers' rows and the
+// Routing page's members say the letters after a restart too. A model the
+// run settled nothing of is sent none, and keeps what was kept of it.
+function saveCaps(id, results) {
+  const caps = {};
+  for (const x of results) if (x?.model && x.caps && Object.keys(x.caps).length) caps[x.model] = x.caps;
+  if (!Object.keys(caps).length) return;
+  api("provider/caps", { id, capsResults: caps }).catch(statusErr);
+}
+
 // testsOn: a provider's tests under way, by run; Stop ends them on the server too (RIck)
 const testsOn = {};
 async function provTest(id, body) {
@@ -11216,13 +11246,7 @@ function renderModels(p) {
     // what it can do besides answer, when a capability test asked: a letter
     // each, ticked when the endpoint said yes, crossed when it said no, and
     // nothing where it didn't say (capWords has the long words)
-    for (const [k, letter] of [["tools", "T"], ["vision", "V"], ["stream", "S"]]) {
-      const v = x?.caps?.[k];
-      if (!v) continue;
-      const b = el("span", "badge cap " + (v === "yes" ? "ok" : "bad"), letter);
-      b.title = capWord(k, v === "yes");
-      c.append(b);
-    }
+    c.append(...capBadges(x?.caps));
     // a caps test that settled no letter says so once in the hover: it was
     // not asked (Gemini skips streaming, an OpenCode free tier skips tools),
     // or it did not say (the owner, 11-11)
@@ -12052,6 +12076,7 @@ function renderModels(p) {
     try {
       const r = await provTest(p.id, { ...asTyped(), test: ids, caps: true });
       r.results.forEach((x, i) => { got[ids[i]] = x; });
+      saveCaps(p.id, r.results);
       const yes = (k) => r.results.filter((x) => x.caps?.[k] === "yes").length;
       // a model that didn't answer is named, as Test models does: the count
       // alone left "one model failed" unfindable (the owner, 11-11)
@@ -12068,6 +12093,7 @@ function renderModels(p) {
     try {
       const r = await provTest(p.id, { ...asTyped(), test: [id], ...(as ? { as } : {}), ...(caps ? { caps: true } : {}) });
       const x = got[id] = r.results[0];
+      if (caps) saveCaps(p.id, r.results);
       const via = x.protocol ? apiLabel(x.protocol) : "";
       const error = (x.status ? x.status + " · " : "") + x.error;
       const did = caps && x.caps ? " · " + capLine(x.caps) : "";

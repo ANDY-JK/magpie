@@ -132,6 +132,11 @@ type memberJSON struct {
 	// what a rule may send it: the tokens it takes, when known, and images
 	Context int  `json:"context,omitempty"`
 	Images  bool `json:"images,omitempty"`
+	// Caps is what a Test capabilities run settled the member's model can do
+	// besides answer (provider.Entry.Caps), as the editor's member rows say
+	// it in the letters a model chip does; nil for one not tested, and for
+	// a member that is itself a group, whose letters aren't one model's
+	Caps *provider.ModelCaps `json:"caps,omitempty"`
 	// ImagesUnknown: nothing was read of its images either way, so it counts
 	// text-only for a describer (gateway.blindTo) without its list having
 	// said it takes none. Sent only when true: a model magpie has an answer
@@ -402,7 +407,7 @@ func groupsState() groupsJSON {
 				for _, e := range served {
 					if e.Group == "" && e.Provider.ID == p.ID && e.Model == model {
 						m.Context, m.Images, m.ImagesUnknown = e.Context, seesImages(e), imagesUnknown(e)
-						m.Efforts = e.Efforts
+						m.Efforts, m.Caps = e.Efforts, e.Caps
 						break
 					}
 				}

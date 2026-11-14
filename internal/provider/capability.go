@@ -291,3 +291,73 @@ func capHas(b []byte, marks [][]byte) bool {
 	}
 	return false
 }
+
+// ModelCaps is what a model can do besides answer, as a Test capabilities
+// run settled it and providers.json keeps it: each "yes" or "no" the
+// endpoint's answer said, and "" where it said nothing — a probe refused
+// for auth or a rate limit says nothing about the model. Spelled tools,
+// vision and stream, as Result.Caps is.
+type ModelCaps struct {
+	Tools  string `json:"tools,omitempty"`
+	Vision string `json:"vision,omitempty"`
+	Stream string `json:"stream,omitempty"`
+}
+
+// settled says the model was given letters at all: an empty one is a model
+// the run asked nothing of, or whose probes all said nothing.
+func (c ModelCaps) settled() bool {
+	return c.Tools != "" || c.Vision != "" || c.Stream != ""
+}
+
+// normalCaps is caps as it is kept: each letter the endpoint said, "yes" or
+// "no" — anything else is a word it didn't settle, no letter — a model with
+// none left out, nil for none.
+func normalCaps(caps map[string]ModelCaps) map[string]ModelCaps {
+	var out map[string]ModelCaps
+	for id, c := range caps {
+		if c.Tools != "yes" && c.Tools != "no" {
+			c.Tools = ""
+		}
+		if c.Vision != "yes" && c.Vision != "no" {
+			c.Vision = ""
+		}
+		if c.Stream != "yes" && c.Stream != "no" {
+			c.Stream = ""
+		}
+		if !c.settled() {
+			continue
+		}
+		if out == nil {
+			out = make(map[string]ModelCaps, len(caps))
+		}
+		out[id] = c
+	}
+	return out
+}
+
+// SetCaps keeps what a Test capabilities run settled of the provider id's
+// models, by model id, beside what was kept of the others: a model the run
+// settled nothing of keeps its letters. What the run said now is what is
+// kept for it. The letters are saved with the provider (Provider.Caps), so
+// the agent pickers' rows and the Routing page's members read them after a
+// restart too; a model gone from the picks takes its letters with it at the
+// save's capsWith.
+func SetCaps(id string, caps map[string]ModelCaps) error {
+	got := normalCaps(caps)
+	if len(got) == 0 {
+		return nil
+	}
+	p, err := Find(id)
+	if err != nil {
+		return err
+	}
+	merged := make(map[string]ModelCaps, len(p.Caps)+len(got))
+	for mid, c := range p.Caps {
+		merged[mid] = c
+	}
+	for mid, c := range got {
+		merged[mid] = c
+	}
+	p.Caps = merged
+	return Save(*p)
+}

@@ -2761,6 +2761,10 @@ type Entry struct {
 	// Context is the tokens a prompt may hold, when known (a group's: the
 	// least of its members')
 	Context int `json:"context,omitempty"`
+	// Caps is what a Test capabilities run settled the model can do besides
+	// answer (Provider.Caps), as the agents' pickers' rows say it; nil for a
+	// model not tested, and for a group, whose letters aren't one model's
+	Caps *ModelCaps `json:"caps,omitempty"`
 	// WindowSet is set when Context is a window the user typed: on the
 	// provider for the model or for all of its models (ContextOf), or on
 	// the group (Group.Context, a size). Codex and Claude Code are then
@@ -3049,6 +3053,11 @@ func entryFor(p Provider, m catalog.Model, s settings.Settings) Entry {
 	if (p.Account == nil || p.Account.Agent != "codex") && len(m.Codex) == 0 {
 		e.Efforts = withUltra(m.ID, e.Efforts)
 		e.AgentsV2 = slices.Contains(e.Efforts, "ultra")
+	}
+	// what a Test capabilities run settled of it (SetCaps), for the
+	// pickers' rows; a model not tested has none
+	if c := p.Caps[m.ID]; c.settled() {
+		e.Caps = &c
 	}
 	// one the user said takes no reasoning ask offers none and is sent
 	// none (SetModelReasonless), whatever its list says

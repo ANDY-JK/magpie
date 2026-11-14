@@ -319,9 +319,13 @@ type providerJSON struct {
 	KeptBy   map[string][]string `json:"keptBy,omitempty"`
 	Off      bool                `json:"off"`                // switched off: kept, but agents get none of its models
 	Contexts map[string]int      `json:"contexts,omitempty"` // the windows the user set, "*" for all its models
-	Outputs  map[string]int      `json:"outputs,omitempty"`  // the reply limits the user set (provider.OutputsOf)
-	Compacts map[string]int      `json:"compacts,omitempty"` // where Codex and Claude Code compact on its models (provider.CompactsOf)
-	Fetched  *time.Time          `json:"fetched,omitempty"`  // when the list came from the vendor; the page says how long ago in its language
+	// Caps is what a Test capabilities run settled of its models
+	// (provider.Provider.Caps), by model id: what the editor keeps beside a
+	// re-test, and what the pickers' rows and the Routing page read
+	Caps     map[string]provider.ModelCaps `json:"caps,omitempty"`
+	Outputs  map[string]int                `json:"outputs,omitempty"`  // the reply limits the user set (provider.OutputsOf)
+	Compacts map[string]int                `json:"compacts,omitempty"` // where Codex and Claude Code compact on its models (provider.CompactsOf)
+	Fetched  *time.Time                    `json:"fetched,omitempty"`  // when the list came from the vendor; the page says how long ago in its language
 	// ListError is why a plugin's account has only the plugin's defaults
 	// (provider.ListError): the editor says so under its models
 	ListError string             `json:"listError,omitempty"`
@@ -706,7 +710,7 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 		Catalog: p.Catalog, Website: p.Website, KeysURL: p.KeysURL,
 		Proxy: p.Proxy, AccountProxies: p.AccountProxies, AccountModels: p.AccountModels, AccountCaps: p.AccountCaps, AccountWindowCaps: p.AccountWindowCaps, AccountNames: p.AccountNames, Headers: p.Headers, ExtraBody: p.ExtraBody, ReplyHeaders: p.ReplyHeaders, Searches: p.Searches, Cline: p.ClinePinnable(), PinUpstream: p.PinUpstream, Unredacted: p.Unredacted, CountFree: p.CountFree, InsecureTLS: p.InsecureTLS, TakesInsecureTLS: p.TakesInsecureTLS(), LimitRestOff: p.LimitRestOff, NativeCompaction: p.NativeCompaction, CarriesCompaction: p.CarriesCompaction(), PassUserAgent: p.PassUserAgent, OwnClient: p.OwnClient(), AuthHeader: p.AuthHeader, BothAuth: p.BothAuth(), BalanceURL: p.BalanceURL, BalancePath: p.BalancePath, BalanceMethod: p.BalanceMethod, ModelsURL: p.ModelsURL,
 		Ready: p.Ready(), Chosen: p.PicksOf(avail), Agents: make([]providerAgent, 0, len(agents)),
-		Fallback: p.Fallback, Routing: p.Routing, Sink: p.Sink, Affinity: p.Affinity, KeepLogin: p.KeepLogin, KeepLoginAs: p.KeepLoginAs, SwitchOnly: p.SwitchOnly, CapStop: p.CapStop, CapCareful: p.CapCareful, Unlisted: p.Unlisted, NoModels: p.ServesNone(), BestInFamily: p.BestInFamily && len(p.Models) == 0 && !p.NoModels, Off: p.Off, Contexts: p.Contexts,
+		Fallback: p.Fallback, Routing: p.Routing, Sink: p.Sink, Affinity: p.Affinity, KeepLogin: p.KeepLogin, KeepLoginAs: p.KeepLoginAs, SwitchOnly: p.SwitchOnly, CapStop: p.CapStop, CapCareful: p.CapCareful, Unlisted: p.Unlisted, NoModels: p.ServesNone(), BestInFamily: p.BestInFamily && len(p.Models) == 0 && !p.NoModels, Off: p.Off, Contexts: p.Contexts, Caps: p.Caps,
 		MaxConcurrency: p.MaxConcurrency, PluginConcurrency: p.PluginConcurrency(), MaxAccounts: p.MaxAccounts, PluginAccounts: p.PluginAtOnce(), PriceRate: p.PriceRate,
 		RateWindows: p.RateWindows, RateNow: rateNowOf(p, time.Now()),
 		AccountConcurrency: p.AccountConcurrency, AccountWeights: p.AccountWeights, QueueLimit: p.QueueLimit, QueueWait: p.QueueWait, MaxRPM: p.MaxRPM,
@@ -1526,6 +1530,11 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			// call, a picture, a streamed answer) are probed too, beside
 			// whether it answers (provider.TestModelsWith)
 			Caps bool `json:"caps"`
+			// CapsResults, for caps: what the run settled of each model, by
+			// model id, as Test capabilities answered it, kept with the
+			// provider (provider.SetCaps); a model it settled nothing of is
+			// sent none, and keeps what was kept of it
+			CapsResults map[string]provider.ModelCaps `json:"capsResults"`
 			// DetectModels, for detect: models to ask on each API, each
 			// answered on its own, in place of Model
 			DetectModels []string `json:"detectModels"`
@@ -2123,6 +2132,13 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			}
 		case "images":
 			if err := provider.SetModelImage(in.ID+"/"+req.Model, req.Images); err != nil {
+				fail(rw, err)
+				return
+			}
+		case "caps":
+			// what a Test capabilities run settled of the provider's models,
+			// kept for the pickers' rows and the Routing page's members too
+			if err := provider.SetCaps(in.ID, req.CapsResults); err != nil {
 				fail(rw, err)
 				return
 			}

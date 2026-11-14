@@ -61,6 +61,11 @@ type agentModelJSON struct {
 	// Own: one of Codex's own, a ChatGPT account's, which Codex lists
 	// ahead of magpie's until the user puts them in an order (#855)
 	Own bool `json:"own,omitempty"`
+	// Caps is what a Test capabilities run settled the model can do besides
+	// answer (provider.Entry.Caps), said in the row's letters; nil for a
+	// model not tested, and for a routing group, whose letters aren't one
+	// model's
+	Caps *provider.ModelCaps `json:"caps,omitempty"`
 }
 
 // takesCatalog reports whether an agent picks among magpie's catalog: some
@@ -204,7 +209,7 @@ func agentModelList(a *agent.Agent) []agentModelJSON {
 	out := []agentModelJSON{}
 	for _, e := range listed {
 		m := agentModelJSON{ID: e.ID, Name: e.Name, Group: e.Provider.Name, Icon: e.Provider.Icon, Context: e.Context,
-			Hidden: off(e.ID), InUse: usedBy(a, vals, e), Own: id == "codex" && provider.CodexOwn(e)}
+			Hidden: off(e.ID), InUse: usedBy(a, vals, e), Own: id == "codex" && provider.CodexOwn(e), Caps: e.Caps}
 		if m.Name == "" {
 			m.Name = e.Model
 		}

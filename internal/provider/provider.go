@@ -530,6 +530,13 @@ type Provider struct {
 	// tokens, over what the vendor or models.dev says: by model id, "*"
 	// for all the provider's models. Agents are told it.
 	Contexts map[string]int `json:"contexts,omitempty"`
+	// Caps is what each of its models can do besides answer, as a Test
+	// capabilities run settled it and the GUI posted to the provider's
+	// caps action (SetCaps): by model id, each "yes" or "no" where the
+	// endpoint's answer said so, nothing where it didn't. A save that
+	// carries none keeps what was kept (capsWith), and a model gone from
+	// the picks takes its letters with it there.
+	Caps map[string]ModelCaps `json:"caps,omitempty"`
 	// Family is a tag the provider's models go by in which agents are
 	// shown them (settings' Visible), with the provider's id.
 	Family string `json:"family,omitempty"`
@@ -788,6 +795,7 @@ func (p Provider) clone() Provider {
 	p.AccountConcurrency = maps.Clone(p.AccountConcurrency)
 	p.AccountWeights = maps.Clone(p.AccountWeights)
 	p.Contexts = maps.Clone(p.Contexts)
+	p.Caps = maps.Clone(p.Caps)
 	if p.AccountModels != nil {
 		m := make(map[string][]string, len(p.AccountModels))
 		for k, v := range p.AccountModels {
@@ -873,6 +881,8 @@ func withPicks(a, pk Provider) Provider {
 func accountSettings(a, pk Provider) Provider {
 	a.PickedFrom, a.Delisted, a.DelistedAt = pk.PickedFrom, pk.Delisted, pk.DelistedAt
 	a.Models, a.Unlisted, a.Off, a.Fallback, a.Routing, a.Affinity, a.KeepLogin, a.KeepLoginAs, a.Contexts, a.Family = pk.Models, pk.Unlisted, pk.Off, pk.Fallback, pk.Routing, pk.Affinity, pk.KeepLogin, pk.KeepLoginAs, pk.Contexts, pk.Family
+	// what a Test capabilities run settled of its models (SetCaps, capsWith)
+	a.Caps = pk.Caps
 	a.SwitchOnly = pk.SwitchOnly
 	a.Sink, a.NoModels, a.BestInFamily = pk.Sink, pk.NoModels, pk.BestInFamily
 	a.NativeCompaction = pk.NativeCompaction
@@ -1085,6 +1095,7 @@ func Save(p Provider) error {
 	p.PickedFrom = listedWith(p, was)
 	p.Delisted = delistedWith(p, was)
 	p.DelistedAt = delistedAtWith(p, was)
+	p.Caps = capsWith(p, was)
 	if was != nil {
 		if p.Was == nil {
 			p.Was = was.Was
@@ -1157,6 +1168,34 @@ func delistedAtWith(p Provider, was *Provider) time.Time {
 		return was.DelistedAt
 	}
 	return p.DelistedAt
+}
+
+// capsWith is what p.Caps is saved as: what the save carries, and — a save
+// that carries none, as the editor's sends none (SetCaps is the only writer
+// of them) — what was kept before, so a model the user hasn't re-tested
+// keeps its letters at every Save. With picks saved, a model neither picked
+// nor set aside any more is one the user deleted, and its letters go with
+// it; a set-aside one keeps them, and is listed again with them (relistPicks).
+// With the vendor's list served (no picks), what is deleted isn't magpie's
+// to say, so nothing is dropped there.
+func capsWith(p Provider, was *Provider) map[string]ModelCaps {
+	caps := p.Caps
+	if caps == nil && was != nil {
+		caps = was.Caps
+	}
+	if len(caps) == 0 || len(p.Models) == 0 {
+		return caps
+	}
+	out := make(map[string]ModelCaps, len(caps))
+	for id, c := range caps {
+		if slices.Contains(p.Models, id) || slices.Contains(p.Delisted, id) {
+			out[id] = c
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // listedWith is what p.PickedFrom is saved as: none without picks; what was
@@ -1579,6 +1618,11 @@ func normalize(p Provider) Provider {
 	}
 	p.Models = cleanList(p.Models)
 	p.Fallback = cleanList(p.Fallback)
+	// a letter the file holds that no answer said ("maybe" typed by hand) is
+	// a word the endpoint didn't settle: no letter
+	p.Caps = normalCaps(p.Caps)
+	// a letter the file holds that no answer said ("maybe" typed by hand) is
+	// a word the endpoint didn't settle: no letter
 	// a provider saved under an id a preset carried before (presetAliases:
 	// qianfan's first day's, Tencent Cloud's plan and TokenHub's two) is
 	// the preset since: its endpoints say the region, and its own id
