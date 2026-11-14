@@ -22,7 +22,9 @@ package usageapi
 // (Thin), but one whose every call was a try handed on to another provider
 // is named even so: its refusals are what made those requests retry. One
 // whose replies no session file timed keeps its score out of the two parts
-// that can't be told, which are folded into the two that can. Failure kinds
+// that can't be told, which are folded into the two that can. A model's
+// pace is its own, held against the period's fastest model and never the
+// fastest provider's, whose number is no model's to catch. Failure kinds
 // are only hints, keyed by what the log kept; the page says what it reads
 // them with rather than claim an account's rest or a vendor's policy.
 
@@ -114,7 +116,9 @@ type RankTag struct {
 // RankModel is one model's part of its provider's period: its own score,
 // what it served, and what it failed with. A provider's models are ranked on
 // their own, so a provider whose one model is bad can be told from one whose
-// every model is.
+// every model is. Its pace parts are the model's own, held against the
+// period's fastest model and never its provider's: the fastest provider's
+// models would score nothing for being as fast as it is.
 type RankModel struct {
 	Model string `json:"model"`
 	// Name is what the user calls the model at At (provider.ModelName), ""
@@ -152,9 +156,11 @@ type RankedModel struct {
 	At []RankModel `json:"at,omitempty"`
 	usage.Totals
 	Causes []RankCause `json:"causes,omitempty"`
-	Parts  []RankPart  `json:"parts,omitempty"`
-	Score  int         `json:"score"`
-	Grade  string      `json:"grade"`
+	// Parts are a model's as any model row's are, the pace held against the
+	// standings' own fastest model, counted from these merged totals
+	Parts []RankPart `json:"parts,omitempty"`
+	Score int        `json:"score"`
+	Grade string     `json:"grade"`
 }
 
 // RankEntry is one provider's place in the ranking.
@@ -236,6 +242,7 @@ func Rank(p usage.Period, all []provider.Provider, zone *time.Location) Ranking 
 	shares := usage.Breakdown(rows, "provider")
 	modelShares := usage.Breakdown(rows, "modelAt")
 	fast, soon := rankPace(shares)
+	mfast, msoon := rankPace(modelShares)
 	tier := RankTier{Needs: RankMinCalls, Days: rankDropDays, Calls: rankDropCalls, Errors: rankDropShare, Still: rankRecentDays}
 	out := Ranking{Period: p, Since: p.Since(now), Tier: tier, Providers: []RankEntry{}}
 	set := map[string]provider.Provider{}
@@ -261,20 +268,20 @@ func Rank(p usage.Period, all []provider.Provider, zone *time.Location) Ranking 
 		}
 		e.Days, e.First, e.Last = d.days, d.first, d.last
 		e.RecentCalls, e.RecentErrors = d.recentCalls, d.recentErrors
-		e.Parts = rankParts(s.Totals, fast, soon, true)
+		e.Parts = rankParts(s.Totals, fast, soon)
 		for _, part := range e.Parts {
 			e.Score += int(math.Round(part.Points))
 		}
 		e.Grade = rankGrade(e.Score)
 		e.Tags = rankTags(s.Totals, e.Causes)
-		e.Models = rankModels(modelShares, s.ID, by, fast, soon)
+		e.Models = rankModels(modelShares, s.ID, by, mfast, msoon)
 		e.Drop = rankDrop(e)
 		out.Providers = append(out.Providers, e)
 		if e.Drop {
 			out.Drops = append(out.Drops, e.ID)
 		}
 	}
-	out.Models = rankModelStandings(modelShares, by, fast, soon)
+	out.Models = rankModelStandings(modelShares, by)
 	rankSort(out.Providers)
 	for i := range out.Providers {
 		out.Providers[i].Rank = i + 1
@@ -374,10 +381,12 @@ func (d *rankDetail) note(r usage.Row, recent time.Time, zone *time.Location, wh
 	}
 }
 
-// rankPace is the fastest provider's speed and the shortest wait of the
-// period, each of the providers with RankMinTimed timed replies: what a
-// provider's own speed and wait are held against. A single fast reply does
-// not stand as the period's fastest.
+// rankPace is the fastest of the shares' speeds and the shortest of their
+// waits, each of the shares with RankMinTimed timed replies: the period's
+// pace each kind of group is held against. Over the providers' shares it is
+// what a provider's own speed and wait are held against; over the modelAt
+// shares, what a model's are (rankParts). A single fast reply does not
+// stand as the period's fastest.
 func rankPace(shares []usage.Share) (fast, soon float64) {
 	for _, s := range shares {
 		if s.Timed < RankMinTimed {
@@ -393,8 +402,15 @@ func rankPace(shares []usage.Share) (fast, soon float64) {
 	return fast, soon
 }
 
-// rankParts scores a provider's period out of 100, in four parts of 25 each.
-func rankParts(t usage.Totals, fast, soon float64, top bool) []RankPart {
+// rankParts scores a period out of 100, in four parts of 25 each, its pace
+// held against the fast and soon given: the period's fastest speed and
+// shortest wait among the group's own kind. A provider's are rankPace over
+// the providers' shares, a model's over the modelAt shares (rankModels), a
+// standing's over the models' merged totals (rankModelStandings) — each
+// kind's fastest scores its pace in full, and a model of the fastest
+// provider is not marked down for matching it, its provider's number being
+// no model's to catch.
+func rankParts(t usage.Totals, fast, soon float64) []RankPart {
 	errRate := float64(t.Errors) / float64(max(1, t.Calls))
 	served := clamp01(1 - errRate/0.25)
 	tried := float64(t.Retried) / float64(max(1, t.Calls))
@@ -411,16 +427,6 @@ func rankParts(t usage.Totals, fast, soon float64, top bool) []RankPart {
 		parts[0].Most, parts[0].Points = 50, math.Round(served*50)
 		parts[1].Most, parts[1].Points = 50, math.Round(stood*50)
 		return parts
-	}
-	if !top {
-		// a model's pace is not held against the period's fastest, which is
-		// a provider's: a model of the fastest provider would score nothing
-		// for being the same, and a model of a slower one would have to
-		// catch a number no provider of its own stands to reach. A model's
-		// own pace is told by the numbers beside its name.
-		return append(parts,
-			RankPart{Key: "fast", Points: math.Round(served * 25), Most: 25},
-			RankPart{Key: "soon", Points: math.Round(stood * 25), Most: 25})
 	}
 	fastPart := 0.0
 	if fast > 0 {
@@ -508,8 +514,10 @@ func rankDrop(e RankEntry) bool {
 // rankModels ranks one provider's models, the best score first and then the
 // most calls. A model with fewer than RankMinCalls is left out: one call
 // says nothing, and a provider with one call per model would be a list of
-// ones.
-func rankModels(shares []usage.Share, id string, by map[string]*rankDetail, fast, soon float64) []RankModel {
+// ones. Its pace is the model's own: mfast and msoon are rankPace over the
+// modelAt shares, the period's fastest model share's speed and shortest
+// wait, so a model is held against the models and not its provider.
+func rankModels(shares []usage.Share, id string, by map[string]*rankDetail, mfast, msoon float64) []RankModel {
 	out := []RankModel{}
 	prefix := id + "/"
 	for _, s := range shares {
@@ -524,7 +532,7 @@ func rankModels(shares []usage.Share, id string, by map[string]*rankDetail, fast
 		if d := by[s.ID]; d != nil {
 			m.Causes = rankCauses(d.causes)
 		}
-		m.Parts = rankParts(s.Totals, fast, soon, false)
+		m.Parts = rankParts(s.Totals, mfast, msoon)
 		for _, part := range m.Parts {
 			m.Score += int(math.Round(part.Points))
 		}
@@ -547,13 +555,17 @@ func rankModels(shares []usage.Share, id string, by map[string]*rankDetail, fast
 // none and a model's may hold more — and a model the log names nothing for
 // has no standing. The gate is RankMinCalls on the merged calls, so a model
 // each provider served too little of to rank still stands once they are
-// summed. Its pace is scored as a model's is anywhere (rankParts with top
-// false, its fast and soon its served and stood again for the reason given
-// there); holding a model's pace against the period's fastest provider is
-// deliberately not done here either this round.
-func rankModelStandings(shares []usage.Share, by map[string]*rankDetail, fast, soon float64) []RankedModel {
+// summed. Its pace is a model's own, held against the standings' fastest
+// model: the fastest speed and shortest wait of the period among the merged
+// totals with RankMinTimed timed replies, counted here from the merges
+// rather than rankPace over the shares, because a standing's pace is its
+// merged pace — shares too few to time each alone still time merged, and a
+// model of two providers is held against what the models' totals say, not
+// what one share of another model did.
+func rankModelStandings(shares []usage.Share, by map[string]*rankDetail) []RankedModel {
 	type merged struct {
 		shares []usage.Share
+		totals usage.Totals
 		at     []RankModel
 		calls  map[string]int
 		causes map[string]int
@@ -583,10 +595,28 @@ func rankModelStandings(shares []usage.Share, by map[string]*rankDetail, fast, s
 			}
 		}
 	}
+	// the standings' own pace, as rankPace is the providers': the fastest
+	// model's speed and the shortest wait of the period, each of the models
+	// whose merged replies RankMinTimed of them timed — what a standing's
+	// speed and wait are held against, so the fastest model scores its pace
+	// in full whether its shares were fast together or one alone
+	var mfast, msoon float64
+	for _, m := range at {
+		m.totals = usage.MergedTotals(m.shares)
+		if m.totals.Timed < RankMinTimed {
+			continue
+		}
+		if v := m.totals.Speed(); v > mfast {
+			mfast = v
+		}
+		if w := float64(m.totals.MeanTTFT()); w > 0 && (msoon == 0 || w < msoon) {
+			msoon = w
+		}
+	}
 	out := make([]RankedModel, 0, len(order))
 	for _, model := range order {
 		m := at[model]
-		t := usage.MergedTotals(m.shares)
+		t := m.totals
 		if t.Calls < RankMinCalls {
 			continue
 		}
@@ -596,7 +626,7 @@ func rankModelStandings(shares []usage.Share, by map[string]*rankDetail, fast, s
 			e.Name = n
 		}
 		e.Causes = rankCauses(m.causes)
-		e.Parts = rankParts(t, fast, soon, false)
+		e.Parts = rankParts(t, mfast, msoon)
 		for _, part := range e.Parts {
 			e.Score += int(math.Round(part.Points))
 		}

@@ -238,9 +238,11 @@ func TestRankParts(t *testing.T) {
 
 // A provider's models are ranked on their own, so one bad model of an
 // otherwise good provider is told apart from a provider whose every model
-// is bad. A model's own pace is not held against the period's fastest
-// provider: the fastest provider's models would score nothing for being the
-// same, so a model's pace parts are its served and stood again.
+// is bad. A model's pace is its own, held against the period's fastest
+// model and never the fastest provider's: the bad model here is marked down
+// for failing, not for pace — its timed replies wrote at the speed of the
+// period's fastest model, which is its own, so its fast part is full where
+// its served part is nothing.
 func TestRankModelsApart(t *testing.T) {
 	now := rankHome(t)
 	saveProvider(t, rankCase{id: "mixed", name: "Mixed"})
@@ -272,14 +274,19 @@ func TestRankModelsApart(t *testing.T) {
 			t.Fatalf("%s's part keys: %v", m.Model, keys)
 		}
 	}
-	// a model's pace is its own served and stood again: the bad model fails
-	// half its calls and never retries, and its fast part is that served
+	// a model's pace is its own, held against the period's fastest model:
+	// both timed models wrote at the same speed and waited the same, so
+	// both pace parts are full — the bad one is marked down for failing,
+	// not for pace, and its fast part is not its served again
 	good, bad := rankPartMap(e.Models[0].Parts), rankPartMap(e.Models[1].Parts)
-	if good["fast"].Points != good["served"].Points || good["soon"].Points != good["stood"].Points {
-		t.Fatalf("the good model's pace: %+v", good)
+	if good["fast"].Points != 25 || good["soon"].Points != 25 {
+		t.Fatalf("the fastest model's pace: %+v", good)
 	}
-	if bad["fast"].Points != 0 || bad["fast"].Points != bad["served"].Points {
-		t.Fatalf("the bad model's pace: %+v", bad)
+	if bad["fast"].Points != 25 || bad["soon"].Points != 25 {
+		t.Fatalf("the bad model's pace is not its own: %+v", bad)
+	}
+	if bad["served"].Points != 0 || bad["stood"].Points != 25 {
+		t.Fatalf("the bad model's own parts: %+v", bad)
 	}
 	// a model with one call says nothing
 	for _, m := range e.Models {
@@ -289,6 +296,86 @@ func TestRankModelsApart(t *testing.T) {
 	}
 	if e.Models[0].Grade == "" || e.Models[1].Grade == "" {
 		t.Fatalf("grades: %+v", e.Models)
+	}
+}
+
+// A model's pace parts are its own samples: its timed replies' speed and
+// first-token wait held against the period's fastest model, not a copy of
+// what it served and stood. An equally clean but slower model stands behind
+// the fast one, and a model whose replies nothing timed is not marked down
+// for pace it cannot tell — its two pace parts are folded into the two that
+// can be told, as any group's are. The same holds in the standings, where a
+// model's pace is its merged one.
+func TestRankModelPace(t *testing.T) {
+	now := rankHome(t)
+	saveProvider(t, rankCase{id: "pace", name: "Pace"})
+	for i := 0; i < 12; i++ {
+		at := now.Add(-time.Duration(i) * time.Minute)
+		// the period's fastest model: 500 tokens over a 5s window, 200ms
+		// to the first token
+		usage.Append(usage.Record{Time: at, Agent: "codex", Provider: "pace", Model: "quick", Input: 100, Output: 500, Status: 200, TTFT: 200, Millis: 5200})
+		// as clean as quick, a fifth its speed and ten times its wait
+		usage.Append(usage.Record{Time: at, Agent: "codex", Provider: "pace", Model: "slow", Input: 100, Output: 400, Status: 200, TTFT: 2000, Millis: 22000})
+		// clean too, but no session timing: nothing to hold a pace against
+		usage.Append(usage.Record{Time: at, Agent: "codex", Provider: "pace", Model: "blank", Input: 100, Output: 50, Status: 200})
+	}
+	r := Rank(usage.All, provider.All(), time.Local)
+	e := rankEntry(t, r, "pace")
+	rows := map[string]RankModel{}
+	for _, m := range e.Models {
+		rows[m.Model] = m
+	}
+	if len(rows) != 3 {
+		t.Fatalf("the provider's models: %+v", e.Models)
+	}
+	quick, slow, blank := rankPartMap(rows["quick"].Parts), rankPartMap(rows["slow"].Parts), rankPartMap(rows["blank"].Parts)
+	// quick is the fastest model of the period, so its pace is full
+	if quick["fast"].Points != 25 || quick["soon"].Points != 25 {
+		t.Fatalf("the fastest model's pace: %+v", quick)
+	}
+	// slow is held against quick: a fifth of its speed is a fifth of the
+	// fast part, and a wait ten times the shortest is out of the soon part
+	// whole — not the served and stood it also earned
+	if slow["fast"].Points != 5 || slow["fast"].Most != 25 {
+		t.Fatalf("the slow model's fast part: %+v", slow)
+	}
+	if slow["soon"].Points != 0 || slow["soon"].Most != 25 {
+		t.Fatalf("the slow model's soon part: %+v", slow)
+	}
+	if slow["served"].Points != 25 || slow["stood"].Points != 25 {
+		t.Fatalf("the slow model's own parts: %+v", slow)
+	}
+	// nothing timed: the pace is folded, told by no fast or soon part
+	if _, ok := blank["fast"]; ok {
+		t.Fatalf("an untimed model has a pace part: %+v", blank)
+	}
+	if blank["served"].Most != 50 || blank["stood"].Most != 50 {
+		t.Fatalf("the untimed model's folded parts: %+v", blank)
+	}
+	// the slow model stands behind the fast one under its provider
+	if rows["slow"].Score >= rows["quick"].Score {
+		t.Fatalf("the slow model is not behind: %+v", e.Models)
+	}
+	// the standings say the same: quick's pace full, slow's held against it,
+	// blank's folded, and slow behind quick
+	at := map[string]RankedModel{}
+	for _, m := range r.Models {
+		at[m.Model] = m
+	}
+	if len(at) != 3 {
+		t.Fatalf("the standings: %+v", r.Models)
+	}
+	if q, s := at["quick"], at["slow"]; q.Parts == nil || s.Parts == nil {
+		t.Fatalf("a standing without parts: %+v %+v", q, s)
+	} else if rankPartMap(q.Parts)["fast"].Points != 25 || rankPartMap(s.Parts)["fast"].Points != 5 {
+		t.Fatalf("the standings' fast parts: %+v %+v", q.Parts, s.Parts)
+	} else if rankPartMap(s.Parts)["soon"].Points != 0 {
+		t.Fatalf("the standing's soon part: %+v", s.Parts)
+	} else if s.Score >= q.Score {
+		t.Fatalf("the slow standing is not behind: %+v", r.Models)
+	}
+	if _, ok := rankPartMap(at["blank"].Parts)["fast"]; ok {
+		t.Fatalf("an untimed standing has a pace part: %+v", at["blank"])
 	}
 }
 
