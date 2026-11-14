@@ -82,7 +82,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await ctx.addInitScript(() => { try { localStorage.setItem("magpie.libTab", "hooks"); } catch {} });
       const page = await ctx.newPage();
       t.after(() => browser.close());
-      page.setDefaultTimeout(5000);
+      // room on both sides: the whole batch shares the machine, and a
+  // 5-second wait went red under it where 10 is quiet
+  page.setDefaultTimeout(10000);
       page.setDefaultNavigationTimeout(60000);
       const errors = [], posts = [];
       page.on("pageerror", (e) => errors.push(e.message));

@@ -70,7 +70,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
       const page = await (await browser.newContext({ viewport: { width: 900, height: 700 }, reducedMotion: "reduce", locale: lang === "zh" ? "zh-CN" : "en-US" })).newPage();
       t.after(() => browser.close());
-      page.setDefaultTimeout(5000);
+      // room on both sides: the whole batch shares the machine, and a
+  // 5-second wait went red under it where 10 is quiet
+  page.setDefaultTimeout(10000);
       page.setDefaultNavigationTimeout(60000);
       const errors = [], posted = [];
       page.on("pageerror", (e) => errors.push(e.message));
