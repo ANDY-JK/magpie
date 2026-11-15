@@ -32,8 +32,9 @@ type limitUpstream struct {
 	mu      sync.Mutex
 	bodies  []map[string]any
 	paths   []string
-	answers [][]string // each call's events, the stream whole
-	tail    string     // after the events: a Chat stream's [DONE]
+	answers [][]string  // each call's events, the stream whole
+	tail    string      // after the events: a Chat stream's [DONE]
+	status  map[int]int // a call answered with this status instead of a stream
 }
 
 func (f *limitUpstream) serve(t *testing.T, w http.ResponseWriter, r *http.Request) {
@@ -52,7 +53,15 @@ func (f *limitUpstream) serve(t *testing.T, w http.ResponseWriter, r *http.Reque
 		events = f.answers[call]
 	}
 	tail := f.tail
+	code := f.status[call]
 	f.mu.Unlock()
+	if code != 0 {
+		// the continuation refused: a 429, a 5xx
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(code)
+		io.WriteString(w, `{"error":{"message":"rate limited"}}`)
+		return
+	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	for _, ev := range events {
 		io.WriteString(w, "data: "+ev+"\n\n")
@@ -594,5 +603,53 @@ func TestAutoContinueLimitShapesRead(t *testing.T) {
 		if len(stops) != 1 || limitStop(stops[0]) {
 			t.Errorf("%s: %q read as a limit stop: %v", c.proto, c.event, stops)
 		}
+	}
+}
+
+// A reply cut by Claude's context window (stop_reason
+// "model_context_window_exceeded") is not a reply stopped at its output
+// limit: asking it to go on would only fill the window again. It ends
+// where it was cut, said as "length" to the client, as before.
+func TestAutoContinueContextWindowIsNotContinued(t *testing.T) {
+	quickPauses(t)
+	contextStop := `{"type":"message_delta","delta":{"stop_reason":"model_context_window_exceeded"},"usage":{"output_tokens":4}}`
+	f := &limitUpstream{
+		answers: [][]string{
+			{anthStart("m", 7), anthText("hel"), contextStop, anthWhole()},
+			{anthStart("m", 11), anthText("lo"), anthStop(4), anthWhole()},
+		},
+	}
+	body := limitAnthropicServer(t, "m", f, true)
+	if f.calls() != 1 {
+		t.Fatalf("a context window cut was asked to go on: %d calls", f.calls())
+	}
+	if got := chatTextOf(body); got != "hel" {
+		t.Fatalf("client's text = %q, want what it said before the cut", got)
+	}
+	if fin := chatFinishOf(body); fin != "length" {
+		t.Fatalf("finish_reason = %q, want length: the client is told it was cut", fin)
+	}
+}
+
+// A whole reply the limit stopped, whose continuation is refused (a 429),
+// keeps the segment the vendor gave: the client asked for a reply and has
+// one, cut at the limit, rather than an error the first segment never was.
+func TestAutoContinueWholeContinuationRefusedKeepsTheSegment(t *testing.T) {
+	quickPauses(t)
+	f := &limitUpstream{
+		answers: [][]string{
+			{anthStart("m", 7), anthText("hel"), anthLimitStop(4), anthWhole()},
+		},
+		status: map[int]int{1: http.StatusTooManyRequests},
+	}
+	body := limitAnthropicServer(t, "m", f, false)
+	if f.calls() != 2 {
+		t.Fatalf("calls = %d, want the continuation asked once", f.calls())
+	}
+	if got := chatContentOf(t, body); got != "hel" {
+		t.Fatalf("reply's text = %q, want the segment kept", got)
+	}
+	if stop := chatStopOf(t, body); stop != "length" {
+		t.Fatalf("finish_reason = %q, want length: it is cut, not ended", stop)
 	}
 }

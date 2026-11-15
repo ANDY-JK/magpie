@@ -1435,10 +1435,15 @@ func (u Usage) anthropic() aUsage {
 
 func stopFromAnthropic(s string) string {
 	switch s {
-	case "max_tokens", "model_context_window_exceeded":
-		// the second is Claude 4.5+ running into its context window
-		// before max_tokens: the reply is cut short all the same
+	case "max_tokens":
 		return "length"
+	case "model_context_window_exceeded":
+		// Claude 4.5+ running into its context window before max_tokens:
+		// the reply is cut short all the same, and said as "length" to
+		// every client (stopToAnthropic), but it is NOT the output limit
+		// — asking it to go on would only fill the window again
+		// (continuation.go's limitStop leaves it out)
+		return "context"
 	case "tool_use",
 		// an Anthropic-shaped relay in front of another vendor's model,
 		// passing on OpenAI's reasons as they came (蓝猫 on Discord)
@@ -1454,7 +1459,7 @@ func stopFromAnthropic(s string) string {
 
 func stopToAnthropic(s string) string {
 	switch s {
-	case "length":
+	case "length", "context":
 		return "max_tokens"
 	case "tool":
 		return "tool_use"

@@ -802,8 +802,13 @@ func (s *Server) streamTranslated(w http.ResponseWriter, r *http.Request, p prov
 		}
 		// the reply was cut mid-way and goes on from what it has: one more
 		// observation against the model's health, recorded when the reply
-		// is through, since a try that then fails is counted by the loop
-		rescued++
+		// is through, since a try that then fails is counted by the loop.
+		// Only a stream that died (cut, an error event with no code, or
+		// serr, the read itself): a 429 or a 5xx asked again is no
+		// instability of the model's, and health never counts those
+		if cut || serr != nil {
+			rescued++
+		}
 		before, this = before.plus(this, false), Usage{}
 		enc.keepalive() // the client waits while the same conversation is asked again
 		select {

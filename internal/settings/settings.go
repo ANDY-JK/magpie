@@ -375,12 +375,14 @@ type Settings struct {
 	// default, the gateway ends such a reply with an error.
 	NoLoopGuard bool `json:"noLoopGuard,omitempty"`
 	// AutoContinue has a reply the vendor stopped at its output limit
-	// (Anthropic's stop_reason "max_tokens", the OpenAI family's
-	// finish_reason "length", a Responses reply's incomplete
-	// "max_output_tokens") asked to go on from what it has said, up to two
-	// more asks of the same reply, spliced into it as one. Off, as by
-	// default, such a reply ends where the limit stopped it, as it always
-	// has.
+	// asked to go on from what it has said, up to two more asks of the same
+	// reply, spliced into it as one. Only an upstream that goes on from a
+	// prefill can: Anthropic's API, and Chat upstreams that take one
+	// (DeepSeek's and Kimi's partial modes, most relays) — not OpenAI's
+	// own API, a Responses upstream, or Gemini (continuation.go's
+	// prefillHow). Elsewhere the reply ends where the limit stopped it,
+	// as it always has, whether this is on or off. A cut by Claude's
+	// context window is not the output limit and is never continued.
 	AutoContinue bool `json:"autoContinue,omitempty"`
 	// ClaudeLeanPrompt starts a Claude subscription's Claude Code run with
 	// the caller's own instructions as its system prompt

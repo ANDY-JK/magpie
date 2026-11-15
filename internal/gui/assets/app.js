@@ -22167,7 +22167,7 @@ function renderReplies(s, keep) {
   // said, at most two more segments (gateway continuation.go); off ends it
   // as before, its stop saying so
   const a = segRow("autoContinueRow", t("Reply cut at the output limit continues"),
-    t("A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply; off ends it as before, its stop saying it was cut"),
+    t("A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply — on Anthropic's API and on Chat upstreams that take a prefill (DeepSeek, Kimi, most relays), not on OpenAI's own API, Responses or Gemini; off ends it as before, its stop saying it was cut"),
     onOff, s.autoContinue ? "on" : "off", (v) => savePrefs({ ...keep, autoContinue: v === "on" }));
   box.append(r, l, f, k, c, u, h, a);
 }

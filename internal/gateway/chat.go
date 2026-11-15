@@ -1529,7 +1529,7 @@ func stopFromChat(s string) string {
 
 func stopToChat(s string) string {
 	switch s {
-	case "length":
+	case "length", "context":
 		return "length"
 	case "tool":
 		return "tool_calls"

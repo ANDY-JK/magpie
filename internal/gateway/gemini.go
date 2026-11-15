@@ -558,7 +558,7 @@ func jsonSchema(raw json.RawMessage) json.RawMessage {
 
 func stopToGemini(s string) string {
 	switch s {
-	case "length":
+	case "length", "context":
 		return "MAX_TOKENS"
 	case "filter":
 		return "SAFETY"

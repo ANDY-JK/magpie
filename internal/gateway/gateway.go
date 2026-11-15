@@ -4643,6 +4643,13 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				rest := s.restAfter(c, call.Status, hw.header, []byte(call.Error))
 				try.Rest = &rest
 			}
+			if last && try.Fail == failOther {
+				// the last candidate's intermittent failure counts against
+				// its model too (health.go): the ones before it are noted
+				// where their rest is made, and a plan of one member would
+				// otherwise never learn that its model is failing
+				noteUnstable(c)
+			}
 		}
 		if try.Fail == failRefused {
 			// the filter refused after (or beside) the try's thinking: the
@@ -7997,69 +8004,34 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request, p provider.Pr
 		}
 		res, actual, err = s.forwardTranslated(r.Context(), p, to, cont.request(request), model, r.Header)
 		if err != nil {
-			return writeError(w, from, 502, p.Name+": "+err.Error()), err.Error()
+			// the continuation couldn't be asked (a 5xx, the connection):
+			// the reply keeps the segment it has, cut where the limit
+			// stopped it, rather than becoming an error the segment the
+			// client asked for never was
+			break
 		}
 		if res.StatusCode >= 400 {
-			b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+			// a model that takes no prefill (forwardTranslated remembers
+			// it, #1447) and any other refusal of an ask the client never
+			// made: the reply stays where the limit stopped it
 			res.Body.Close()
-			if refusesPrefill(res.StatusCode, b) {
-				// a model that takes no prefill (forwardTranslated
-				// remembers it): the reply stays where the limit stopped
-				// it, not the refusal of an ask the client never made
-				// (#1447)
-				break
-			}
-			msg := p.Explain(p.Name+": "+provider.APIError(b, res.Status), res.StatusCode, b)
-			if wrongEndpoint(res.StatusCode, b) {
-				msg += wrongAPINote(p, model, res, b)
-			}
-			turnedAway := res.StatusCode == http.StatusTooManyRequests && antigravityTurnedAway(p, request.System, string(b))
-			if turnedAway {
-				msg += " — " + antigravityHint(request.System)
-				markAntigravityTurnsAway(w, request.System)
-			}
-			if p.Preset == "openrouter" && openRouterSharedPool(b) {
-				markOpenRouterSharedPool(w)
-			}
-			keepRetry(w.Header(), res.Header, b)
-			u.ErrType = provider.ErrorType(b)
-			if turnedAway {
-				u.ErrType = turnedAwayErrType
-			}
-			return writeVendorError(w, from, res.StatusCode, msg, b), msg
+			break
 		}
 		more, complete, failed := ask(res, actual, cont)
-		if failed != "" {
-			return writeError(w, from, 502, failed), failed
-		}
-		if more.err != "" && (!saidAnything(more.res.Parts) || more.errSaid != nil) {
-			// a reply the vendor refused part way is no answer either, as
-			// the first try's isn't (#3274)
-			said := more.err
-			if markAntigravityRefused(w, p, request.System, said) {
-				said += " — " + antigravityHint(request.System)
-				u.ErrType = turnedAwayErrType
-			}
-			if code := gjson.GetBytes(more.errSaid, "error.code").String(); code != "" {
-				e, _ := json.Marshal(map[string]string{"code": code, "message": more.err})
-				if note, ok := policyRefusal(e); ok {
-					w.Header().Set(refusedHeader, note)
-				}
-			}
-			return writeVendorError(w, from, cmp.Or(more.errStatus, streamStatus(said)), p.Name+": "+said, more.errSaid), said
-		}
-		if more.err == "" && !complete && saysItsEnd(p, actual, model) && r.Context().Err() == nil {
-			// a continuation that just stopped, as a first try would be
-			// told (streamTranslated)
-			msg := p.Name + ": " + errEndedShort.Error()
-			return writeError(w, from, 502, msg), msg
-		}
 		more2 := more.finish()
-		if more.err != "" {
-			col.err = more.err // what it said stands, the error said after
+		// whatever the continuation said is kept: nothing said is dropped,
+		// and a reply the vendor refused part way keeps what it had said
+		// before the refusal
+		if saidAnything(more.res.Parts) {
+			res2.Usage = res2.Usage.plus(more2.Usage, false)
+			res2 = joinReply(res2, more2)
 		}
-		res2.Usage = res2.Usage.plus(more2.Usage, false)
-		res2 = joinReply(res2, more2)
+		if failed != "" || more.err != "" || (!complete && saysItsEnd(p, actual, model) && r.Context().Err() == nil) {
+			// the continuation didn't finish the reply (it failed to be
+			// read, was refused part way, or stopped without saying it was
+			// done): the reply ends here with what it has
+			break
+		}
 	}
 	u.add(res2.Usage)
 	u.add(Usage{Served: res2.Model})

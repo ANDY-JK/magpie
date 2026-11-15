@@ -1621,8 +1621,6 @@ func normalize(p Provider) Provider {
 	// a letter the file holds that no answer said ("maybe" typed by hand) is
 	// a word the endpoint didn't settle: no letter
 	p.Caps = normalCaps(p.Caps)
-	// a letter the file holds that no answer said ("maybe" typed by hand) is
-	// a word the endpoint didn't settle: no letter
 	// a provider saved under an id a preset carried before (presetAliases:
 	// qianfan's first day's, Tencent Cloud's plan and TokenHub's two) is
 	// the preset since: its endpoints say the region, and its own id

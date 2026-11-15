@@ -57,8 +57,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const page = await (await browser.newContext({ viewport: { width: 1100, height: 1200 }, reducedMotion: "reduce", locale: lang === "zh" ? "zh-CN" : "en-US" })).newPage();
       t.after(() => browser.close());
       // room on both sides: the whole batch shares the machine, and a
-  // 5-second wait went red under it where 10 is quiet
-  page.setDefaultTimeout(10000);
+      // 5-second wait went red under it where 10 is quiet
+      page.setDefaultTimeout(10000);
       page.setDefaultNavigationTimeout(60000);
       const errors = [];
       page.on("pageerror", (e) => errors.push(e.message));

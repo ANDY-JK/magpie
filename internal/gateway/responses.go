@@ -2425,7 +2425,7 @@ func (e *responsesEncoder) finish() {
 	res := e.col.finish()
 	status, typ := "completed", "response.completed"
 	extra := map[string]any{"usage": res.Usage.responses(), "incomplete_details": nil}
-	if res.Stop == "length" || res.Stop == "filter" {
+	if res.Stop == "length" || res.Stop == "context" || res.Stop == "filter" {
 		status, typ = "incomplete", "response.incomplete"
 		reason := "max_output_tokens"
 		if res.Stop == "filter" {
@@ -2519,7 +2519,7 @@ func renderResponses(res Result, model string, named map[string]nsTool) []byte {
 	status := "completed"
 	var incomplete any
 	switch res.Stop {
-	case "length":
+	case "length", "context":
 		status, incomplete = "incomplete", map[string]any{"reason": "max_output_tokens"}
 	case "filter":
 		// as the stream says it (#248)

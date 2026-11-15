@@ -1,6 +1,13 @@
 package gateway
 
-import "testing"
+import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/yetone/magpie/internal/provider"
+)
 
 // healthRecord is how many models have a health record and the counts of
 // the one that does: one model per request, so one record.
@@ -74,5 +81,30 @@ func TestMidStreamNoCutLeavesNoHealth(t *testing.T) {
 	continuationServer(t, "kimi-k3", f)
 	if n, wins, loss := healthRecord(t); n != 1 || wins != 1 || loss != 0 {
 		t.Fatalf("%d models, wins %v, loss %v, want one model, one win, no loss", n, wins, loss)
+	}
+}
+
+// A plan of one member is the common case, and its 500s must count: the
+// try loop's own failure path notes an intermittent failure only where a
+// rest is made, which a last candidate has none of (health.go).
+func TestMidStreamLastMemberFailureCounts(t *testing.T) {
+	fresh(t)
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, `{"error":{"message":"upstream blew up"}}`)
+	}))
+	t.Cleanup(up.Close)
+	p := provider.Provider{ID: "solo", Name: "Solo", Key: "k", Models: []string{"m"}, Chat: up.URL + "/v1"}
+	if err := provider.Save(p); err != nil {
+		t.Fatal(err)
+	}
+	code, body := post(t, "/v1/chat/completions", `{"model":"solo/m","messages":[{"role":"user","content":"hi"}]}`)
+	if code == 200 {
+		t.Fatalf("a 500 was answered 200: %s", body)
+	}
+	n, wins, loss := healthRecord(t)
+	if n != 1 || loss < 1 || wins != 0 {
+		t.Fatalf("%d models, wins %v, loss %v: want one model with a loss", n, wins, loss)
 	}
 }

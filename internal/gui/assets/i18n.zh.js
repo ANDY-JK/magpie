@@ -4552,6 +4552,6 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "Unstable models after the steady ones": "不稳定的模型排在稳定模型之后",
     "A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set": "时好时坏的模型会被排到同一计划里稳定模型之后，直到它重新稳定应答；关闭则路由顺序照你设置的原样",
     "Reply cut at the output limit continues": "输出上限掐断的回复自动续写",
-    "A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply; off ends it as before, its stop saying it was cut": "回复被厂商在输出上限掐断时，接着已说的内容再续写最多两段，拼回完整回复；关闭则照现状收尾，停止原因会说明回复被掐断",
+    "A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply — on Anthropic's API and on Chat upstreams that take a prefill (DeepSeek, Kimi, most relays), not on OpenAI's own API, Responses or Gemini; off ends it as before, its stop saying it was cut": "回复被厂商在输出上限掐断时，接着已说的内容再续写最多两段、拼回完整回复——只在 Anthropic 的接口与接受 prefill 的 Chat 上游（DeepSeek、Kimi、多数中转）上如此，OpenAI 官方接口、Responses、Gemini 不续写；关闭则照现状收尾，停止原因会说明回复被掐断",
 });
 localeWordsHere.add("zh");
