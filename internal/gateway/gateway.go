@@ -155,6 +155,24 @@ func wiresOf(ctx context.Context) map[string]string {
 	return settings.Shared().Wires()
 }
 
+// tryModelKey carries the model one try of the candidates' loop is on, as
+// the loop chose it: the per-model settings (ModelExtraBody) key by the id
+// magpie knows the model by, and by the time the request goes out the body
+// carries the upstream's name for it instead, so the body alone says it
+// only where no wire name is in force.
+type tryModelKey struct{}
+
+func withTryModel(ctx context.Context, model string) context.Context {
+	return context.WithValue(ctx, tryModelKey{}, model)
+}
+
+// tryModelOf is the model the try is on, "" where none was carried — a
+// request magpie made for itself, which reads its body instead.
+func tryModelOf(ctx context.Context) string {
+	m, _ := ctx.Value(tryModelKey{}).(string)
+	return m
+}
+
 // The reasons serve gives a model move of its own (ModelMove.Why);
 // Claude Desktop's are desktopMove's.
 const (
@@ -1708,8 +1726,9 @@ func (s *Server) countOn(w http.ResponseWriter, r *http.Request, p provider.Prov
 		}
 		// a count doesn't wait for room in a MaxRPM's minute: one with
 		// none now is left out, and where none has room the estimate
-		// below says the count (rpm.go)
-		counts = slices.DeleteFunc(counts, func(c candidate) bool { return !s.rpms.free(c.who(), c.p.RPMLimit()) })
+		// below says the count (rpm.go). The room is the model's own
+		// minute bound over the key or account's, as the try's would be
+		counts = slices.DeleteFunc(counts, func(c candidate) bool { return !s.rpms.free(c.who(), c.p.ModelRPMLimit(model)) })
 		// of those resting, only the one back soonest (#1799)
 		counts = probeOne(counts)
 	}
@@ -3490,14 +3509,15 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				continue
 			}
 			var inMinute time.Duration
-			if err == nil && c.p.RPMLimit() > 0 {
-				// with a MaxRPM, it then waits for room in the minute, and
-				// goes counted in it; the requests it makes on the way
-				// count too (rpm.go)
-				if inMinute, err = s.rpms.wait(ctx, c.who(), c.p.RPMLimit(), rpmWait(c.p)); err != nil {
+			if limit := c.p.ModelRPMLimit(c.model); err == nil && limit > 0 {
+				// with a MaxRPM — the model's own over the key or account's,
+				// the smaller of the two (rpm.go) — it then waits for room
+				// in the minute, and goes counted in it; the requests it
+				// makes on the way count too
+				if inMinute, err = s.rpms.wait(ctx, c.who(), limit, rpmWait(c.p)); err != nil {
 					release()
 				} else {
-					ctx = s.paidFor(ctx, c.p, c.who())
+					ctx = s.paidFor(ctx, c.p, c.who(), c.model)
 				}
 			}
 			queuedAlive()
@@ -3516,7 +3536,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 					defer release()
 					defer hw.watch()()
 					defer notePhase(ctx, "upstream")()
-					call.Status, call.Error = s.attempt(hw, r.WithContext(withRestID(ctx, c.restID())), from, c.p, c.model, attemptBody, &call)
+					call.Status, call.Error = s.attempt(hw, r.WithContext(withRestID(withTryModel(ctx, c.model), c.restID())), from, c.p, c.model, attemptBody, &call)
 				}()
 			}
 			stop()
@@ -5095,9 +5115,12 @@ func (s *Server) forward(ctx context.Context, p provider.Provider, to provider.P
 	return res, err
 }
 
-// forwardOnce is one request to the provider, as forward makes it.
+// forwardOnce is one request to the provider, as forward makes it. Under a
+// try its RPM place is the one paid for it (paidFor, rpm.go); asked with
+// no try's ticket — a count_tokens of its own, a relay — it is metered at
+// the key or account's, no model in hand to take a model's own by.
 func (s *Server) forwardOnce(ctx context.Context, p provider.Provider, to provider.Protocol, path string, body []byte, in http.Header) (*http.Response, error) {
-	ctx = s.metered(p.Via(ctx), p, "")
+	ctx = s.metered(p.Via(ctx), p, "", "")
 	body = deepseekToolPatterns(p, to, body)
 	body = grokToolPatterns(p, to, body)
 	body = deepseekTokenField(p, to, body)
@@ -5173,10 +5196,12 @@ func (s *Server) forwardOnce(ctx context.Context, p provider.Provider, to provid
 	}
 	ctx = provider.WithConversation(ctx, conv)
 	if !countsTokens(path) {
-		// the user's own fields for the provider (#1604), last, so the
-		// body is as it goes out when they fill in what it lacks, and
-		// before it is signed
-		extra := p.WithExtraBody(body, conv)
+		// the user's own fields for the provider (#1604) and the model's
+		// own over them (settings' ModelExtraBody), last, so the body is
+		// as it goes out when they fill in what it lacks, and before it is
+		// signed; the model the try is on, else the body's, which says it
+		// only where no wire name went out with it
+		extra := p.WithModelExtraBody(cmp.Or(tryModelOf(ctx), modelOf(body)), body, conv)
 		if to == provider.Anthropic && !bytes.Equal(extra, body) {
 			// a thinking budget the user's fields put in is fitted to a
 			// model that thinks only adaptively as the agent's is, its

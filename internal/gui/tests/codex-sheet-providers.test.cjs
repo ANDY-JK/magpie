@@ -12,7 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
-const { watchSettingsReads, openAgentSettings } = require("./reader.cjs");
+const { watchSettingsReads, openAgentSettings, openCodexSides } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 // Codex's field options as internal/agent builds them: a magpie model's
@@ -96,6 +96,7 @@ async function open(engine, width, lang, memories, sub, t) {
   await watchSettingsReads(page);
   await page.goto("http://magpie.test/?view=agents");
   await openAgentSettings(page);
+  await openCodexSides(page); // the six model rows, behind the one entry
   await page.locator("#codexMemoriesPick button").waitFor();
   return { page, errors };
 }

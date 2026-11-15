@@ -12,7 +12,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
-const { watchSettingsReads, wheelTo, agentRow, openAgentSettings } = require("./reader.cjs");
+const { watchSettingsReads, wheelTo, agentRow, openAgentSettings, openCodexSides } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 
@@ -100,6 +100,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await watchSettingsReads(page);
       await page.goto("http://magpie.test/?view=agents");
       await openAgentSettings(page); // on Codex's opened row, not in Settings (the owner, 10-20)
+      await openCodexSides(page); // the six model rows, behind the one entry
       const row = page.locator("#codexAutoReviewRow");
       const pick = page.locator("#codexAutoReviewPick button");
       await pick.waitFor();
@@ -108,11 +109,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal((await pick.textContent()).trim(), want[lang].own, "Codex's own pick by default");
       assert.equal(await row.locator(".sub").count(), 0, "the row says its name alone, its button the choice (1ooogle on X)");
 
-      // scrolled by a wheel till the row is mid-view, so a click that
-      // moved the page would show
-      await wheelTo(page, pick, 200); // each wheel landed before the next (#2370)
+      // the row is in the side-requests sheet, which scrolls nothing of
+      // the page; the list was scrolled here by the row's opening
       const before = await view(page);
-      assert(before > 0, "the agents list must scroll to the row");
 
       // the app's menu: Codex's own pick and magpie's models and groups
       const choose = async (text) => {

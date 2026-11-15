@@ -191,6 +191,16 @@ async function openAgentSettings(page, id = "codex") {
   await page.locator(`.row.agent[data-id="${id}"] .ag-prefs`).waitFor();
   await page.waitForFunction(() => __settingsReads.asked > 0 && __settingsReads.asked === __settingsReads.drawn);
 }
+// openCodexSides opens Codex's side-requests sheet from its opened row's
+// one entry (codexSidesRow): the six model rows (CODEX_SIDES) live there.
+// The row is opened first if it isn't yet. Watch the settings reads first,
+// as openAgentSettings is.
+async function openCodexSides(page, id = "codex") {
+  const row = page.locator(`.row.agent[data-id="${id}"]`);
+  if (await row.evaluate((e) => !e.classList.contains("expanded")).catch(() => true)) await openAgentSettings(page, id);
+  await row.locator("#codexSidesRow button").click();
+  await page.locator("#modal .editor.agent-prefs #codexTitlesRow").waitFor();
+}
 
 // settled waits for the page's motion to end: a routing group opening
 // into its editor moves its height and parts for ~700ms (91b0be836), and
@@ -223,4 +233,4 @@ async function pickItem(page, locator) {
   throw new Error("the picker's item never settled: " + last);
 }
 
-module.exports = { settled, inView, reach, wheelTo, click, openPart, watchSettingsReads, settingsDrawn, agentRow, openAgentSettings, pickItem };
+module.exports = { settled, inView, reach, wheelTo, click, openPart, watchSettingsReads, settingsDrawn, agentRow, openAgentSettings, openCodexSides, pickItem };

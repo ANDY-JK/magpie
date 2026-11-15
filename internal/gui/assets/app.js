@@ -461,6 +461,7 @@ let agentArranging = false, agentRenderPending = false;
 function renderAgents() {
   renderCodexMemories(); // the Codex sheet's row is the same field
   renderCodexSubagentModel(); // and this one
+  renderCodexSides(); // its entry, whose count follows the fields too
   if (agentArranging) { agentRenderPending = true; return; }
   if (unhideCleared()) return; // it renders again with the hiding dropped
   const page = $("#view-agents");
@@ -2241,7 +2242,10 @@ function connectPanel(a, { fields, fieldBtn }) {
   if (own) {
     const list = el("div", "list prefs ag-prefs");
     homeAgentPrefRows();
-    list.append(...own.map((id) => $("#" + id)));
+    // a sheet open holds some of the rows (the settings one, the side
+    // requests); they go back to the page when it shuts, not into this list
+    const m = $("#modal");
+    list.append(...own.map((id) => $("#" + id)).filter((r) => r && !(m && !m.hidden && m.contains(r))));
     kv(t("Settings"), list);
     if (!prefs) {
       list.hidden = true;
@@ -10159,6 +10163,13 @@ function drawEditor(p, presetID) {
     const xb = extraBodyOf(draft.extraBody);
     if (xb.error) { shown(ed.querySelector(".extra-body textarea"))?.focus(NO_SCROLL); return editorError(t("Extra body: {why}", { why: xb.error }), "warn"); }
     body.extraBody = xb.value;
+    // a model's own extra body typed wrong is said where it was typed
+    const mb = draft?.modelPrefs && Object.entries(draft.modelPrefs).find(([, v]) => v.xbBad !== undefined);
+    if (mb) {
+      const cell = shown(ed.querySelector(".mname .mxb input.bad"));
+      cell?.focus(NO_SCROLL);
+      return editorError(t("Extra body of {id}: {why}", { id: mb[0], why: extraBodyOf(mb[1].xbBad).error }), "warn");
+    }
     const rh = replyHeadersOf(draft.replyHeaders);
     if (rh.error) { shown(ed.querySelector(".reply-headers"))?.focus(NO_SCROLL); return editorError(t("Reply headers: {why}", { why: rh.error }), "warn"); }
     body.replyHeaders = rh.value;
@@ -11677,6 +11688,61 @@ function renderModels(p) {
         wire.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") wire.blur(); else if (e.key === "Escape") { wire.value = wireNow(); wire.blur(); } };
         wireBox.append(el("span", "", t("Wire as")), wire);
         row.append(wireBox);
+      }
+      // the requests a minute the model may send its vendor (coeo91),
+      // beside its key or account's; empty is none of its own
+      if (m.on) {
+        const savedRPM = m.rpm || 0;
+        const rpmNow = () => prefs[id]?.rpm ?? savedRPM;
+        const rpmBox = el("label", "msame mlocal mrpm");
+        const rpm = input(rpmNow() ? String(rpmNow()) : "", t("No limit"), "number");
+        rpm.title = t("How many requests {id} sends the vendor in any minute, retries included; the smaller of this and the key or account's Requests per minute is the one that counts. Empty: no bound of its own", { id: m.id });
+        rpm.min = "0";
+        rpm.max = "10000";
+        rpm.step = "1";
+        rpm.inputMode = "numeric";
+        rpm.onchange = () => {
+          const v = Math.floor(Number(rpm.value)) || 0;
+          if (v && v === savedRPM) delete pref().rpm; else pref().rpm = v;
+          drawReset();
+        };
+        rpm.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") rpm.blur(); else if (e.key === "Escape") { rpm.value = rpmNow() ? String(rpmNow()) : ""; rpm.blur(); } };
+        rpmBox.append(el("span", "", t("RPM")), rpm);
+        row.append(rpmBox);
+      }
+      // the model's own extra body fields (the relay that wants one field
+      // of one model's requests different), over its provider's Extra
+      // body; a JSON object typed one line here, as the provider editor's
+      // takes it spread over lines. Empty is none of its own
+      if (m.on) {
+        const savedXB = m.xb && Object.keys(m.xb).length ? JSON.stringify(m.xb) : "";
+        const xbNow = () => prefs[id]?.extraBody !== undefined ? (prefs[id].extraBody && Object.keys(prefs[id].extraBody).length ? JSON.stringify(prefs[id].extraBody) : "") : savedXB;
+        const xbBox = el("label", "msame mlocal mxb");
+        const xb = input(xbNow(), '{"prompt_cache_key": "${sessionId}"}');
+        xb.title = t("Extra body fields of {id}'s own, over the provider's Extra body: a field both give goes out as the model's says it, \"!name\" replacing one the request has; ${sessionId} is the conversation's id. Empty: none of its own", { id: m.id });
+        xb.spellcheck = false;
+        const xbWhy = el("span", "why");
+        const stageXB = () => {
+          const x = pref();
+          delete x.extraBody; delete x.xbBad;
+          const v = xb.value.trim(), err = v ? extraBodyOf(v).error || "" : "";
+          xb.classList.toggle("bad", !!err);
+          xb.setAttribute("aria-invalid", err ? "true" : "false");
+          xbWhy.textContent = err;
+          if (!v) {
+            if (savedXB) x.extraBody = {}; // take the model's own away
+          } else if (err) {
+            x.xbBad = v; // the Save refuses it where it was typed
+          } else {
+            const o = extraBodyOf(v).value;
+            if (JSON.stringify(o) !== savedXB) x.extraBody = o;
+          }
+          drawReset();
+        };
+        xb.onchange = stageXB;
+        xb.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") xb.blur(); else if (e.key === "Escape") { xb.value = xbNow(); stageXB(); xb.blur(); } };
+        xbBox.append(el("span", "", t("Extra body")), xb, xbWhy);
+        row.append(xbBox);
       }
       // its cost to the user, $ per million tokens, as Usage counts it
       // (#819): a box empty is its list price. The 1-hour cache write,
@@ -14787,6 +14853,24 @@ function renderKeyAccounts(p) {
   const fold = keyFold(p);
   const folds = fold.folded ? keyFoldRows(p, fold) : { before: [], after: [] };
   list.append(...folds.before);
+  // one key's Test models: every model agents see, asked with that key
+  // alone (ref), on or off — which of several keys is at fault is said by
+  // this, not by a whole-provider test that went out by the first. The
+  // answer is said in the status line, and the marks land on the chips
+  const testKey = async (k) => {
+    const ids = servedIds(p).filter((id) => p.decideTest || !decidesModel(p, id));
+    if (!ids.length) { status(t("Pick a model first."), "err"); return; }
+    const got = modelTests[p.id] = modelTests[p.id] || {};
+    for (const id of ids) got[id] = null;
+    try {
+      const r = await provTest(p.id, { ...asTyped(), ref: k.id, test: ids });
+      r.results.forEach((x, i) => { got[ids[i]] = x; });
+      const i = r.results.findIndex((x) => !x.ok), x = r.results[i], bad = r.results.filter((x) => !x.ok).length;
+      status(x ? t("{n} of {all} models didn't answer; {model}: {error}", { n: bad, all: ids.length, model: ids[i], error: (x.status ? x.status + " · " : "") + x.error })
+        : t("All {n} models answered with {key}", { n: ids.length, key: k.name || k.masked }), x ? "err" : "ok");
+      renderProviders();
+    } catch (e) { for (const id of ids) delete got[id]; testErr(e); }
+  };
   for (const k of fold.shown) {
     const row = el("div", "acc" + (k.on ? " in-use" : " off") + (k.id === justAdded ? " new" : ""));
     row.dataset.accountId = k.id;
@@ -14872,6 +14956,12 @@ function renderKeyAccounts(p) {
     const acts = el("span", "key-acts");
     acts.onclick = () => keyHeld = k.id;
     if (keyHeld === k.id) row.classList.add("held"), addEventListener("pointermove", function go(e) { if (!row.contains(e.target)) keyHeld = null, row.classList.remove("held"), removeEventListener("pointermove", go); });
+    // Test models with this key alone: an off key's too, and testing turns
+    // nothing on. The run shows in the Tests' Stop, as any other's does
+    const kt = el("button", "text", t("Test"));
+    kt.title = t("Test the models with this key alone; an off key's too, and testing turns nothing on");
+    kt.onclick = (e) => { e.stopPropagation(); testKey(k); };
+    acts.append(kt);
     // off and on by name (wei_VC on X); not the last key on, which the
     // provider's own switch is for. An off key's Switch on always shows
     if (!k.on || several) {
@@ -18402,6 +18492,9 @@ $("#modal").addEventListener("click", (e) => {
   if (confirmAsk && modalBackdrop(e)) { e.stopImmediatePropagation(); closeConfirmAsk(); }
 }, true);
 document.addEventListener("keydown", (e) => {
+  // a model picker open over the ask (Codex's side requests) closes first,
+  // as it does over every page
+  if (e.key !== "Escape" || pick) return;
   // an open menu in it (the reset to use) closes first, on its own
   if (!confirmationPending && confirmAsk && !protoMenu && e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); closeConfirmAsk(); }
 }, true);
@@ -21617,11 +21710,15 @@ function renderAlerts(s, keep) {
 // #agentPrefRows and shown in the agent's sheet (openAgentPrefs). They sat
 // in Settings, apart from the agents they set (the owner, 10-20); Long
 // conversations is Codex's, Claude Code's and Grok Build's (uk.jent), in each one's sheet.
+// Codex's side requests are the six model rows behind the one entry
+// codexSidesRow (CODEX_SIDES, openCodexSides): six pickers in a row read as one.
 const AGENT_PREFS = {
-  codex: ["codexAgentsV1Row", "codexSubagentModelRow", "fullContextRow", "codexAsyncRow", "codexTitlesRow", "codexDescriptionsRow", "codexPredictionsRow", "codexAutoReviewRow", "codexMemoriesRow"],
+  codex: ["codexAgentsV1Row", "codexSidesRow", "fullContextRow", "codexAsyncRow"],
   claude: ["fullContextRow"],
   grok: ["fullContextRow"],
 };
+// the six model rows Codex's side-requests sheet holds, in its order
+const CODEX_SIDES = ["codexTitlesRow", "codexDescriptionsRow", "codexPredictionsRow", "codexAutoReviewRow", "codexMemoriesRow", "codexSubagentModelRow"];
 const agentPrefsOf = (a) => gatewayMode ? null : AGENT_PREFS[kindOf(a)];
 const PREFS_GLYPH = "M2.75 4.75h10.5M2.75 11.25h10.5M5.75 3.25v3M10.25 9.75v3";
 let agentPrefRowEls = null;
@@ -21661,6 +21758,60 @@ async function openAgentPrefs(a) {
     if (agentExpanded) renderAgents();
   });
   back.observe(m, { attributes: true, attributeFilter: ["hidden"], childList: true, subtree: true });
+}
+
+// openCodexSides: Codex's side requests in a sheet, as its settings sheet
+// holds its rows (openAgentPrefs); the entry codexSidesRow opens it, each
+// side request keeps its row and picker, its own meaning untouched
+async function openCodexSides(a) {
+  if (!a || kindOf(a) !== "codex") return;
+  try { await loadSettings(); } catch (e) { return statusErr(e); }
+  homeAgentPrefRows();
+  const ed = el("div", "editor agent-prefs");
+  const head = el("div", "ehead");
+  head.append(el("b", "", t("Codex side requests")));
+  const list = el("div", "list prefs");
+  for (const id of CODEX_SIDES) list.append($("#" + id));
+  const bar = el("div", "bar");
+  const done = el("button", "primary", t("Done"));
+  done.type = "button";
+  done.onclick = () => closeConfirmAsk();
+  bar.append(el("span", "grow"), done);
+  ed.append(head, list, bar);
+  confirmAsk = ed;
+  openModal(ed);
+  // the rows go back to the page once the sheet is shut, as the settings sheet's do
+  const m = $("#modal"), back = new MutationObserver(() => {
+    if (!m.hidden && m.firstElementChild.contains(ed)) return;
+    back.disconnect();
+    homeAgentPrefRows();
+    if (agentExpanded) renderAgents();
+  });
+  back.observe(m, { attributes: true, attributeFilter: ["hidden"], childList: true, subtree: true });
+}
+
+// renderCodexSides: the entry row for Codex's side requests, one where six
+// pickers sat; it says how many have a setting of their own, the rest on
+// the session, the lead, or Codex's own pick, as each unset one is
+function renderCodexSides() {
+  homeAgentPrefRows();
+  const row = $("#codexSidesRow");
+  if (!row) return;
+  row.hidden = gatewayMode;
+  const a = state.agents.find((x) => x.id === "codex");
+  const b = el("button", "rt-cond on");
+  b.type = "button";
+  b.setAttribute("aria-label", t("Codex side requests"));
+  b.setAttribute("aria-haspopup", "dialog");
+  if (prefs) {
+    const sides = [prefs.codexTitles, prefs.codexDescriptions, prefs.codexPredictions, prefs.codexAutoReview];
+    for (const [id, label] of [["codexMemoriesRow", MEMORIES], ["codexSubagentModelRow", SUB_MODEL]])
+      if (!$("#" + id).hidden) sides.push(a?.fields?.find((f) => f.label === label)?.value);
+    const n = sides.filter((v) => v).length;
+    b.append(el("span", "", n ? t("{n} of {all} set", { n, all: sides.length }) : t("None set")));
+  } else b.append(el("span", "", t("Codex side requests")));
+  b.onclick = (ev) => { ev.stopPropagation(); openCodexSides(a); };
+  $("#codexSidesPick").replaceChildren(b);
 }
 
 // renderAgentPrefs draws those rows, wherever they are: the sheet's
@@ -21738,6 +21889,7 @@ function renderAgentPrefs() {
   renderCodexAutoReview(s);
   renderCodexMemories();
   renderCodexSubagentModel();
+  renderCodexSides();
 }
 
 // renderAgentPrefLinks: Settings' search still finds the settings an agent's
@@ -21754,7 +21906,10 @@ function renderAgentPrefLinks() {
   if (!state.agents.some((a) => agentPrefsOf(a)?.includes(loose.id))) box.before(loose);
   else if (loose.parentElement === box.parentElement) $("#agentPrefRows").append(loose);
   for (const r of agentPrefRowEls) {
-    const agents = state.agents.filter((a) => agentPrefsOf(a)?.includes(r.id) && !a.id.includes("@wsl:"));
+    // a side request's row: found through the entry codexSidesRow, which
+    // the Open of its link opens (openCodexSides), not the settings sheet
+    const sides = CODEX_SIDES.includes(r.id);
+    const agents = state.agents.filter((a) => agentPrefsOf(a)?.includes(sides ? "codexSidesRow" : r.id) && !a.id.includes("@wsl:"));
     if (!agents.length || ((r.id === "codexMemoriesRow" || r.id === "codexSubagentModelRow") && r.hidden)) continue;
     const row = el("div", "row pref agent-pref-link");
     const who = el("div", "who");
@@ -21762,7 +21917,7 @@ function renderAgentPrefLinks() {
     const n = el("div", "name", name.textContent);
     n.dataset.en = name.dataset.en || name.textContent;
     who.append(n);
-    who.append(el("div", "sub", t("In {agent}'s settings, on the Agents page", { agent: agents.map((a) => a.name).join(", ") })));
+    who.append(el("div", "sub", t(sides ? "In {agent}'s side requests, on the Agents page" : "In {agent}'s settings, on the Agents page", { agent: agents.map((a) => a.name).join(", ") })));
     // the row's own line, unshown, is searched as well
     const sub = r.querySelector(".sub:not(.err)");
     if (sub) {
@@ -21773,7 +21928,7 @@ function renderAgentPrefLinks() {
     }
     const go = el("button", "text", t("Open"));
     go.type = "button";
-    go.onclick = async () => { if (await show("agents") !== false) openAgentPrefs(agents[0]); };
+    go.onclick = async () => { if (await show("agents") !== false) sides ? openCodexSides(agents[0]) : openAgentPrefs(agents[0]); };
     row.append(who, go);
     box.append(row);
   }

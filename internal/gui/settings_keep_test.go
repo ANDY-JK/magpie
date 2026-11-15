@@ -2,6 +2,7 @@ package gui
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -138,6 +139,8 @@ func TestSettingsSaveKeepsWhatItDoesNotSend(t *testing.T) {
 		UsageAliases:         map[string]string{"deepseek-v4.1-flash": "deepseek-flash"},
 		UsageCleared:         []settings.UsageClear{{Provider: "p", Model: "m", At: 1761600000000}},
 		ModelKinds:           map[string]string{"p/m": "video"},
+		ModelRPM:             map[string]int{"p/m": 20},
+		ModelExtraBody:       map[string]settings.ExtraBody{"p/m": {"prompt_cache_key": json.RawMessage(`"${sessionId}"`)}},
 		RedactRules:          []redact.Rule{{Kind: "prefix", Prefix: "oc_sk_"}},
 		RedactActions:        map[string]string{"API_KEY": "block", "EMAIL": "warn"},
 		RedactAllow:          []string{"team@kelvarn.io"},

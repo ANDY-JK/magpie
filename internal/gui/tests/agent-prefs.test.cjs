@@ -20,7 +20,9 @@ const { chromium, webkit } = require("playwright");
 const { watchSettingsReads, agentRow, openAgentSettings } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
-const CODEX = ["codexAgentsV1Row", "fullContextRow", "codexAsyncRow", "codexTitlesRow", "codexDescriptionsRow", "codexPredictionsRow", "codexAutoReviewRow", "codexMemoriesRow"];
+const CODEX = ["codexAgentsV1Row", "codexSidesRow", "fullContextRow", "codexAsyncRow"];
+// the six model rows behind the entry, in the side-requests sheet (openCodexSides)
+const SIDES = ["codexTitlesRow", "codexDescriptionsRow", "codexPredictionsRow", "codexAutoReviewRow", "codexMemoriesRow", "codexSubagentModelRow"];
 
 function settingsPayload(over) {
   return {
@@ -38,9 +40,13 @@ function settingsPayload(over) {
 
 function server(lang, { gateway = false, none = false, posts = [] } = {}) {
   let settings = settingsPayload({ lang, compactAt: 200000, ...(gateway ? { web: true, gatewayMode: "", gatewayOn: true } : {}) });
-  // Codex with a memories field, so its memories row is there to show
+  // Codex with a memories field and a subagent model, so the six side
+  // requests are all there to show
   const codex = agentRow("codex", "Codex");
-  codex.fields.push({ key: "memories", label: "memories", value: "", options: [{ value: "relay/m1", label: "m1", ref: "relay/m1" }] });
+  codex.fields.push(
+    { key: "memories", label: "memories", value: "", options: [{ value: "relay/m1", label: "m1", ref: "relay/m1" }] },
+    { key: "subagent_model", label: "subagent model", value: "", options: [{ value: "relay/m1", label: "m1", ref: "relay/m1" }] },
+  );
   return async (route) => {
     const url = new URL(route.request().url());
     const json = (data) => route.fulfill({ json: data });
@@ -70,11 +76,11 @@ function server(lang, { gateway = false, none = false, posts = [] } = {}) {
 }
 
 const want = {
-  en: { titles: "Codex thread titles", sheet: "Codex settings", open: "Open" },
-  zh: { titles: "Codex 会话标题", sheet: "Codex 设置", open: "打开" },
-  "zh-TW": { titles: "Codex 會話標題", sheet: "Codex 設定", open: "開啟" },
-  ja: { titles: "Codex のスレッドタイトル", sheet: "Codex の設定", open: "開く" },
-  de: { titles: "Codex-Thread-Titel", sheet: "Einstellungen von Codex", open: "Öffnen" },
+  en: { titles: "Codex thread titles", sheet: "Codex settings", open: "Open", sides: "Codex side requests" },
+  zh: { titles: "Codex 会话标题", sheet: "Codex 设置", open: "打开", sides: "Codex 附属请求" },
+  "zh-TW": { titles: "Codex 會話標題", sheet: "Codex 設定", open: "開啟", sides: "Codex 附屬請求" },
+  ja: { titles: "Codex のスレッドタイトル", sheet: "Codex の設定", open: "開く", sides: "Codex の補助リクエスト" },
+  de: { titles: "Codex-Thread-Titel", sheet: "Einstellungen von Codex", open: "Öffnen", sides: "Codex-Nebenanfragen" },
 };
 // the ids of an agent's settings rows shown in `box`, in order
 const shownIn = (page, box) => page.locator(box).evaluate((b) => [...b.querySelectorAll(":scope [id$=Row]")].filter((r) => r.checkVisibility()).map((r) => r.id));
@@ -103,7 +109,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await page.goto("http://magpie.test/?view=agents");
         await openAgentSettings(page, "codex");
         const codexBox = '.row.agent[data-id="codex"] .ag-prefs';
-        assert.deepEqual(await shownIn(page, codexBox), CODEX, `${lang} ${width}: Codex's eight`);
+        assert.deepEqual(await shownIn(page, codexBox), CODEX, `${lang} ${width}: Codex's own four, the six model rows behind the entry`);
         assert(await page.locator(codexBox).evaluate((b) => b.scrollWidth <= b.clientWidth + 1), `${lang} ${width}: the rows fit the opened row`);
         await noSideScroll(page, `${lang} ${width} Codex`);
         await openAgentSettings(page, "claude");
@@ -122,7 +128,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         // #setQ is in the page before Settings is drawn, and Long
         // conversations with it: wait for the drawing to take it out
         await page.waitForFunction(() => !document.querySelector("#view-settings #fullContextRow")).catch(() => {});
-        for (const id of CODEX) assert.equal(await page.locator(`#view-settings #${id}`).count(), 0, `${lang}: ${id} not in Settings`);
+        for (const id of [...CODEX, ...SIDES]) assert.equal(await page.locator(`#view-settings #${id}`).count(), 0, `${lang}: ${id} not in Settings`);
         assert.equal(await page.locator(".agent-pref-link").first().isVisible(), false, "no link rows till searching");
         await page.locator("#setQ").fill(w.titles);
         const link = page.locator(".agent-pref-link").filter({ hasText: w.titles });
@@ -130,13 +136,14 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await noSideScroll(page, `${lang} ${width} search`);
         await link.getByRole("button", { name: w.open, exact: true }).click();
         await sheet(page).waitFor();
-        assert.equal(await sheet(page).locator(".ehead").textContent(), w.sheet);
-        assert.deepEqual(await shownIn(page, "#modal .editor.agent-prefs"), CODEX, `${lang} ${width}: the sheet has Codex's eight`);
+        // a side request's row opens the side-requests sheet, where its six are
+        assert.equal(await sheet(page).locator(".ehead").textContent(), w.sides);
+        assert.deepEqual(await shownIn(page, "#modal .editor.agent-prefs"), SIDES, `${lang} ${width}: the sheet has Codex's six`);
         assert(await page.locator("#view-agents").isVisible(), "Open goes to the Agents page");
         await page.keyboard.press("Escape");
         await page.locator("#modal").waitFor({ state: "hidden" });
         // shut, every row is back in the page, none lost with the sheet
-        for (const id of CODEX) assert.equal(await page.locator(`#${id}`).count(), 1, `${lang}: ${id} back`);
+        for (const id of [...CODEX, ...SIDES]) assert.equal(await page.locator(`#${id}`).count(), 1, `${lang}: ${id} back`);
         assert.deepEqual(errors, []);
       });
     }
@@ -156,7 +163,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await page.locator('.row.agent[data-id="codex"] .ag-link').click();
         await page.locator('.row.agent[data-id="codex"] .ag-prefs').waitFor({ state: "detached" });
         await page.locator('.row.agent[data-id="codex"] .ag-link[aria-expanded="false"]').waitFor();
-        for (const id of CODEX) assert(await page.evaluate((id) => document.getElementById(id)?.isConnected === true, id), `${lang} ${width}: ${id} in the page once shut`);
+        for (const id of [...CODEX, ...SIDES]) assert(await page.evaluate((id) => document.getElementById(id)?.isConnected === true, id), `${lang} ${width}: ${id} in the page once shut`);
         await page.locator("#prefs").click();
         await page.locator("#view-settings").waitFor();
         await page.waitForFunction(() => __settingsReads.asked > 0 && __settingsReads.asked === __settingsReads.drawn);

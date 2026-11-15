@@ -240,11 +240,15 @@ func meterWho(p provider.Provider) string {
 }
 
 // metered is ctx with requests made with it counted against p's MaxRPM
-// for who, "" for p's own key or account. One counted for who already is
-// kept, and so is the forward loop's for a try of p: a try's own requests
-// are counted against the key or account the try is of.
-func (s *Server) metered(ctx context.Context, p provider.Provider, who string) context.Context {
-	limit := p.RPMLimit()
+// for who, "" for p's own key or account. The limit is the model's own
+// (settings' ModelRPM) over the key or account's, the smaller of the two
+// when both are set (provider.ModelRPMLimit); a caller that has no model
+// in hand — a body it doesn't read, a search with no model — passes "",
+// and its requests keep the key or account's alone. One counted for who
+// already is kept, and so is the forward loop's for a try of p: a try's
+// own requests are counted against the key or account the try is of.
+func (s *Server) metered(ctx context.Context, p provider.Provider, who, model string) context.Context {
+	limit := p.ModelRPMLimit(model)
 	if limit <= 0 {
 		return ctx
 	}
@@ -258,13 +262,14 @@ func (s *Server) metered(ctx context.Context, p provider.Provider, who string) c
 }
 
 // paidFor is ctx whose first request to who is counted already: the
-// forward loop waited for it. The ones the try makes after it (a second
-// ask after the vendor refused a beta or a shape) wait as long as it
-// takes: the try is under way, and turned away it would rest its key or
-// account for nothing. That is never long, the minute's places to come
-// being bounded by rpmWait.
-func (s *Server) paidFor(ctx context.Context, p provider.Provider, who string) context.Context {
-	t := &rpmTicket{l: &s.rpms, id: p.ID, try: true, who: who, limit: p.RPMLimit()}
+// forward loop waited for it. The limit is the model's own over the key
+// or account's (ModelRPMLimit), the one the try's later requests keep to
+// as well. The ones the try makes after it (a second ask after the vendor
+// refused a beta or a shape) wait as long as it takes: the try is under
+// way, and turned away it would rest its key or account for nothing. That
+// is never long, the minute's places to come being bounded by rpmWait.
+func (s *Server) paidFor(ctx context.Context, p provider.Provider, who, model string) context.Context {
+	t := &rpmTicket{l: &s.rpms, id: p.ID, try: true, who: who, limit: p.ModelRPMLimit(model)}
 	t.paid.Store(true)
 	return context.WithValue(ctx, rpmKey{}, t)
 }

@@ -379,7 +379,7 @@ func (s *Server) waitMate(cands []candidate, i int, group bool, gave map[string]
 			}
 			continue
 		}
-		if reserveNow(m) || !s.rpms.free(m.who(), m.p.RPMLimit()) {
+		if reserveNow(m) || !s.rpms.free(m.who(), m.p.ModelRPMLimit(m.model)) {
 			continue
 		}
 		if rel, took := s.lanes.tryTake(m.who(), m.p.LaneLimit()); took {
@@ -411,9 +411,10 @@ func dropReserves(cands []candidate, i int, id string) []candidate {
 }
 
 // ready is whether c's request would go at once: a slot free in its lane,
-// and room in its minute (rpm.go).
+// and room in its minute (rpm.go), the model's own bound over the key or
+// account's.
 func (s *Server) ready(c candidate) bool {
-	return s.lanes.free(c.who(), c.p.LaneLimit()) && s.rpms.free(c.who(), c.p.RPMLimit())
+	return s.lanes.free(c.who(), c.p.LaneLimit()) && s.rpms.free(c.who(), c.p.ModelRPMLimit(c.model))
 }
 
 // laneMessage tells the agent why its request was turned away by c's

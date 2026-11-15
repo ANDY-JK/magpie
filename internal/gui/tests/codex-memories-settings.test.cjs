@@ -16,7 +16,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
-const { watchSettingsReads, openAgentSettings } = require("./reader.cjs");
+const { watchSettingsReads, openAgentSettings, openCodexSides } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 const models = [{ value: "gpt-5.5", label: "GPT-5.5", ref: "openai/gpt-5.5" }, { value: "gpt-5.4-mini", label: "GPT-5.4 mini", ref: "openai/gpt-5.4-mini" }];
@@ -104,6 +104,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await watchSettingsReads(page);
         await page.goto("http://magpie.test/?view=agents");
         await openAgentSettings(page);
+        await openCodexSides(page); // the six model rows, behind the one entry
         const row = page.locator("#codexMemoriesRow");
         const pick = page.locator("#codexMemoriesPick button");
         await pick.waitFor();
@@ -123,14 +124,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         });
         assert(fit, "the row overflows");
 
-        // scrolled by a wheel till the row is mid-view, so a click that
-        // moved the page would show
-        const box = await page.locator("#view-agents").boundingBox();
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-        const top = () => pick.evaluate((e) => e.getBoundingClientRect().top);
-        for (let i = 0; i < 60 && (await top()) > 200; i++) { await page.mouse.wheel(0, 100); await page.waitForTimeout(30); }
+        // the row is in the side-requests sheet, which scrolls nothing of
+        // the page; the list was scrolled here by the row's opening
         const before = await view(page);
-        assert(before > 0, "the agents list must scroll to the row");
 
         // the app's model picker, Default first
         await pick.click();

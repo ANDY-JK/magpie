@@ -970,6 +970,25 @@ type Settings struct {
 	// Absent leaves it to the vendor's list and the model's name (see
 	// provider.SetModelKind).
 	ModelKinds map[string]string `json:"modelKinds,omitempty"`
+	// ModelRPM is how many requests a minute the user lets one model send
+	// the vendor, by "<provider id>/<model id>": a request on it goes only
+	// when its key or account's minute has room for it at this too, the
+	// smaller of the two where its provider's MaxRPM is set as well — a
+	// limit only ever tightens. 0 or absent leaves the model at its key or
+	// account's (see provider.ModelRPMLimit).
+	ModelRPM map[string]int `json:"modelRPM,omitempty"`
+	// ModelExtraBody is the JSON fields the user adds to the body of every
+	// request on one model, by "<provider id>/<model id>", over its
+	// provider's extraBody: a relay that turns one model's requests away
+	// without a field, or wants one model's different, says so on the
+	// model. A name both the model and its provider give goes out as the
+	// model's says it, the "!" it wrote or left off with it; a name only
+	// one gives is that one's alone. What a field stands for and what it
+	// can't set is the provider's extraBody's (see provider.ExtraBody;
+	// provider.ExtraBodyOK refuses the reserved ones on a save). None, or
+	// none of the model's own, leaves it at its provider's (see
+	// provider.WithModelExtraBody).
+	ModelExtraBody map[string]ExtraBody `json:"modelExtraBody,omitempty"`
 	// The main window's size as it last settled, width and height, so it
 	// opens at it again after a restart: the size it is restored to, kept as
 	// it was while it is maximised, and a side fitted to a smaller screen
@@ -987,6 +1006,27 @@ type Settings struct {
 	// minimised; not at all under Wayland, where a window can't place
 	// itself. gui's openAt moves it onto a screen there now.
 	WindowAt []int `json:"windowAt,omitempty"`
+}
+
+// ExtraBody is a set of extra body fields as the user wrote them, each
+// value the JSON they gave it as, a name written with a "!" before it
+// forced. It is the provider's extraBody (providers.json) and one model's
+// own (ModelExtraBody) alike: provider.ExtraBody is this type, and what
+// the fields mean and can't set is said there. A value that isn't a JSON
+// object — a string or list written by hand — is read as none, rather than
+// failing the whole file.
+type ExtraBody map[string]json.RawMessage
+
+// UnmarshalJSON reads an object; anything else written by hand (a string,
+// a list) is read as none, rather than failing the whole file.
+func (e *ExtraBody) UnmarshalJSON(b []byte) error {
+	var m map[string]json.RawMessage
+	if json.Unmarshal(b, &m) != nil {
+		*e = nil
+		return nil
+	}
+	*e = m
+	return nil
 }
 
 // ModelPrice is the price of one model as the user states it. Each part is a

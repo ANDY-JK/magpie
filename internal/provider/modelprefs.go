@@ -1,7 +1,9 @@
 package provider
 
 import (
+	"bytes"
 	"cmp"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -227,6 +229,80 @@ func DropModelPrice(key string) (bool, error) {
 	}
 	delete(s.ModelPrices, key)
 	return true, settings.Save(s)
+}
+
+// setModelRPM keeps how many requests a minute p's model may send the
+// vendor, in settings' ModelRPM the way a price is: 0 takes the user's
+// away, leaving the model at what its key or account's MaxRPM (RPMLimit)
+// allows. A limit for a model the provider does not serve is one no
+// request would ever be sent under, and is refused, as a name is — a
+// removal is not, there being nothing served to clear either.
+func setModelRPM(ref string, rpm int) (bool, error) {
+	p, model, err := splitRef(ref)
+	if err != nil {
+		return false, err
+	}
+	if err := CheckRPM(rpm); err != nil {
+		return false, err
+	}
+	if rpm > 0 && !p.serves(model) {
+		return false, fmt.Errorf("%s has no model %s (magpie provider %s lists them)", p.ID, model, p.ID)
+	}
+	s := settings.Load()
+	key := p.ID + "/" + model
+	if s.ModelRPM[key] == rpm {
+		return false, nil
+	}
+	if rpm == 0 {
+		delete(s.ModelRPM, key)
+	} else {
+		if s.ModelRPM == nil {
+			s.ModelRPM = map[string]int{}
+		}
+		s.ModelRPM[key] = rpm
+	}
+	if err := settings.Save(s); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// setModelExtraBody keeps the extra body fields of one of p's models, in
+// settings' ModelExtraBody the way a price is: none given, or none left
+// once cleaned, takes the model's own away, leaving it at its provider's
+// (WithExtraBody). A field magpie sets itself, one named twice and a value
+// that isn't JSON are refused (ExtraBodyOK), and so is a set for a model
+// the provider does not serve — fields for one it does not list ride no
+// request; a removal is not, there being nothing served to clear either.
+func setModelExtraBody(ref string, eb *ExtraBody) (bool, error) {
+	p, model, err := splitRef(ref)
+	if err != nil {
+		return false, err
+	}
+	if bad := ExtraBodyOK(*eb); bad != "" {
+		return false, errors.New(bad)
+	}
+	if len(*eb) > 0 && !p.serves(model) {
+		return false, fmt.Errorf("%s has no model %s (magpie provider %s lists them)", p.ID, model, p.ID)
+	}
+	keep := cleanExtraBody(*eb)
+	s := settings.Load()
+	key := p.ID + "/" + model
+	if maps.EqualFunc(s.ModelExtraBody[key], keep, func(a, b json.RawMessage) bool { return bytes.Equal(a, b) }) {
+		return false, nil
+	}
+	if len(keep) == 0 {
+		delete(s.ModelExtraBody, key)
+	} else {
+		if s.ModelExtraBody == nil {
+			s.ModelExtraBody = map[string]ExtraBody{}
+		}
+		s.ModelExtraBody[key] = keep
+	}
+	if err := settings.Save(s); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // Levels are the reasoning levels a model whose own aren't known can be
@@ -539,6 +615,17 @@ type ModelPref struct {
 	// Kind is what the model makes, as SetModelKind takes it: "image",
 	// "video", or "" for what its vendor's list and name say (#1399)
 	Kind *string `json:"kind,omitempty"`
+	// RPM is how many requests a minute the model may send the vendor, as
+	// setModelRPM keeps it; 0 sends what its key or account's (RPMLimit)
+	// does again. Like a price it tells the agents nothing.
+	RPM *int `json:"rpm,omitempty"`
+	// ExtraBody is the model's own extra body fields, as its provider's
+	// (ExtraBody) but only its requests take: a name both levels give goes
+	// out as the model's says it (WithModelExtraBody). nil is nothing
+	// given; empty is its provider's again. Like a price it tells the
+	// agents nothing, and a field magpie sets itself, one named twice and
+	// a value that isn't JSON are refused (ExtraBodyOK).
+	ExtraBody *ExtraBody `json:"extraBody,omitempty"`
 	// Wire is the name the provider is asked for the model by, as
 	// SetUpstreamName takes it: "" asks for it by the name magpie knows
 	// it by again. Like the ID below it goes to the id the model is
@@ -614,6 +701,20 @@ func SetModelPrefs(pid string, prefs map[string]ModelPref) error {
 					price = nil
 				}
 				if err := SetModelPrice(ref, price); err != nil {
+					return err
+				}
+			}
+			// nor how many requests a minute the model may send: like a
+			// price it tells the agents nothing (setModelRPM)
+			if m.RPM != nil {
+				if _, err := setModelRPM(ref, *m.RPM); err != nil {
+					return err
+				}
+			}
+			// nor the fields its requests' bodies carry: like a price it
+			// tells the agents nothing (setModelExtraBody)
+			if m.ExtraBody != nil {
+				if err := set(setModelExtraBody(ref, m.ExtraBody)); err != nil {
 					return err
 				}
 			}

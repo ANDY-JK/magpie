@@ -74,6 +74,15 @@ type modelJSON struct {
 	// Wire is the name requests for it go out under now
 	// (settings.ModelWires), "" for the vendor's own
 	Wire string `json:"wire,omitempty"`
+	// RPM is how many requests a minute the user lets the model send the
+	// vendor (settings.ModelRPM), 0 for none of its own: the editor's
+	// Names & levels shows it beside its provider's (the key or account's)
+	RPM int `json:"rpm,omitempty"`
+	// XB is the extra body fields the user gave the model, over its
+	// provider's (settings.ModelExtraBody, provider.WithModelExtraBody);
+	// none when it has none of its own. The editor's Names & levels shows
+	// it as a small JSON box beside the price's
+	XB provider.ExtraBody `json:"xb,omitempty"`
 	// Desktop is the number Claude Desktop's menu says beside this model
 	// (gateway.DesktopNumber), so a row of that menu can be matched to its
 	// provider (#2578): only for a model Claude Desktop, installed here,
@@ -936,6 +945,8 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 		// the wire name saved for it, for the editor's Wire as box to show
 		j.Wires = p.TakesModelWires()
 		j.Wire = held.ModelWires[ref]
+		j.RPM = held.ModelRPM[ref]
+		j.XB = held.ModelExtraBody[ref]
 		j.Kind = p.ModelKind(m.ID)
 		j.Merge = provider.MergeName(m.ID)
 		j.Desktop = desktop[ref]
@@ -1526,6 +1537,11 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			// Run, for test and teststop: the window's name for one
 			// test, which its Stop ends (testRuns)
 			Run string `json:"run"`
+			// Ref, for test: the key to test with, by its fingerprint
+			// (KeyInfo.ID) or the name given it; the models are asked
+			// with that key alone, on or off, where no ref asks with the
+			// first that can serve. "" for the provider's keys as ever
+			Ref string `json:"ref"`
 			// Caps, for test: whether each model's capabilities (a tool
 			// call, a picture, a streamed answer) are probed too, beside
 			// whether it answers (provider.TestModelsWith)
@@ -2281,6 +2297,16 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			saved := *p
 			if req.Typed {
 				q := typed(*p, in, req.Proxy, req.InsecureTLS)
+				p = &q
+			}
+			if req.Ref != "" {
+				// a test asked of one key: it alone is asked with, whether
+				// it is on or off, and it is put to no use by it
+				q, ok := p.OnlyKey(req.Ref)
+				if !ok {
+					fail(rw, fmt.Errorf("%s has no such key", p.Name))
+					return
+				}
 				p = &q
 			}
 			if len(req.Test) > 0 {

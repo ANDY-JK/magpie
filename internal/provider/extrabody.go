@@ -9,6 +9,10 @@ package provider
 //
 //   - A field the body has already — the client's own, or what magpie put
 //     there for it — is kept: the user's value fills in what is missing.
+//   - One model may hold fields of its own (settings' ModelExtraBody, the
+//     editor's Names & levels): its field of a name both it and its
+//     provider give goes out as the model's says it, and a name only it
+//     gives is added (WithModelExtraBody).
 //   - A name written with a "!" before it ("!prompt_cache_key") is forced:
 //     it replaces the body's own.
 //   - ${sessionId} in a string value, at any depth, is the conversation's
@@ -49,23 +53,15 @@ import (
 	"maps"
 	"slices"
 	"strings"
+
+	"github.com/yetone/magpie/internal/settings"
 )
 
 // ExtraBody is a provider's extra body fields, each value as the user
-// wrote it, a name that begins with "!" forced.
-type ExtraBody map[string]json.RawMessage
-
-// UnmarshalJSON reads an object; anything else written by hand (a string,
-// a list) is read as none, rather than failing the whole providers file.
-func (e *ExtraBody) UnmarshalJSON(b []byte) error {
-	var m map[string]json.RawMessage
-	if json.Unmarshal(b, &m) != nil {
-		*e = nil
-		return nil
-	}
-	*e = m
-	return nil
-}
+// wrote it, a name that begins with "!" forced. It is settings' ExtraBody,
+// which one model's own (settings' ModelExtraBody) holds as well; what it
+// is read from a file as is said there.
+type ExtraBody = settings.ExtraBody
 
 // ExtraBodyReserved are the fields extraBody can't set: the model and
 // whether to stream, which magpie decides for routing and reads the reply
@@ -150,8 +146,45 @@ func cleanExtraBody(e ExtraBody) ExtraBody {
 // ${threadId}, its Subagent for ${subagentId}. A body that isn't a JSON
 // object goes as it came.
 func (p Provider) WithExtraBody(body []byte, c Conversation) []byte {
+	return p.withExtraBody(p.ExtraBody, body, c)
+}
+
+// WithModelExtraBody is WithExtraBody with one model's own fields
+// (settings' ModelExtraBody, the editor's Names & levels) over the
+// provider's: a name both levels give goes out as the model's says it,
+// the "!" it wrote or left off with it, and a name only one of them gives
+// is that one's alone. model is the id magpie knows the model by — the
+// one the settings keep it under. The request itself decides which of the
+// two a name goes out as where it has one of its own, the "!" forcing it
+// either way, as it does a provider's alone.
+func (p Provider) WithModelExtraBody(model string, body []byte, c Conversation) []byte {
+	return p.withExtraBody(modelExtraOver(p.ExtraBody, settings.Shared().ModelExtraBody[p.ID+"/"+model]), body, c)
+}
+
+// modelExtraOver is the provider's fields with the model's over them: the
+// model's entry of a name it gives takes the field whole, the provider's
+// spelling of it out and the model's in with its own.
+func modelExtraOver(base, model ExtraBody) ExtraBody {
+	if len(model) == 0 {
+		return base
+	}
+	out := make(ExtraBody, len(base)+len(model))
+	maps.Copy(out, base)
+	for k, v := range model {
+		if n, _ := extraName(k); n != "" {
+			delete(out, n)
+			delete(out, "!"+n)
+		}
+		out[k] = v
+	}
+	return out
+}
+
+// withExtraBody is WithExtraBody over the fields given: the provider's, or
+// the model's own over them (WithModelExtraBody).
+func (p Provider) withExtraBody(e ExtraBody, body []byte, c Conversation) []byte {
 	owned, takes := p.extraBodyTakes()
-	if len(p.ExtraBody) == 0 || !takes {
+	if len(e) == 0 || !takes {
 		return body
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))
@@ -161,7 +194,7 @@ func (p Provider) WithExtraBody(body []byte, c Conversation) []byte {
 		return body
 	}
 	changed := false
-	for k, raw := range p.ExtraBody {
+	for k, raw := range e {
 		n, forced := extraName(k)
 		if n == "" || slices.Contains(ExtraBodyReserved, n) || slices.Contains(owned, n) {
 			continue

@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -156,6 +157,11 @@ func perModelValue(typ reflect.Type, table string) reflect.Value {
 	case reflect.Float32, reflect.Float64:
 		return reflect.ValueOf(float64(len(table))).Convert(typ)
 	case reflect.Slice:
+		if typ.Elem().Kind() == reflect.Uint8 {
+			// json.RawMessage marshals as the bytes say: they are JSON
+			// already, as the tables of them hold (settings' ExtraBody)
+			return reflect.ValueOf(json.RawMessage(`"said of ` + table + `"`)).Convert(typ)
+		}
 		out := reflect.MakeSlice(typ, 1, 1)
 		out.Index(0).Set(perModelValue(typ.Elem(), table))
 		return out

@@ -252,6 +252,10 @@ func (s *Server) serveRetrieval(w http.ResponseWriter, r *http.Request, path, op
 		// the headers of the vendor's reply passed on (#4145)
 		var heard heardHeaders
 		ctx = withReplySink(ctx, c.p.ID, heard.put)
+		// counted against its MaxRPM, the model's own over the key or
+		// account's; the sender would keep to the key's alone, no model in
+		// hand there (rpm.go)
+		ctx = s.metered(ctx, c.p, "", c.model)
 		var b []byte
 		var got string
 		var code int
@@ -366,7 +370,7 @@ func (s *Server) retrieveAs(ctx context.Context, p provider.Provider, url, ctype
 // (none when empty). A success's answer is left unread in res, for the
 // caller to read and close; a failure's is read into b, res nil.
 func (s *Server) retrieveOpen(ctx context.Context, p provider.Provider, url, ctype, accept string, body []byte) (*http.Response, []byte, string, int, error) {
-	ctx = s.metered(p.Via(ctx), p, "") // counted against its MaxRPM (rpm.go)
+	ctx = s.metered(p.Via(ctx), p, "", "") // counted against its MaxRPM (rpm.go)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, nil, "", 500, err

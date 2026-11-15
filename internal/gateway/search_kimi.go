@@ -116,7 +116,7 @@ func logOwnSearch(ctx context.Context, p provider.Provider, where, query string,
 func (s *Server) kimiSearch(ctx context.Context, p provider.Provider, query string) (string, []Hit, error) {
 	// the service gives itself 30 s, as kimi-cli asks
 	// through the plan's own proxy, if it has one (#237, #1522)
-	ctx, cancel := context.WithTimeout(s.metered(p.Via(ctx), p, ""), searchTimeout/2)
+	ctx, cancel := context.WithTimeout(s.metered(p.Via(ctx), p, "", ""), searchTimeout/2)
 	defer cancel()
 	q, err := maskedQuery(ctx, query, &p)
 	if err != nil {

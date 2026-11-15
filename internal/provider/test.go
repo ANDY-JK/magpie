@@ -519,6 +519,24 @@ func (p Provider) keySeeing(proto Protocol, model string) (Provider, bool) {
 	return p, false
 }
 
+// OnlyKey is p testing with the one key ref names alone: a test asked of
+// one key goes to it, not to the first on that can serve. ref is the key's
+// fingerprint (KeyID) or the name given it; of several named alike, the
+// first is taken. A key that's off can be tested too, and stays off: the
+// candidate is made, nothing is saved. ok is false when p has no such key.
+func (p Provider) OnlyKey(ref string) (Provider, bool) {
+	for _, k := range append([]KeyAccount{p.first()}, p.Keys...) {
+		if k.Key == "" {
+			continue
+		}
+		if keyID(k.Key) == ref || k.Name != "" && k.Name == ref {
+			p.Keys = nil // that key alone: what keySeeing finds to ask with
+			return p.WithKey(k), true
+		}
+	}
+	return p, false
+}
+
 // testOn is model's test on proto's endpoint with p's key, asked for by
 // its upstream name, as client would ask it when one is named (TestAs).
 func (p Provider) testOn(ctx context.Context, client string, proto Protocol, model, upstream string) Result {

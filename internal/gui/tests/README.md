@@ -2242,6 +2242,14 @@ nothing; a subscription with one account has no badge; no border stripes,
 every string has its Chinese. It runs in Chromium and WebKit, in English and
 node --test internal/gui/tests/account-models.test.cjs
 
+`key-row-test.test.cjs` checks a key row's Test beside Switch on and Remove:
+the request carries that key's `ref` and the models agents see, the answer
+said in the status line with the key's name (the masked one when unnamed),
+the models field's Test models sending no `ref`, as ever. No click moves
+the page, no native select, no border stripes, every string has its four
+languages. Chromium and WebKit, every language:
+node --test internal/gui/tests/key-row-test.test.cjs
+
 `favorite-star.test.cjs` checks a model's favourite star in the model
 picker (#482): not a favourite, an outline star on hover; a favourite, a
 filled star shown always, with its title and aria-pressed to match. In the

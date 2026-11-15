@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yetone/magpie/internal/settings"
 )
 
 // Concurrency is how many requests the gateway lets be out at the vendor
@@ -239,6 +241,22 @@ func (p Provider) RPMLimit() int {
 	if n == 0 && p.Account != nil {
 		if s, ok := storedPicks(p.ID); ok {
 			n = s.MaxRPM
+		}
+	}
+	return min(max(n, 0), MaxRPMLimit)
+}
+
+// ModelRPMLimit is how many requests a minute a request on p's model may
+// send the vendor, 0 for none: the model's own (settings' ModelRPM, the
+// editor's Names & levels) over its key or account's, the smaller of the
+// two when both are set — a limit only ever tightens, never loosens. A
+// model with none of its own sends what its key or account's (RPMLimit)
+// does.
+func (p Provider) ModelRPMLimit(model string) int {
+	n := p.RPMLimit()
+	if m := settings.Shared().ModelRPM[p.ID+"/"+model]; m > 0 {
+		if n <= 0 || m < n {
+			n = m
 		}
 	}
 	return min(max(n, 0), MaxRPMLimit)

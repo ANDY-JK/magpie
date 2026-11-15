@@ -623,12 +623,12 @@ func TestRPMReserveKeepsTheSlack(t *testing.T) {
 func TestRPMTicketOfATry(t *testing.T) {
 	s := &Server{}
 	p := provider.Provider{ID: "codex", MaxRPM: 3, Account: &provider.Account{}}
-	ctx := s.paidFor(context.Background(), p, "codex@someone")
-	if got := s.metered(ctx, p, ""); got != ctx {
+	ctx := s.paidFor(context.Background(), p, "codex@someone", "")
+	if got := s.metered(ctx, p, "", ""); got != ctx {
 		t.Fatal("a try's own request got a ticket of its own: it would be counted twice")
 	}
 	other := provider.Provider{ID: "kimi", Key: "k", MaxRPM: 3}
-	got := s.metered(ctx, other, "")
+	got := s.metered(ctx, other, "", "")
 	tk, _ := got.Value(rpmKey{}).(*rpmTicket)
 	if tk == nil || tk.who != meterWho(other) || tk.paid.Load() {
 		t.Fatalf("another provider's request on the way: %+v", tk)

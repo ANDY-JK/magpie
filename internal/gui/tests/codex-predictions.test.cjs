@@ -14,7 +14,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { test } = require("node:test");
 const { chromium, webkit } = require("playwright");
-const { watchSettingsReads, agentRow, openAgentSettings } = require("./reader.cjs");
+const { watchSettingsReads, agentRow, openAgentSettings, openCodexSides } = require("./reader.cjs");
 
 const assets = path.resolve(__dirname, "../assets");
 
@@ -101,6 +101,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await watchSettingsReads(page);
         await page.goto("http://magpie.test/?view=agents");
         await openAgentSettings(page); // on Codex's opened row, not in Settings (the owner, 10-20)
+        await openCodexSides(page); // the six model rows, behind the one entry
         const row = page.locator("#codexPredictionsRow");
         const pick = page.locator("#codexPredictionsPick button");
         const shows = (s) => page.locator("#codexPredictionsPick button", { hasText: s }).waitFor();
@@ -117,14 +118,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         });
         assert(fit.inRow && fit.inWindow, JSON.stringify(fit));
 
-        // scrolled by a wheel till the row is mid-view, so a click that
-        // moved the page would show
-        const box = await page.locator("#view-agents").boundingBox();
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-        const top = () => pick.evaluate((e) => e.getBoundingClientRect().top);
-        for (let i = 0; i < 80 && (await top()) > 200; i++) { await page.mouse.wheel(0, 100); await page.waitForTimeout(30); }
+        // the row is in the side-requests sheet, which scrolls nothing of
+        // the page; the list was scrolled here by the row's opening
         const before = await view(page);
-        assert(before > 0, "the agents list must scroll to the row");
         const pickItem = async (s) => {
           await pick.click();
           await page.locator("#pop:not([hidden]) #list li").first().waitFor();

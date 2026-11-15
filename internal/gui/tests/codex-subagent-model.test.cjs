@@ -227,7 +227,9 @@ for (const engine of engines) {
         assert.equal(await page.evaluate(() => scrollY), y);
 
         // Codex's sheet has it as a row with a name: where Codex's own is
-        // picked
+        // picked — the six model rows behind the one entry, its side requests
+        await page.locator(`${codex} #codexSidesRow button`).click();
+        await page.locator("#modal .editor.agent-prefs #codexSubagentModelRow").waitFor();
         const pick = page.locator("#codexSubagentModelRow button");
         await pick.waitFor();
         assert.equal((await page.locator("#codexSubagentModelRow .name").textContent()).trim(), w.row);

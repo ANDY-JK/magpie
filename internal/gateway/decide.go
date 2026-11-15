@@ -484,7 +484,7 @@ func (s *Server) postDecideSent(ctx context.Context, p provider.Provider, model 
 	if msg, off := modelOff(p, model, p.ID+"/"+model); off {
 		return decided{}, errors.New(msg)
 	}
-	ctx = s.metered(p.Via(ctx), p, "") // counted against its MaxRPM (rpm.go)
+	ctx = s.metered(p.Via(ctx), p, "", model) // counted against its MaxRPM (rpm.go)
 	u, err := p.DecideModelURL(ctx, model)
 	if err != nil {
 		return decided{}, err
