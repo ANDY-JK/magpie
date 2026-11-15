@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"math"
 	"slices"
 	"sync"
@@ -61,6 +62,24 @@ type healthPoint struct {
 	at   time.Time
 }
 
+// restIDIn carries the candidate a request is being served for, so a
+// reply recovered inside one try (the continuation, continuation.go) marks
+// that model's health where the try loop's candidate isn't at hand.
+type restIDCarrier struct{ id string }
+
+var restIDKey = &restIDCarrier{}
+
+// withRestID tags ctx with the candidate's rest id.
+func withRestID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, restIDKey, id)
+}
+
+// restIDOf is the rest id withRestID tagged ctx with, "" for none.
+func restIDOf(ctx context.Context) string {
+	id, _ := ctx.Value(restIDKey).(string)
+	return id
+}
+
 var modelHealth = struct {
 	sync.Mutex
 	m map[string]healthPoint
@@ -111,8 +130,18 @@ func note(c candidate, ok bool) {
 	if c.model == "" {
 		return
 	}
+	noteID(c.restID(), ok)
+}
+
+// noteID records one observation of the model resting by id: the try
+// loop's candidate isn't at hand where a reply is recovered inside one try
+// (a cut one the continuation goes on from, continuation.go), and the
+// model it was of is the one the id names.
+func noteID(id string, ok bool) {
+	if id == "" {
+		return
+	}
 	now := time.Now()
-	id := c.restID()
 	modelHealth.Lock()
 	defer modelHealth.Unlock()
 	h := modelHealth.m[id].decayed(now)

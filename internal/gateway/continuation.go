@@ -490,6 +490,10 @@ func (s *Server) streamTranslated(w http.ResponseWriter, r *http.Request, p prov
 	// try's reasoning was found stuck in a loop before it had, and it is
 	// let go to ask again (loopReasks)
 	var spoke, relooped bool
+	// rescued: the times this reply was cut mid-way and the continuation
+	// recovered it, inside one try — the model's own instability, recorded
+	// when the reply comes through (health.go)
+	rescued := 0
 	var summaryUpstream bool
 	reasks := 0
 	// a reply the vendor stopped at its output limit goes on only when the
@@ -775,13 +779,20 @@ func (s *Server) streamTranslated(w http.ResponseWriter, r *http.Request, p prov
 			if zen != nil {
 				zen.end(enc.event)
 			}
+			// the reply is through: the cuts the continuation recovered
+			// inside this try count against the model's health now (a try
+			// that failed instead is counted by the loop, once)
+			for i := 0; i < rescued; i++ {
+				noteID(restIDOf(r.Context()), false)
+			}
 			enc.finish()
 			return 200, ""
 		}
 		// an error the client already has ends the reply: nothing of it
 		// goes on after it (a group member's mid-reply error fails the
 		// try at once, for the group's next member, #733)
-		if errSent || !cont.again(failedStatus, failedCode, again, r.Context()) {
+		goingOn := !errSent && cont.again(failedStatus, failedCode, again, r.Context())
+		if !goingOn {
 			if held != nil {
 				// what was held goes as the text it is, as it used to;
 				// a reply that goes on reads it again instead
@@ -789,6 +800,10 @@ func (s *Server) streamTranslated(w http.ResponseWriter, r *http.Request, p prov
 			}
 			break
 		}
+		// the reply was cut mid-way and goes on from what it has: one more
+		// observation against the model's health, recorded when the reply
+		// is through, since a try that then fails is counted by the loop
+		rescued++
 		before, this = before.plus(this, false), Usage{}
 		enc.keepalive() // the client waits while the same conversation is asked again
 		select {

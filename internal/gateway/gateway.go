@@ -3516,7 +3516,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 					defer release()
 					defer hw.watch()()
 					defer notePhase(ctx, "upstream")()
-					call.Status, call.Error = s.attempt(hw, r.WithContext(ctx), from, c.p, c.model, attemptBody, &call)
+					call.Status, call.Error = s.attempt(hw, r.WithContext(withRestID(ctx, c.restID())), from, c.p, c.model, attemptBody, &call)
 				}()
 			}
 			stop()
