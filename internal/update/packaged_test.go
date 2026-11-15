@@ -3,6 +3,7 @@ package update
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -72,12 +73,20 @@ func TestPackagedByPacmanOtherName(t *testing.T) {
 }
 
 // dpkg lists absolute paths, and on a merged /usr may list /bin for the
-// /usr/bin the binary resolves to.
+// /usr/bin the binary resolves to. An arch-specific package's list is
+// named name:arch.list; Windows can't hold that file name (the colon
+// makes it an NTFS stream), and there magpie.list is what an arch-all
+// package is called. dpkgOwner cuts the arch off the name either way, and
+// the name:arch form itself is read in TestPackagedByDpkgArchSuffix.
 func TestPackagedByDpkg(t *testing.T) {
 	root := t.TempDir()
 	info := filepath.Join(root, "var/lib/dpkg/info")
 	writeFile(t, filepath.Join(info, "coreutils.list"), "/.\n/bin\n/bin/ls\n")
-	writeFile(t, filepath.Join(info, "magpie:amd64.list"), "/.\n/usr\n/usr/bin\n/usr/bin/magpie\n")
+	listName := "magpie:amd64.list"
+	if runtime.GOOS == "windows" {
+		listName = "magpie.list"
+	}
+	writeFile(t, filepath.Join(info, listName), "/.\n/usr\n/usr/bin\n/usr/bin/magpie\n")
 	p := packagedIn(root, "linux", "/usr/bin/magpie")
 	if p == nil || p.Manager != "dpkg" || p.Package != "magpie" || p.Name() != "apt" || p.Command() != "sudo apt install --only-upgrade magpie" {
 		t.Fatalf("%+v", p)

@@ -60,8 +60,15 @@ func TestCCListingKeepsItsNames(t *testing.T) {
 	if !reflect.DeepEqual(again, first) {
 		t.Fatal("an unchanged folder listed otherwise")
 	}
-	// a path and a key a file made again are 2n more
-	if m := after.Mallocs - before.Mallocs; m > 3*n {
+	// a path and a key a file made again are 2n more. On Windows every
+	// os.ReadDir/os.Stat converts UTF-16, ~6 allocations a file instead of
+	// ~3 (measured 18165 for 3000, jitter 3), so the budget there is 7n; a
+	// listing that rebuilds path and key is ~8n and still trips it.
+	var bound uint64 = 3 * n
+	if runtime.GOOS == "windows" {
+		bound = 7 * n
+	}
+	if m := after.Mallocs - before.Mallocs; m > bound {
 		t.Fatalf("listing %d unchanged files took %d allocations", n, m)
 	}
 
