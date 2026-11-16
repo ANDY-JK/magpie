@@ -56,7 +56,7 @@ window.claudeTokenSheet = function () {
   const go = el("button", "text primary", t("Add"));
   go.type = "submit";
   go.disabled = !inp.value.trim() || !!flow.busy;
-  const why = el("span", "s why", flow.error || "");
+  const why = el("span", "s why", tErr(flow.error) || "");
   inp.oninput = () => { flow.token = inp.value; go.disabled = !inp.value.trim(); why.textContent = ""; };
   const submit = async (e) => {
     e.preventDefault();

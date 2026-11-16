@@ -395,7 +395,7 @@ function icon(name, lazy) {
 const saidOk = (msg, ms) => state.notice ? status(withNotice(msg, state.notice), "warn", 9000) : status(msg, "ok", ms);
 // statusErr: a failed call's message, as the status line's error
 function statusErr(e) { status(e.message, "err"); }
-function statusTErr(e) { status(t(e.message), "err"); }
+function statusTErr(e) { status(tErr(e.message), "err"); }
 function settingsErr(e) { statusTErr(e); renderSettings(); }
 function status(msg, kind = "", ms = kind === "err" ? 8000 : 3500) {
   const s = $("#status");
@@ -1202,7 +1202,7 @@ function connectSwitch(a) {
         openAgentModels(a, s, e);
         return;
       }
-      status(t(err.message), "err");
+      status(tErr(err.message), "err");
     }
   };
   return s;
@@ -1870,7 +1870,7 @@ async function guideConnect(a, ev) {
       openAgentModels(a, chip, ev);
       return;
     }
-    status(t(err.message), "err");
+    status(tErr(err.message), "err");
   }
 }
 
@@ -1888,7 +1888,7 @@ async function guideTemplate(tp, name) {
   } catch (err) {
     guideBusy = "";
     guideRedraw();
-    status(t(err.message), "err");
+    status(tErr(err.message), "err");
   }
 }
 
@@ -1904,7 +1904,7 @@ async function hideGuide() {
   } catch (err) {
     guideBusy = "";
     guideRedraw();
-    status(t(err.message), "err");
+    status(tErr(err.message), "err");
   }
 }
 
@@ -1943,7 +1943,7 @@ function desktopLongestLine() {
       renderAgents();
     } catch (err) {
       b.disabled = false;
-      status(t(err.message), "err");
+      status(tErr(err.message), "err");
     }
   };
   return l;
@@ -2366,7 +2366,7 @@ function askDisconnect(a) {
     revision = preview.revision;
     previewBlocked = !!a.native && !revision;
     go.disabled = previewBlocked;
-  }, (err) => { if (!a.native) { show(null); return; } previewBlocked = true; go.disabled = true; body.replaceChildren(el("p", "lib-confirm", t(err.message))); });
+  }, (err) => { if (!a.native) { show(null); return; } previewBlocked = true; go.disabled = true; body.replaceChildren(el("p", "lib-confirm", tErr(err.message))); });
   ed.append(body);
   if (kindOf(a) === "codex") ed.append(el("p", "ag-note", t("magpie's provider table stays, so sessions opened on magpie's models still open")));
   const bar = el("div", "bar");
@@ -2396,7 +2396,7 @@ function askDisconnect(a) {
         cancel.focus(NO_SCROLL);
         return;
       }
-      status(t(err.message), "err");
+      status(tErr(err.message), "err");
     }
   };
   const cancel = el("button", "text", t("Cancel"));
@@ -5736,11 +5736,11 @@ async function setPick(agent, field, value, opt) {
         save.onclick = async () => {
           save.disabled = true;
           try { state = await api("agents/stage/" + agent.id, { field: field.key, value }); closeConfirmAsk(); renderAgents(); }
-          catch (err) { save.disabled = false; status(t(err.message), "err"); }
+          catch (err) { save.disabled = false; status(tErr(err.message), "err"); }
         };
         bar.append(cancel, save); ed.append(bar); confirmAsk = ed; openModal(ed);
         cancel.focus(NO_SCROLL);
-      } else status(t(err.message), "err");
+      } else status(tErr(err.message), "err");
     }
     return;
   }
@@ -12826,7 +12826,7 @@ function renderPluginAsk(sub) {
   }
   const q = signing.prompt;
   const form = el("form", "callback-form");
-  const why = el("span", "s why", flow.error || "");
+  const why = el("span", "s why", tErr(flow.error) || "");
   if (flow.state === "prompt" && q.type === "select") {
     tt.append(el("span", "n", q.message), why);
     const ch = el("div", "choices");
@@ -13243,7 +13243,7 @@ function renderSigning(sub) {
     const submit = el("button", "text primary", t("Finish sign-in"));
     submit.type = "submit";
     submit.disabled = url.disabled || !url.value.trim();
-    const why = el("span", "s why", flow.callbackError || "");
+    const why = el("span", "s why", tErr(flow.callbackError) || "");
     url.oninput = () => { flow.callbackURL = url.value; submit.disabled = !!flow.callbackSubmitted || !!flow.callbackSubmitting || !url.value.trim(); };
     const finish = async (e) => {
       e.preventDefault();
@@ -13258,7 +13258,7 @@ function renderSigning(sub) {
         url.disabled = true;
       } catch (err) {
         if (signing !== flow) return;
-        flow.callbackError = why.textContent = err.message;
+        flow.callbackError = why.textContent = tErr(err.message);
         url.disabled = false;
         submit.disabled = !url.value.trim();
       } finally {
@@ -13829,7 +13829,7 @@ function renderLoginImport(sub) {
       // a file that held no account is named, not passed over
       const who = r.user || (r.file && signing.names?.[r.file - 1]) || "";
       row.append(el("span", "u", who), el("span", "st", t(importStatus[r.status] || r.status)));
-      if (r.error) { row.title = r.error; row.append(el("span", "why", r.error)); }
+      if (r.error) { row.title = tErr(r.error); row.append(el("span", "why", tErr(r.error))); }
       rs.append(row);
     }
     tt.append(rs);
@@ -13878,7 +13878,7 @@ function renderLoginImport(sub) {
   const acts = el("span", "acts");
   acts.append(pick, names, file);
   tt.append(acts, area);
-  if (signing.error) tt.append(el("span", "s why", signing.error));
+  if (signing.error) tt.append(el("span", "s why", tErr(signing.error)));
   box.append(tt);
   go.onclick = () => runImport(sub.agent);
   ready();
@@ -20184,7 +20184,7 @@ function renderUpdateMirror(r, s) {
   save.onclick = () => {
     const v = i.value.trim();
     if (!v) return i.focus(NO_SCROLL);
-    setUpdateMirror(v).catch((e) => { mirrorErr = t(e.message); statusTErr(e); renderSettings(); });
+    setUpdateMirror(v).catch((e) => { mirrorErr = tErr(e.message); statusTErr(e); renderSettings(); });
   };
   const cancel = el("button", "text", t("Cancel"));
   cancel.onclick = () => { mirrorEditing = false; mirrorDraft = mirrorErr = ""; renderUpdateMirror(r, s); };
@@ -21400,7 +21400,7 @@ function renderProxyCheck(s, row) {
     renderProxyCheck(s, row);
     api("proxy/check", {})
       .then((out) => { proxyCheck = { key, out }; })
-      .catch((e) => { proxyCheck = { key, err: t(e.message) }; })
+      .catch((e) => { proxyCheck = { key, err: tErr(e.message) }; })
       .finally(() => {
         // Settings may have been drawn again meanwhile: draw on the row there now
         const now = row.isConnected ? row : document.querySelector("#proxySegs .proxy-controls");
@@ -21461,7 +21461,7 @@ function renderGitHubToken(s) {
   box.append(r);
   const set = (token) => writingPrefs(api("settings/github-token", { token }))
     .then((ns) => { prefs = ns; githubTokenErr = githubTokenDraft = ""; echoPrefs(); status(t("Saved"), "ok", 1500); })
-    .catch((e) => { githubTokenErr = t(e.message); statusTErr(e); echoPrefs(); });
+    .catch((e) => { githubTokenErr = tErr(e.message); statusTErr(e); echoPrefs(); });
   const why = t("The library checks skills for updates with it: GitHub allows 5,000 requests an hour with a token, 60 without. It also installs skills from private repositories it can read; for public ones it needs no scopes.");
   if (s.githubTokenFrom === "settings") {
     sub.textContent = sub.title = s.githubTokenRefused ? t("GitHub refused this token: it may have expired or been revoked. Requests go without one (60 an hour) until it is replaced.") : why;
@@ -22145,7 +22145,7 @@ function libWay(name, label, cls) {
       renderSettings();
     } catch (err) {
       go.disabled = false;
-      status(t(err.message), "err");
+      status(tErr(err.message), "err");
     }
   };
   const line = el("div", "sub lib-way");
@@ -23260,7 +23260,7 @@ function checkinAccountRows(s, by) {
         prefs = await writingPrefs(api("settings/checkin-account", { key: a.key, on: v === "on" }));
         state.settings = prefs;
       } catch (err) {
-        status(t(err.message), "err");
+        status(tErr(err.message), "err");
       }
       renderSettings();
     }));
@@ -23975,7 +23975,7 @@ function renderBuiltins(box, list, done) {
         status(t("Saved"), "ok", 1500);
       } catch (err) {
         b.disabled = false;
-        status(t(err.message), "err");
+        status(tErr(err.message), "err");
       }
     };
     r.append(who, b);
@@ -23988,7 +23988,7 @@ function renderBuiltins(box, list, done) {
         done(next);
         status(t("Saved"), "ok", 1500);
       } catch (err) {
-        status(t(err.message), "err");
+        status(tErr(err.message), "err");
         done(list);
       }
     });

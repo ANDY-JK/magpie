@@ -283,6 +283,225 @@ function t(s, vars) {
   return out;
 }
 
+
+// ERRORS is the errors magpie itself writes (internal/gateway and
+// internal/provider) that the window says in the reader's language: each
+// is the English template as the Go writes it, its variables as {slots}.
+// tErr matches an error back to one, the longest first; a vendor's own
+// words, and the reason a template's tail lets through, read as given.
+// TestEveryErrIsTranslated keeps these and the language files the same.
+const ERRORS = [
+  "{provider} has no model {model} (magpie provider {provider} lists them)",
+  "{provider} has no such key",
+  "that address isn't from this sign-in: paste the one its browser tab ended on",
+  "this sign-in is over; start it again",
+  "{provider} has no account {account}",
+  "no saved {agent} account {account}",
+  "no {agent} account {account}",
+  "name a model as provider/model, not {got}",
+  "that is a routing group, not a provider's model",
+  "no provider {id} — magpie providers lists them{cause}",
+  "the routing group {name} is switched off in Magpie, so {model} is not served; switch it on again on Magpie's Routing page to use it",
+  "magpie has no routing group {name}",
+  "this video was started with a key of {key} that is no longer on: turn it back on to get the video",
+  "no {vendor} search API is set up",
+  "Kiro's sign-in has expired; sign in again with `kiro-cli login` or the Kiro IDE",
+  "the sign-in was canceled",
+  "paste the token `claude setup-token` printed",
+  "this is an Anthropic API key, not a setup-token: add it as an API key provider instead",
+  "this isn't a setup-token: `claude setup-token` prints one that starts with sk-ant-oat",
+  "no balance path: where in the reply the amount is, e.g. data.balance",
+  "the balance path has a [ without its ]",
+  "turn this account on before moving it first",
+  "accounts changed; reopen the provider and try again",
+  "the picture is over 1 MB; pick a smaller one",
+  "tokens {got} is not a length (200000, 200k, 1m)",
+  "Codex is signed out; run codex login",
+  "the ChatGPT sign-in has expired — sign in again",
+  "magpie's web search is off: turn the Web search plugin on in magpie's Settings → Plugins",
+];
+
+// tErr is an error of magpie's own in the reader's language: the whole
+// string looked up first, then matched back to an ERRORS template whole
+// (anchored at both ends), as tNotice matches its NOTICES. What no
+// template takes whole — a vendor's words most of all — reads as given;
+// a template's {cause} slot takes the reason its tail wraps (%w, a
+// vendor's words) and rides along as it came.
+let errRes;
+function tErr(s) {
+  if (!s || !I18N[locale]) return s;
+  if (I18N[locale][s]) return I18N[locale][s];
+  if (!errRes) {
+    errRes = ERRORS.map((en) => {
+      const parts = en.split(/\{(\w+)\}/), names = [];
+      let re = "";
+      parts.forEach((p, i) => {
+        if (i % 2 === 0) re += p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        // a slot is a name, path, model or HTTP code: never a sentence's
+        // end, so the match can't take in words the template doesn't own
+        else names.push(p), (re += p === "cause" ? "([\\s\\S]*)" : "((?:(?!\\. ).)+?)");
+      });
+      return { en, names, re: new RegExp("^" + re + "$") };
+    });
+    // the longest template first, so "no saved x account y" is not read
+    // as the shorter "no x account y"
+    errRes.sort((a, b) => b.en.replace(/\{\w+\}/g, "").length - a.en.replace(/\{\w+\}/g, "").length);
+  }
+  for (const n of errRes) {
+    const m = n.re.exec(s);
+    if (!m) continue;
+    const vars = {};
+    n.names.forEach((k, i) => (vars[k] ??= m[i + 1]));
+    return t(n.en, vars);
+  }
+  return s;
+}
+
+// ERRORS is the errors magpie itself writes (internal/gateway and
+// internal/provider) that the window says in the reader's language: each
+// is the English template as the Go writes it, its variables as {slots}.
+// tErr matches an error back to one, the longest first; a vendor's own
+// words, and the reason a template's tail lets through, read as given.
+// TestEveryErrIsTranslated keeps these and the language files the same.
+const ERRORS = [
+  "{provider} has no model {model} (magpie provider {provider} lists them)",
+  "{provider} has no such key",
+  "that address isn't from this sign-in: paste the one its browser tab ended on",
+  "this sign-in is over; start it again",
+  "{provider} has no account {account}",
+  "no saved {agent} account {account}",
+  "no {agent} account {account}",
+  "name a model as provider/model, not {got}",
+  "that is a routing group, not a provider's model",
+  "no provider {id} — magpie providers lists them{cause}",
+  "the routing group {name} is switched off in Magpie, so {model} is not served; switch it on again on Magpie's Routing page to use it",
+  "magpie has no routing group {name}",
+  "this video was started with a key of {key} that is no longer on: turn it back on to get the video",
+  "no {vendor} search API is set up",
+  "Kiro's sign-in has expired; sign in again with `kiro-cli login` or the Kiro IDE",
+  "the sign-in was canceled",
+  "paste the token `claude setup-token` printed",
+  "this is an Anthropic API key, not a setup-token: add it as an API key provider instead",
+  "this isn't a setup-token: `claude setup-token` prints one that starts with sk-ant-oat",
+  "no balance path: where in the reply the amount is, e.g. data.balance",
+  "the balance path has a [ without its ]",
+  "turn this account on before moving it first",
+  "accounts changed; reopen the provider and try again",
+  "the picture is over 1 MB; pick a smaller one",
+  "tokens {got} is not a length (200000, 200k, 1m)",
+  "Codex is signed out; run codex login",
+  "the ChatGPT sign-in has expired — sign in again",
+  "magpie's web search is off: turn the Web search plugin on in magpie's Settings → Plugins",
+];
+
+// tErr is an error of magpie's own in the reader's language: the whole
+// string looked up first, then matched back to an ERRORS template whole
+// (anchored at both ends), as tNotice matches its NOTICES. What no
+// template takes whole — a vendor's words most of all — reads as given;
+// a template's {cause} slot takes the reason its tail wraps (%w, a
+// vendor's words) and rides along as it came.
+let errRes;
+function tErr(s) {
+  if (!s || !I18N[locale]) return s;
+  if (I18N[locale][s]) return I18N[locale][s];
+  if (!errRes) {
+    errRes = ERRORS.map((en) => {
+      const parts = en.split(/\{(\w+)\}/), names = [];
+      let re = "";
+      parts.forEach((p, i) => {
+        if (i % 2 === 0) re += p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        // a slot is a name, path, model or HTTP code: never a sentence's
+        // end, so the match can't take in words the template doesn't own
+        else names.push(p), (re += p === "cause" ? "([\\s\\S]*)" : "((?:(?!\\. ).)+?)");
+      });
+      return { en, names, re: new RegExp("^" + re + "$") };
+    });
+    // the longest template first, so "no saved x account y" is not read
+    // as the shorter "no x account y"
+    errRes.sort((a, b) => b.en.replace(/\{\w+\}/g, "").length - a.en.replace(/\{\w+\}/g, "").length);
+  }
+  for (const n of errRes) {
+    const m = n.re.exec(s);
+    if (!m) continue;
+    const vars = {};
+    n.names.forEach((k, i) => (vars[k] ??= m[i + 1]));
+    return t(n.en, vars);
+  }
+  return s;
+}
+
+// ERRORS is the errors magpie itself writes (internal/gateway and
+// internal/provider) that the window says in the reader's language: each
+// is the English template as the Go writes it, its variables as {slots}.
+// tErr matches an error back to one, the longest first; a vendor's own
+// words, and the reason a template's tail lets through, read as given.
+// TestEveryErrIsTranslated keeps these and the language files the same.
+const ERRORS = [
+  "{provider} has no model {model} (magpie provider {provider} lists them)",
+  "{provider} has no such key",
+  "that address isn't from this sign-in: paste the one its browser tab ended on",
+  "this sign-in is over; start it again",
+  "{provider} has no account {account}",
+  "no saved {agent} account {account}",
+  "no {agent} account {account}",
+  "name a model as provider/model, not {got}",
+  "that is a routing group, not a provider's model",
+  "no provider {id} — magpie providers lists them{cause}",
+  "the routing group {name} is switched off in Magpie, so {model} is not served; switch it on again on Magpie's Routing page to use it",
+  "magpie has no routing group {name}",
+  "this video was started with a key of {key} that is no longer on: turn it back on to get the video",
+  "no {vendor} search API is set up",
+  "Kiro's sign-in has expired; sign in again with `kiro-cli login` or the Kiro IDE",
+  "the sign-in was canceled",
+  "paste the token `claude setup-token` printed",
+  "this is an Anthropic API key, not a setup-token: add it as an API key provider instead",
+  "this isn't a setup-token: `claude setup-token` prints one that starts with sk-ant-oat",
+  "no balance path: where in the reply the amount is, e.g. data.balance",
+  "the balance path has a [ without its ]",
+  "turn this account on before moving it first",
+  "accounts changed; reopen the provider and try again",
+  "the picture is over 1 MB; pick a smaller one",
+  "tokens {got} is not a length (200000, 200k, 1m)",
+  "Codex is signed out; run codex login",
+  "the ChatGPT sign-in has expired — sign in again",
+  "magpie's web search is off: turn the Web search plugin on in magpie's Settings → Plugins",
+];
+
+// tErr is an error of magpie's own in the reader's language: the whole
+// string looked up first, then matched back to an ERRORS template whole
+// (anchored at both ends), as tNotice matches its NOTICES. What no
+// template takes whole — a vendor's words most of all — reads as given;
+// a template's {cause} slot takes the reason its tail wraps (%w, a
+// vendor's words) and rides along as it came.
+let errRes;
+function tErr(s) {
+  if (!s || !I18N[locale]) return s;
+  if (I18N[locale][s]) return I18N[locale][s];
+  if (!errRes) {
+    errRes = ERRORS.map((en) => {
+      const parts = en.split(/\{(\w+)\}/), names = [];
+      let re = "";
+      parts.forEach((p, i) => {
+        if (i % 2 === 0) re += p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        // a slot is a name, path, model or HTTP code: never a sentence's
+        // end, so the match can't take in words the template doesn't own
+        else names.push(p), (re += p === "cause" ? "([\\s\\S]*)" : "((?:(?!\\. ).)+?)");
+      });
+      return { en, names, re: new RegExp("^" + re + "$") };
+    });
+    // the longest template first, so "no saved x account y" is not read
+    // as the shorter "no x account y"
+    errRes.sort((a, b) => b.en.replace(/\{\w+\}/g, "").length - a.en.replace(/\{\w+\}/g, "").length);
+  }
+  for (const n of errRes) {
+    const m = n.re.exec(s);
+    if (!m) continue;
+    const vars = {};
+    n.names.forEach((k, i) => (vars[k] ??= m[i + 1]));
+    return t(n.en, vars);
+  }
+  return s;
+}
 // tNotice is an agent's advice after a change (state.notice) in the
 // reader's language (#1508). magpie writes it from the templates in
 // NOTICES, with names, paths and commands in their {slots}, and may join
