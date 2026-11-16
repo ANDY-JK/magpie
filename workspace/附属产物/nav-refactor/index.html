@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>magpie 界面原型 · 总览</title>
+<style>
+:root{
+  --bg:#f4f4f6; --card:#fff; --card-2:#f9f9fb; --pill:#f1f1f4;
+  --line:#e3e3e8; --line-2:#ececf0; --fg:#1c1c21; --fg-2:#4b4b53; --muted:#85858d; --faint:#b9b9c2;
+  --accent:#4f46e5; --accent-soft:#eeedfd; --green:#189a58; --green-soft:#e4f6ec;
+  --amber:#b45309; --amber-soft:#fbf0df; --grey:#6b7280; --grey-soft:#f0f1f4;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --shadow:0 12px 30px rgba(20,22,30,.10),0 1px 3px rgba(20,22,30,.05),0 0 0 .5px rgba(20,22,30,.06);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 0 0 .5px rgba(0,0,0,.07);
+}
+[data-theme="dark"]{
+  --bg:#1a1a1e; --card:#232327; --card-2:#1f1f23; --pill:#2d2d33;
+  --line:#333339; --line-2:#2c2c32; --fg:#ededf1; --fg-2:#b9b9c1; --muted:#8b8b94; --faint:#56565f;
+  --accent:#a5b4fc; --accent-soft:#2b2c47; --green:#6fd99b; --green-soft:#1e3a2b;
+  --amber:#f2b544; --amber-soft:#3f3220; --grey:#9ca3af; --grey-soft:#2a2a30;
+  --shadow:0 12px 30px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.08);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.09);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--fg);min-height:100vh;padding:34px 20px 40px;display:flex;flex-direction:column;align-items:center;gap:18px;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+h1{font-size:20px;font-weight:650;letter-spacing:-.01em}
+h2{font-size:13px;font-weight:600;margin-bottom:7px}
+.sub{font-size:11.5px;color:var(--muted);line-height:1.55}
+.wrap{width:1040px;max-width:100%;display:flex;flex-direction:column;gap:16px}
+.top{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.top .grow{flex:1}
+.tbtn{height:26px;padding:0 9px;border-radius:7px;font-size:11.5px;color:var(--fg-2);background:var(--card);box-shadow:0 0 0 .5px var(--line)}
+.tbtn:hover{color:var(--fg)}
+.pill{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:6px;font-size:9.5px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--green-soft);color:var(--green)}
+.pill.now{background:var(--accent-soft);color:var(--accent)}
+.pill.prop{background:var(--amber-soft);color:var(--amber)}
+.pill.old{background:var(--grey-soft);color:var(--grey)}
+
+.hero{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+@media (max-width:900px){.hero{grid-template-columns:1fr 1fr}}
+.entry{display:flex;flex-direction:column;gap:5px;background:var(--card);border-radius:11px;padding:11px 12px;box-shadow:var(--shadow-sm);border-top:3px solid var(--accent)}
+.entry.ok{border-top-color:var(--green)}
+.entry .n{font-size:9.5px;color:var(--muted);font-weight:600}
+.entry b{font-size:12.5px}
+.entry .d{font-size:10.5px;color:var(--muted);line-height:1.45}
+.entry:hover{box-shadow:var(--shadow)}
+
+.timeline{display:flex;align-items:stretch;gap:0;background:var(--card);border-radius:11px;padding:10px 12px;box-shadow:var(--shadow-sm);overflow-x:auto}
+.step{flex:1;min-width:110px;padding:6px 8px;border-left:1px solid var(--line-2);display:flex;flex-direction:column;gap:3px}
+.step:first-child{border-left:0}
+.step .v{font-size:9px;color:var(--faint);font-weight:600}
+.step b{font-size:10.5px}
+.step .s{font-size:9px}
+.step a:hover b{color:var(--accent)}
+.step.old{opacity:.62}
+.step.prop .v{color:var(--amber)}
+.step.ok .v{color:var(--green)}
+
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:11px;overflow:hidden;box-shadow:var(--shadow-sm);font-size:11px}
+th,td{text-align:left;padding:7px 9px;border-top:.5px solid var(--line-2);vertical-align:top}
+th{font-size:9.5px;color:var(--muted);font-weight:600;border-top:0}
+td:first-child{font-weight:500;white-space:nowrap}
+td a{color:var(--accent)}
+td a:hover{text-decoration:underline}
+td .f{font-size:9.5px;color:var(--muted)}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:10px;color:var(--muted)}
+.note{background:var(--accent-soft);color:var(--accent);border-radius:9px;padding:9px 11px;font-size:11px;line-height:1.55}
+.foot{font-size:10px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="grow">
+      <h1>magpie 界面原型 · 总览</h1>
+      <p class="sub">唯一入口。定稿、当前、提案、历史分开；以后只从这里进。最后整理 2026-11-16。</p>
+    </div>
+    <button class="tbtn" id="themeBtn">明 / 暗</button>
+  </div>
+
+  <div>
+    <h2>只看这 4 个（当前）</h2>
+    <div class="hero">
+      <a class="entry ok" href="skeleton-components.html">
+        <span class="n">① 骨架</span>
+        <b>骨架与通用组件</b>
+        <span class="d">外壳、4 个导航组件、11 个内容组件</span>
+        <span class="pill ok">当前</span>
+      </a>
+      <a class="entry" href="all-pages.html">
+        <span class="n">② 页面</span>
+        <b>全部页面（31 个视图）</b>
+        <span class="d">11 个页面 + 23 个页内视图，带区域标注</span>
+        <span class="pill now">当前</span>
+      </a>
+      <a class="entry" href="overlays.html">
+        <span class="n">③ 浮层</span>
+        <b>弹窗与浮层（16 个）</b>
+        <span class="d">供应商行展开、添加 sheet、确认、选择器、托盘</span>
+        <span class="pill now">当前</span>
+      </a>
+      <a class="entry ok" href="framework-layers.html">
+        <span class="n">④ 层级</span>
+        <b>四层导航框架</b>
+        <span class="d">一级分区 / 二级页面 / 三级标签 / 顶部功能</span>
+        <span class="pill ok">定稿</span>
+      </a>
+    </div>
+  </div>
+
+  <div>
+    <h2>版本关系（从旧到新）</h2>
+    <div class="timeline">
+      <div class="step old"><span class="v">v1 历史</span><a href="prototype.html"><b>三方案</b></a><span class="s">英文，早期骨架</span></div>
+      <div class="step old"><span class="v">v2 历史</span><a href="layout-frameworks.html"><b>宽窄两套框架</b></a><span class="s">两套骨架对比</span></div>
+      <div class="step ok"><span class="v">v3 定稿</span><a href="framework-layers.html"><b>四层框架</b></a><span class="s">层级定义</span></div>
+      <div class="step prop"><span class="v">v4 提案</span><a href="grouping-options.html"><b>分组 A/B/C</b></a><span class="s">还没确认</span></div>
+      <div class="step"><span class="v">v5 当前</span><a href="skeleton-components.html"><b>骨架 = 组件</b></a><span class="s">外壳 + 组件库</span></div>
+      <div class="step"><span class="v">v6 当前</span><a href="all-pages.html"><b>31 个视图</b></a><span class="s">页面 + 区域标注</span></div>
+      <div class="step"><span class="v">v7 当前</span><a href="overlays.html"><b>16 个浮层</b></a><span class="s">弹窗 + 全界面清单</span></div>
+    </div>
+  </div>
+
+  <div>
+    <h2>文件清单</h2>
+    <table>
+      <thead><tr><th>文件</th><th>状态</th><th>是什么</th><th>规模 / 说明</th></tr></thead>
+      <tbody>
+        <tr><td><a href="skeleton-components.html">skeleton-components.html</a></td><td><span class="pill ok">当前</span></td><td>骨架与通用组件</td><td>外壳 + 4 导航组件 + 11 内容组件<br><span class="f">骨架宽/窄、明暗</span></td></tr>
+        <tr><td><a href="all-pages.html">all-pages.html</a></td><td><span class="pill now">当前</span></td><td>全部页面与页内视图</td><td>31 个视图 + 每页元素表 + 31 行总索引<br><span class="f">顶部可开「标注」</span></td></tr>
+        <tr><td><a href="overlays.html">overlays.html</a></td><td><span class="pill now">当前</span></td><td>弹窗与浮层</td><td>16 个 + 19 行全界面清单<br><span class="f">含托盘、手机、外部流程说明</span></td></tr>
+        <tr><td><a href="framework-layers.html">framework-layers.html</a></td><td><span class="pill ok">定稿</span></td><td>四层导航框架</td><td>一级 5 分区 / 二级页面 / 三级标签 / 四级工具栏<br><span class="f">外壳已定，不再改</span></td></tr>
+        <tr><td><a href="grouping-options.html">grouping-options.html</a></td><td><span class="pill prop">提案</span></td><td>导航分组 A/B/C</td><td>3 套分组方案，尚未确认<br><span class="f">等选 A / B / C</span></td></tr>
+        <tr><td><a href="layout-detail.html">layout-detail.html</a></td><td><span class="pill old">历史</span></td><td>六页细节版</td><td>真实页内标签数的早期版本<br><span class="f">已被 all-pages 取代</span></td></tr>
+        <tr><td><a href="layout-frameworks.html">layout-frameworks.html</a></td><td><span class="pill old">历史</span></td><td>宽窄两套骨架</td><td>早期框架对比<br><span class="f">已被 framework-layers 取代</span></td></tr>
+        <tr><td><a href="prototype.html">prototype.html</a></td><td><span class="pill old">历史</span></td><td>三方案（英文）</td><td>最早的三套导航方案<br><span class="f">已被四层框架取代</span></td></tr>
+        <tr><td><a href="README.md">README.md</a></td><td><span class="pill old">说明</span></td><td>文字台账（非入口）</td><td>组件、层级、标注、清单的详细说明</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    改哪里：改页面 → <b>all-pages</b>；改弹窗 → <b>overlays</b>；改通用组件 → <b>skeleton-components</b>；改层级 → <b>framework-layers</b>（定稿，先别动）；分组 → <b>grouping-options</b>（还没定）。历史文件只读，打开会看到“历史版本”角标。
+  </div>
+
+  <p class="foot">截图都在本目录：skeleton-*、page-*、tab-*、spec-*、overlays-* 为当前；detail-*、frame-*、group-*、nav-* 为历史。</p>
+</div>
+
+<script>
+const state = { theme:'light' };
+const qs = new URLSearchParams(location.search);
+if(qs.get('theme')==='dark'){ state.theme='dark'; document.documentElement.dataset.theme='dark'; }
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  state.theme = state.theme==='light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = state.theme==='dark' ? 'dark' : '';
+});
+</script>
+</body>
+</html>

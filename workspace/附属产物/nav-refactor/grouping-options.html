@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>magpie · 导航分组方案</title>
+<style>
+:root{
+  --bg:#f4f4f6; --card:#fff; --card-2:#f9f9fb; --pill:#f1f1f4; --pill-hover:#e9e9ee;
+  --seg-track:#e6e6eb; --seg-thumb:#fff;
+  --seg-edge:0 1px 2px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.08);
+  --line:#e3e3e8; --line-2:#ececf0; --fg:#1c1c21; --fg-2:#4b4b53; --muted:#85858d; --faint:#b9b9c2;
+  --ctl:#63636b; --accent:#4f46e5; --accent-soft:#eeedfd; --accent-fg:#fff;
+  --green:#189a58; --amber:#b45309; --red:#d64545;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --code:ui-monospace,"SF Mono",Menlo,Consolas,"Microsoft YaHei UI",monospace;
+  --shadow:0 16px 44px rgba(20,22,30,.16),0 2px 8px rgba(20,22,30,.06),0 0 0 .5px rgba(20,22,30,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 0 0 .5px rgba(0,0,0,.07);
+  --stage:#e6e7ec; --pop:rgba(255,255,255,.94);
+}
+[data-theme="dark"]{
+  --bg:#1a1a1e; --card:#232327; --card-2:#1f1f23; --pill:#2d2d33; --pill-hover:#36363d;
+  --seg-track:rgba(255,255,255,.035); --seg-thumb:rgba(255,255,255,.15);
+  --seg-edge:inset 0 .5px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.3);
+  --line:#333339; --line-2:#2c2c32; --fg:#ededf1; --fg-2:#b9b9c1; --muted:#8b8b94; --faint:#56565f;
+  --ctl:#a1a1aa; --accent:#a5b4fc; --accent-soft:#2b2c47; --accent-fg:#14142a;
+  --green:#6fd99b; --amber:#f2b544; --red:#f28b82;
+  --shadow:0 16px 44px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.09);
+  --stage:#0f1013; --pop:rgba(38,38,43,.96);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);color:var(--fg);background:var(--stage);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:56px 12px 26px;gap:12px;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:default;appearance:none;text-align:left}
+.ic{width:16px;height:16px;flex:none;color:var(--muted)}
+
+/* 顶栏 */
+.proto{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:5px 8px;padding:5px 8px;border-radius:12px;background:var(--pop);box-shadow:var(--shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);max-width:calc(100% - 24px)}
+.ptitle{font-size:12px;font-weight:600;color:var(--fg-2);padding:0 2px;white-space:nowrap}
+.seg{display:inline-flex;padding:2px;border-radius:8px;background:var(--seg-track)}
+.seg button{height:24px;padding:0 9px;border-radius:6px;font-size:12px;color:var(--ctl);white-space:nowrap}
+.seg button.on{background:var(--seg-thumb);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.sep{width:1px;height:18px;background:var(--line)}
+.tbtn{height:24px;padding:0 9px;border-radius:7px;font-size:12px;color:var(--ctl);background:var(--card);box-shadow:0 0 0 .5px var(--line)}
+.tbtn:hover{color:var(--fg)}
+
+/* 窗口 */
+.win{flex:none;background:var(--bg);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.win.wide{width:1180px;max-width:100%;height:600px}
+.win.narrow{width:720px;max-width:100%;height:600px}
+.top{height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;flex:none;border-bottom:.5px solid var(--line-2)}
+.lights{display:flex;gap:7px;margin-right:2px}
+.lights i{width:11px;height:11px;border-radius:50%;background:#ff5f57}
+.lights i:nth-child(2){background:#febc2e}
+.lights i:nth-child(3){background:#28c840}
+.brand{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13.5px;white-space:nowrap}
+.logo{width:18px;height:18px;color:var(--fg);display:inline-flex}
+.logo svg{display:block;width:100%;height:100%}
+.crumb{font-size:12.5px;color:var(--muted);padding-left:4px;white-space:nowrap}
+.actions{margin-left:auto;display:flex;align-items:center;gap:6px}
+.btn{height:26px;padding:0 9px;border-radius:7px;font-size:11.5px;color:var(--fg-2);background:var(--card);box-shadow:0 0 0 .5px var(--line),0 1px 1px rgba(0,0,0,.03);white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.btn.primary{background:var(--accent);color:var(--accent-fg);box-shadow:none}
+.iconbtn{width:26px;height:26px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.main{flex:1;display:flex;min-height:0}
+
+/* 侧栏 */
+.side{width:204px;flex:none;display:flex;flex-direction:column;border-right:.5px solid var(--line);background:var(--bg);padding:0 8px 8px}
+.head{height:44px;display:flex;align-items:center;gap:7px;padding:0 4px;flex:none}
+.jump{margin:0 0 6px;display:flex;align-items:center;gap:6px;height:26px;padding:0 7px;border-radius:7px;background:var(--pill);color:var(--muted);font-size:11.5px;width:100%}
+.jump .ic{width:13px;height:13px}
+.scroll{flex:1;overflow:auto;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.grp{display:flex;align-items:center;gap:5px;padding:9px 6px 3px;font-size:10px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
+.grp:first-child{padding-top:2px}
+.row{display:flex;align-items:center;gap:8px;width:100%;height:28px;padding:0 7px;border-radius:7px;font-size:12.5px;color:var(--fg-2);white-space:nowrap}
+.row:hover{background:var(--pill);color:var(--fg)}
+.row.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.row .ic{width:15px;height:15px}
+.row.on .ic{color:var(--fg)}
+.footnav{flex:none;border-top:.5px solid var(--line-2);padding:6px 0 0;margin-top:4px}
+
+/* 窄窗顶栏标签 */
+.tabstrip{flex:none;display:flex;align-items:center;gap:3px;padding:0 8px;height:36px;border-bottom:.5px solid var(--line-2);overflow-x:auto;scrollbar-width:none}
+.tabstrip::-webkit-scrollbar{display:none}
+.tab{flex:none;height:24px;padding:0 9px;border-radius:6px;font-size:11.5px;color:var(--ctl);white-space:nowrap}
+.tab:hover{background:var(--pill);color:var(--fg)}
+.tab.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.gchip{flex:none;height:17px;display:inline-flex;align-items:center;padding:0 5px;border-radius:5px;background:var(--pill);font-size:9.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.tsep{flex:none;width:1px;height:14px;background:var(--line);margin:0 3px}
+
+/* 内容 */
+.view{flex:1;min-width:0;overflow:auto;padding:10px 12px 18px;scrollbar-width:none}
+.view::-webkit-scrollbar{display:none}
+.pagehead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px}
+.pagehead h1{font-size:16px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.pagehead .tools{margin-left:auto;display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.win.narrow .pagehead .tools{margin-left:0;width:100%}
+.win.narrow .pagehead .field{flex:1;width:auto}
+.field{height:26px;border-radius:7px;background:var(--card);box-shadow:0 0 0 .5px var(--line),0 1px 1px rgba(0,0,0,.03);display:flex;align-items:center;gap:5px;padding:0 8px;font-size:11px;color:var(--muted);width:160px}
+.field .ic{width:12px;height:12px}
+.list{background:var(--card);border-radius:10px;box-shadow:var(--shadow-sm);overflow:hidden}
+.item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-top:.5px solid var(--line-2)}
+.item:first-child{border-top:0}
+.logo2{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;flex:none}
+.who{flex:1;min-width:0}
+.nm{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:10.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none}
+.dot.amber{background:var(--amber)}
+
+/* 方案说明 */
+.plans{width:1180px;max-width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.plan{background:var(--card);border-radius:11px;padding:10px 12px;box-shadow:var(--shadow-sm);border-top:3px solid var(--faint)}
+.plan.on{border-top-color:var(--accent)}
+.plan h3{font-size:12.5px;display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.plan h3 .k{font-size:9.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:4px}
+.plan .lead{font-size:10.5px;color:var(--muted);margin-bottom:6px}
+.plan .grps{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--fg-2);line-height:1.4}
+.plan .grps b{color:var(--fg);font-weight:600}
+.plan .pro{font-size:10.5px;color:var(--green);margin-top:6px}
+.plan .con{font-size:10.5px;color:var(--amber)}
+.reco{width:1180px;max-width:100%;font-size:11.5px;color:var(--accent);background:var(--accent-soft);border-radius:9px;padding:8px 11px}
+.footnote{font-size:10.5px;color:var(--muted);line-height:1.5;max-width:900px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="proto">
+  <span class="ptitle">导航分组</span>
+  <div class="seg" id="schemeSeg">
+    <button data-s="a" class="on">A 四组</button>
+    <button data-s="b">B 三组</button>
+    <button data-s="c">C 五组</button>
+  </div>
+  <span class="sep"></span>
+  <div class="seg" id="frameSeg">
+    <button data-f="narrow" class="on">窄窗</button>
+    <button data-f="wide">宽窗</button>
+  </div>
+  <button class="tbtn" id="themeBtn">明 / 暗</button>
+</div>
+
+<div id="stage"></div>
+
+<div class="plans" id="plans">
+  <div class="plan" data-p="a">
+    <h3><span class="k">A</span>四组 · 现状微调</h3>
+    <div class="lead">只挪资源库和插件，其余不动</div>
+    <div class="grps">
+      <div><b>日常</b> · 智能体、会话</div>
+      <div><b>模型</b> · 供应商、路由、网关</div>
+      <div><b>观察</b> · 用量、指标、诊断、掩码</div>
+      <div><b>资源与扩展</b> · 资源库、插件</div>
+    </div>
+    <div class="pro">最平衡，改动最小</div>
+    <div class="con">观察组 4 个，略长</div>
+  </div>
+  <div class="plan" data-p="b">
+    <h3><span class="k">B</span>三组 · 按任务</h3>
+    <div class="lead">用、看、管，三个动作分到底</div>
+    <div class="grps">
+      <div><b>使用</b> · 智能体、会话、供应商、路由、网关</div>
+      <div><b>查看</b> · 用量、指标、诊断、掩码</div>
+      <div><b>管理</b> · 资源库、插件</div>
+    </div>
+    <div class="pro">组最少，扫一眼就到底</div>
+    <div class="con">使用组 5 个，偏长</div>
+  </div>
+  <div class="plan" data-p="c">
+    <h3><span class="k">C</span>五组 · 按对象</h3>
+    <div class="lead">对话、模型、数据、安全、工具，各管各的</div>
+    <div class="grps">
+      <div><b>对话</b> · 智能体、会话</div>
+      <div><b>模型</b> · 供应商、路由、网关</div>
+      <div><b>数据</b> · 用量、指标</div>
+      <div><b>安全</b> · 掩码、诊断</div>
+      <div><b>工具</b> · 资源库、插件</div>
+    </div>
+    <div class="pro">每组最短，边界最清楚</div>
+    <div class="con">组标题最多，侧栏更长</div>
+  </div>
+</div>
+
+<div class="reco" id="reco">建议先看 A：改动最小、组数适中。如果你觉得“观察”太杂，就选 C。</div>
+<p class="footnote">设置始终在侧栏脚 / 顶栏齿轮，不占分组。页面内容只是示意，重点是分组。未改动现有代码，并行会话不受影响。</p>
+
+<script>
+const ICONS = {
+  agents:'<path d="M4 6l4 4-4 4M10 14h6"/>',
+  sessions:'<path d="M4 5h12v8H9l-4 3v-3H4z"/>',
+  library:'<path d="M5 3.5h9v13H5a1.5 1.5 0 0 1 0-3h9"/>',
+  providers:'<circle cx="7" cy="10" r="3"/><path d="M10 10h7M14 10v3M16.5 10v2"/>',
+  routing:'<path d="M3 10h5l4-5h5M8 10l4 5h5M14.5 3l2.5 2-2.5 2M14.5 13l2.5 2-2.5 2"/>',
+  gateway:'<rect x="3" y="4" width="14" height="5" rx="1.5"/><rect x="3" y="11" width="14" height="5" rx="1.5"/><path d="M6 6.5h.01M6 13.5h.01"/>',
+  usage:'<path d="M4 16V9M8 16V5M12 16v-5M16 16V7"/>',
+  shield:'<path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z"/>',
+  doctor:'<circle cx="10" cy="10" r="7"/><path d="M10 6.5v7M6.5 10h7"/>',
+  gauge:'<path d="M3.5 14a6.5 6.5 0 1 1 13 0"/><path d="M10 13l3.2-4.2"/><circle cx="10" cy="13" r="1"/>',
+  plug:'<path d="M8 3.5h4v2.5a1.5 1.5 0 0 0 3 0V3.5h1.5v13H4v-4h2.5a1.5 1.5 0 0 0 0-3H4v-6z"/>',
+  gear:'<circle cx="10" cy="10" r="2.6"/><path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.4 1.4M13.6 13.6 15 15M15 5l-1.4 1.4M6.4 13.6 5 15"/>',
+  search:'<circle cx="8" cy="8" r="4.5"/><path d="m11.5 11.5 3 3"/>',
+};
+function ic(k, cls='ic'){
+  return `<svg class="${cls}" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||''}</svg>`;
+}
+function logo(){
+  return `<span class="logo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.6 12.2c4.2-.7 6.5-3.7 7.6-7.2 2 2.2 3.3 4.4 8.3 4.4-.8 4.1-3.9 7.1-8.8 7.1-2.7 0-5.2-1.3-7.1-4.3Zm10.7 2.2c2.4-1.4 4-3.3 4.7-5.6 2 .5 3.4 1.6 3.4 3.3 0 1.8-1.6 3.1-3.5 3.1-1.6 0-3.2-.3-4.6-.8Z"/></svg></span>`;
+}
+
+const PAGES = {
+  agents:{n:'智能体',i:'agents'},
+  sessions:{n:'会话',i:'sessions'},
+  library:{n:'资源库',i:'library'},
+  providers:{n:'供应商',i:'providers'},
+  routing:{n:'路由',i:'routing'},
+  gateway:{n:'网关',i:'gateway'},
+  usage:{n:'用量',i:'usage'},
+  masking:{n:'掩码',i:'shield'},
+  doctor:{n:'诊断',i:'doctor'},
+  metrics:{n:'指标',i:'gauge'},
+  plugins:{n:'插件',i:'plug'},
+};
+const SCHEMES = {
+  a:{name:'四组',groups:[
+    ['日常',['agents','sessions']],
+    ['模型',['providers','routing','gateway']],
+    ['观察',['usage','metrics','doctor','masking']],
+    ['资源与扩展',['library','plugins']],
+  ]},
+  b:{name:'三组',groups:[
+    ['使用',['agents','sessions','providers','routing','gateway']],
+    ['查看',['usage','metrics','doctor','masking']],
+    ['管理',['library','plugins']],
+  ]},
+  c:{name:'五组',groups:[
+    ['对话',['agents','sessions']],
+    ['模型',['providers','routing','gateway']],
+    ['数据',['usage','metrics']],
+    ['安全',['masking','doctor']],
+    ['工具',['library','plugins']],
+  ]},
+};
+const ACTIVE = 'providers';
+const ROWS = [
+  ['Codex','3 个账号 · 12 个模型','1.2M','#10a37f',''],
+  ['Claude Code','2 个账号 · 9 个模型','842K','#d97757',''],
+  ['Gemini CLI','1 个账号 · 7 个模型','318K','#4285f4',''],
+  ['Qwen Code','1 个账号 · 6 个模型','96K','#615ced'],
+];
+
+const state = { scheme:'a', frame:'narrow', theme:'light' };
+const qs = new URLSearchParams(location.search);
+if(['a','b','c'].includes(qs.get('s'))) state.scheme = qs.get('s');
+if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
+if(qs.get('theme')==='dark'){ state.theme='dark'; document.documentElement.dataset.theme='dark'; }
+const stage = document.getElementById('stage');
+
+function navSide(){
+  const groups = SCHEMES[state.scheme].groups;
+  return `<aside class="side">
+    <div class="head">${logo()}<span style="font-weight:600;font-size:13px">magpie</span></div>
+    <button class="jump">${ic('search')}<span>跳转</span></button>
+    <div class="scroll">
+      ${groups.map(([g,ids])=>`<div class="grp">${g}</div>${ids.map(id=>`<button class="row${id===ACTIVE?' on':''}">${ic(PAGES[id].i)}<span>${PAGES[id].n}</span></button>`).join('')}`).join('')}
+    </div>
+    <div class="footnav"><button class="row">${ic('gear')}<span>设置</span></button></div>
+  </aside>`;
+}
+function navTop(){
+  const groups = SCHEMES[state.scheme].groups;
+  let out = '';
+  groups.forEach(([g,ids],gi)=>{
+    if(gi) out += `<span class="tsep"></span>`;
+    out += `<span class="gchip">${g}</span>`;
+    out += ids.map(id=>`<button class="tab${id===ACTIVE?' on':''}">${PAGES[id].n}</button>`).join('');
+  });
+  return `<nav class="tabstrip">${out}</nav>`;
+}
+function bodyContent(){
+  return `<div class="list">
+    ${ROWS.map(([n,s,v,c])=>`<div class="item">
+      <span class="logo2" style="background:${c}">${n[0]}</span>
+      <div class="who"><div class="nm">${n}</div><div class="sub">${s}</div></div>
+      <span class="meta">今日 ${v}</span>
+    </div>`).join('')}
+  </div>`;
+}
+function pageView(wide){
+  const tools = `<div class="field">${ic('search')}<span>查找供应商</span></div><button class="btn">隐藏账号</button><button class="btn primary">＋ 添加</button>`;
+  if(wide) return `<main class="view"><div class="pagehead"><h1>供应商</h1><div class="tools">${tools}</div></div>${bodyContent()}</main>`;
+  return `<main class="view"><div class="pagehead"><div class="tools">${tools}</div></div>${bodyContent()}</main>`;
+}
+function topbar(brand){
+  return `<header class="top">
+    <div class="lights"><i></i><i></i><i></i></div>
+    ${brand?`<div class="brand">${logo()}<span>magpie</span></div>`:`<div class="crumb">供应商</div>`}
+    <div class="actions"><button class="btn">更新</button><button class="iconbtn">${ic('gear')}</button></div>
+  </header>`;
+}
+function footerbar(){
+  return `<footer style="flex:none;height:28px;display:flex;align-items:center;gap:6px;padding:0 10px;border-top:.5px solid var(--line-2);font-size:10.5px;color:var(--muted)"><span class="dot"></span>网关运行中 · 4 个会话已连接</footer>`;
+}
+function renderStage(){
+  stage.innerHTML = state.frame==='wide'
+    ? `<div class="win wide">${topbar(false)}<div class="main">${navSide()}${pageView(true)}</div>${footerbar()}</div>`
+    : `<div class="win narrow">${topbar(true)}${navTop()}${pageView(false)}${footerbar()}</div>`;
+  document.querySelectorAll('#schemeSeg button[data-s]').forEach(b=>b.classList.toggle('on', b.dataset.s===state.scheme));
+  document.querySelectorAll('#frameSeg button[data-f]').forEach(b=>b.classList.toggle('on', b.dataset.f===state.frame));
+  document.querySelectorAll('#plans .plan').forEach(p=>p.classList.toggle('on', p.dataset.p===state.scheme));
+}
+
+document.getElementById('schemeSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-s]');
+  if(!b) return;
+  state.scheme = b.dataset.s; renderStage();
+});
+document.getElementById('frameSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-f]');
+  if(!b) return;
+  state.frame = b.dataset.f; renderStage();
+});
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  state.theme = state.theme==='light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = state.theme==='dark' ? 'dark' : '';
+});
+renderStage();
+</script>
+<a href="index.html" class="magpie-flag">分组提案 · 返回总览</a>
+<style>.magpie-flag{position:fixed;right:12px;bottom:12px;z-index:99999;display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;background:#b45309;color:#fff;font:12px -apple-system,"Segoe UI","Microsoft YaHei UI",sans-serif;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.25)}.magpie-flag:hover{background:#4f46e5}</style>
+</body>
+</html>

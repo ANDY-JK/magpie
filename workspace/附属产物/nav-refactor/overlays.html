@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>magpie · 弹窗与浮层</title>
+<style>
+:root{
+  --bg:#f4f4f6; --card:#fff; --card-2:#f9f9fb; --pill:#f1f1f4;
+  --seg-track:#e6e6eb; --seg-thumb:#fff;
+  --seg-edge:0 1px 2px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.08);
+  --line:#e3e3e8; --line-2:#ececf0; --fg:#1c1c21; --fg-2:#4b4b53; --muted:#85858d; --faint:#b9b9c2;
+  --ctl:#63636b; --accent:#4f46e5; --accent-soft:#eeedfd; --accent-fg:#fff;
+  --green:#189a58; --amber:#b45309; --red:#d64545;
+  --skel:#e9e9ee; --skel-2:#f2f2f5;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --shadow:0 16px 44px rgba(20,22,30,.16),0 2px 8px rgba(20,22,30,.06),0 0 0 .5px rgba(20,22,30,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 0 0 .5px rgba(0,0,0,.07);
+  --stage:#e6e7ec; --pop:rgba(255,255,255,.94);
+}
+[data-theme="dark"]{
+  --bg:#1a1a1e; --card:#232327; --card-2:#1f1f23; --pill:#2d2d33;
+  --seg-track:rgba(255,255,255,.035); --seg-thumb:rgba(255,255,255,.15);
+  --seg-edge:inset 0 .5px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.3);
+  --line:#333339; --line-2:#2c2c32; --fg:#ededf1; --fg-2:#b9b9c1; --muted:#8b8b94; --faint:#56565f;
+  --ctl:#a1a1aa; --accent:#a5b4fc; --accent-soft:#2b2c47; --accent-fg:#14142a;
+  --green:#6fd99b; --amber:#f2b544; --red:#f28b82;
+  --skel:#2a2a30; --skel-2:#232327;
+  --shadow:0 16px 44px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.09);
+  --stage:#0f1013; --pop:rgba(38,38,43,.96);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);color:var(--fg);background:var(--stage);min-height:100vh;padding:56px 16px 28px;display:flex;flex-direction:column;align-items:center;gap:12px;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:default;appearance:none;text-align:left}
+h2{font-size:14px;font-weight:600;margin-bottom:2px}
+.lead{font-size:11px;color:var(--muted);margin-bottom:8px}
+.proto{position:fixed;top:9px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:12px;background:var(--pop);box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+.ptitle{font-size:12px;font-weight:600;color:var(--fg-2);white-space:nowrap}
+.tbtn{height:23px;padding:0 9px;border-radius:7px;font-size:11.5px;color:var(--ctl);background:var(--card);box-shadow:0 0 0 .5px var(--line)}
+.tbtn:hover{color:var(--fg)}
+section{width:1120px;max-width:100%}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:var(--card);border-radius:12px;box-shadow:var(--shadow-sm);padding:10px 11px;display:flex;flex-direction:column;gap:7px}
+.ch{display:flex;align-items:baseline;gap:7px}
+.ch b{font-size:12.5px}
+.ch span{font-size:9.5px;color:var(--faint);margin-left:auto;white-space:nowrap}
+.stage{position:relative;height:230px;background:var(--bg);border-radius:9px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.dim{position:absolute;inset:0;background:var(--bg);opacity:.6}
+.skel{position:absolute;inset:12px;display:flex;flex-direction:column;gap:6px}
+.skel i{height:9px;border-radius:4px;background:var(--skel)}
+.skel i:nth-child(2){width:80%}
+.skel i:nth-child(3){width:64%}
+.skel i:nth-child(4){width:72%}
+.sheet{position:relative;z-index:1;width:88%;background:var(--card);border-radius:10px;box-shadow:var(--shadow);padding:10px 11px;display:flex;flex-direction:column;gap:6px;max-height:206px;overflow:auto;scrollbar-width:none}
+.sheet::-webkit-scrollbar{display:none}
+.sheet.small{width:74%}
+.sheet-h{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;margin-bottom:2px}
+.sheet-h .grow{flex:1}
+.subhead{font-size:9.5px;font-weight:600;color:var(--muted);margin:3px 0 0}
+.item{display:flex;align-items:center;gap:7px;padding:5px 0;border-top:.5px solid var(--line-2)}
+.item:first-of-type{border-top:0}
+.logo2{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600;color:#fff;flex:none}
+.who{flex:1;min-width:0}
+.nm{font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:9.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{font-size:9.5px;color:var(--muted);white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+.btn{height:23px;padding:0 8px;border-radius:6px;font-size:10px;color:var(--fg-2);background:var(--card);box-shadow:0 0 0 .5px var(--line);display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--accent-fg);box-shadow:none}
+.btn.danger{color:var(--red);box-shadow:0 0 0 .5px color-mix(in srgb,var(--red) 35%,transparent)}
+.rowbtns{display:flex;gap:5px;flex-wrap:wrap;margin-top:3px}
+.switch{width:28px;height:17px;border-radius:999px;background:var(--pill);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.on{background:var(--accent)}
+.switch.on::after{left:13px}
+.field{height:24px;border-radius:6px;background:var(--bg);box-shadow:0 0 0 .5px var(--line);display:flex;align-items:center;padding:0 7px;font-size:10px;color:var(--muted)}
+.tiles{display:flex;flex-wrap:wrap;gap:4px}
+.tile{height:24px;padding:0 8px;border-radius:6px;background:var(--bg);box-shadow:0 0 0 .5px var(--line);font-size:10px;color:var(--fg-2);display:inline-flex;align-items:center}
+.pop{position:relative;z-index:1;width:44%;background:var(--pop);border-radius:9px;box-shadow:var(--shadow);padding:4px;display:flex;flex-direction:column;gap:1px}
+.mi{height:24px;padding:0 8px;border-radius:5px;font-size:10.5px;color:var(--fg-2);display:flex;align-items:center}
+.mi.on{background:var(--accent-soft);color:var(--accent);font-weight:500}
+.mi.danger{color:var(--red)}
+.msep{height:1px;background:var(--line-2);margin:3px 0}
+.hint{font-size:10px;color:var(--muted);line-height:1.45}
+.formrow{display:flex;align-items:center;gap:8px}
+.formrow label{width:44px;font-size:10px;color:var(--muted);flex:none}
+.formrow .field{flex:1}
+.preview{background:var(--bg);border-radius:6px;padding:7px 8px;font:10px/1.5 ui-monospace,Consolas,monospace;color:var(--fg-2);white-space:pre-wrap}
+.panel{position:relative;z-index:1;width:70%;background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:10px 11px;display:flex;flex-direction:column;gap:5px}
+.panel-h{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;margin-bottom:2px}
+.panel-h .grow{flex:1}
+.phone{position:relative;z-index:1;width:190px;height:200px;background:var(--card);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+.phone-h{height:32px;display:flex;align-items:center;padding:0 10px;font-size:10.5px;font-weight:600;border-bottom:.5px solid var(--line-2)}
+.phone-b{flex:1;padding:8px;display:flex;flex-direction:column;gap:5px}
+.phone-tabs{height:30px;display:flex;align-items:center;justify-content:space-around;border-top:.5px solid var(--line-2);font-size:8.5px;color:var(--muted)}
+.phone-tabs b{color:var(--fg)}
+table{width:100%;border-collapse:collapse;font-size:11px;background:var(--card);border-radius:10px;overflow:hidden;box-shadow:var(--shadow-sm)}
+th,td{text-align:left;padding:6px 9px;border-top:.5px solid var(--line-2)}
+th{font-size:9.5px;color:var(--muted);font-weight:600;border-top:0}
+td:first-child{font-weight:500}
+.note{font-size:10.5px;color:var(--muted);line-height:1.5;max-width:900px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="proto">
+  <span class="ptitle">弹窗与浮层</span>
+  <button class="tbtn" id="themeBtn">明 / 暗</button>
+</div>
+
+<section>
+  <h2>供应商相关</h2>
+  <p class="lead">点供应商行是原地展开，不是 modal；添加走底部 sheet。</p>
+  <div class="grid">
+    <div class="card">
+      <div class="ch"><b>1. 供应商行展开</b><span>点击行</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="item"><span class="logo2" style="background:#10a37f">C</span><div class="who"><div class="nm">Codex</div><div class="sub">3 个账号 · 12 个模型</div></div><span class="switch on"></span></div>
+          <div class="subhead">账号</div>
+          <div class="item"><span class="dot"></span><div class="who"><div class="nm">alex@example.com</div><div class="sub">ChatGPT Pro · 62% 已用</div></div><button class="btn">⋯</button></div>
+          <div class="item"><span class="dot"></span><div class="who"><div class="nm">team@example.com</div><div class="sub">ChatGPT Plus · 31% 已用</div></div><button class="btn">⋯</button></div>
+          <div class="rowbtns"><button class="btn">＋ 添加账号</button><button class="btn">登录新账号</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>2. 添加供应商</b><span>底部 sheet</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">添加供应商<span class="grow"></span><button class="btn">导入…</button></div>
+          <div class="field">搜索厂商…</div>
+          <div class="tiles"><span class="tile">Codex</span><span class="tile">Claude</span><span class="tile">Gemini</span><span class="tile">Qwen</span><span class="tile">Kimi</span><span class="tile">自定义…</span></div>
+          <div class="hint">先选厂商，再填密钥或登录；自定义放最后。</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>3. 供应商行右键菜单</b><span>右键行</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="pop">
+          <div class="mi">移至顶部</div><div class="mi">上移</div><div class="mi">下移</div><div class="mi">移至底部</div>
+          <div class="msep"></div><div class="mi">编辑</div><div class="mi danger">删除</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>4. 导入配置</b><span>弹窗</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">导入配置</div>
+          <div class="item"><span class="dot"></span><div class="who"><div class="nm">Codex</div><div class="sub">~/.codex/config.toml</div></div><span class="switch on"></span></div>
+          <div class="item"><span class="dot"></span><div class="who"><div class="nm">Claude Code</div><div class="sub">~/.claude/settings.json</div></div><span class="switch on"></span></div>
+          <div class="rowbtns"><button class="btn">取消</button><button class="btn primary">导入选中</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>通用弹窗与浮层</h2>
+  <p class="lead">编辑、确认、选择器、更新，都用同一种弹窗外壳。</p>
+  <div class="grid">
+    <div class="card">
+      <div class="ch"><b>5. 密钥编辑</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">编辑密钥</div>
+          <div class="formrow"><label>名称</label><div class="field">openai-key</div></div>
+          <div class="formrow"><label>密钥</label><div class="field">sk-••••••••</div></div>
+          <div class="formrow"><label>模型</label><div class="field">全部</div></div>
+          <div class="rowbtns"><button class="btn">取消</button><button class="btn primary">保存</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>6. 确认删除</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet small">
+          <div class="sheet-h">删除密钥？</div>
+          <p class="hint">删除后无法恢复，使用它的请求会失败。</p>
+          <div class="rowbtns"><button class="btn">取消</button><button class="btn danger">删除</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>7. 模型选择器</b><span>popover</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="pop">
+          <div class="field">搜索模型…</div>
+          <div class="mi on">gpt-5.6-sol</div><div class="mi">opus-4.6</div><div class="mi">gemini-3-pro</div><div class="mi">qwen-3-max</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>8. 更新提示</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet small">
+          <div class="sheet-h">发现新版本 0.1.2401</div>
+          <p class="hint">更新会重启 magpie，正在运行的请求会先完成。</p>
+          <div class="rowbtns"><button class="btn">稍后</button><button class="btn primary">更新</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>其它页面弹窗</h2>
+  <p class="lead">会话、密钥、资源详情，共用同一个 modal 外壳。</p>
+  <div class="grid">
+    <div class="card">
+      <div class="ch"><b>9. 会话详情</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">项目一 · 2 小时前</div>
+          <p class="hint">12 个会话 · Claude Code</p>
+          <div class="rowbtns"><button class="btn">打开</button><button class="btn">重命名</button><button class="btn">移动…</button><button class="btn danger">删除</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>10. 资源详情</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">代码规范.md</div>
+          <pre class="preview"># 代码规范
+- 先读后写
+- 改动最小
+- 测试随结论</pre>
+          <div class="rowbtns"><button class="btn">关闭</button><button class="btn primary">在编辑器中打开</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>11. 托盘面板</b><span>另一种形态</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="panel">
+          <div class="panel-h">magpie<span class="grow"></span><button class="btn">⚙</button></div>
+          <div class="item"><span class="logo2" style="background:#10a37f">C</span><div class="who"><div class="nm">Codex</div><div class="sub">5 小时 · 62%</div></div></div>
+          <div class="item"><span class="logo2" style="background:#d97757">A</span><div class="who"><div class="nm">Claude</div><div class="sub">5 小时 · 31%</div></div></div>
+          <div class="rowbtns"><button class="btn">打开窗口</button><button class="btn">退出</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>12. 手机窄屏</b><span>底部标签</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="phone">
+          <div class="phone-h">magpie</div>
+          <div class="phone-b">
+            <div class="item"><span class="logo2" style="background:#10a37f">C</span><div class="who"><div class="nm">Codex</div><div class="sub">3 个账号 · 1.2M</div></div></div>
+            <div class="item"><span class="logo2" style="background:#d97757">A</span><div class="who"><div class="nm">Claude</div><div class="sub">2 个账号 · 842K</div></div></div>
+          </div>
+          <div class="phone-tabs"><span>对话</span><b>模型</b><span>分析</span><span>隐私</span><span>扩展</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>更多弹窗</h2>
+  <p class="lead">智能体、网关、登录、托盘右键——同一个外壳的不同内容。</p>
+  <div class="grid">
+    <div class="card">
+      <div class="ch"><b>13. 智能体行展开</b><span>点击行</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="item"><span class="logo2" style="background:#10a37f">C</span><div class="who"><div class="nm">Codex</div><div class="sub">3 个账号 · 运行中</div></div><span class="switch on"></span></div>
+          <div class="subhead">设置</div>
+          <div class="formrow"><label>模型</label><div class="field">gpt-5.6-sol</div></div>
+          <div class="formrow"><label>权限</label><div class="field">完全访问</div></div>
+          <div class="formrow"><label>命令</label><div class="field">codex</div></div>
+          <div class="rowbtns"><button class="btn">重启</button><button class="btn">打开配置</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>14. 网关调用详情</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">codex/gpt-5.6-sol <span class="meta">200 · 1.2s</span></div>
+          <div class="subhead">请求</div>
+          <pre class="preview">{"model":"gpt-5.6-sol","messages":[…]}</pre>
+          <div class="subhead">响应</div>
+          <pre class="preview">{"choices":[{"message":{"content":"…"}}]}</pre>
+          <div class="rowbtns"><button class="btn">关闭</button><button class="btn">复制</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>15. 添加账号 / 登录</b><span>底部 sheet</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">添加账号 · Codex</div>
+          <div class="tiles"><span class="tile">ChatGPT 登录</span><span class="tile">API 密钥</span></div>
+          <div class="hint">订阅账号走浏览器登录；API 密钥直接填。</div>
+          <div class="rowbtns"><button class="btn">取消</button><button class="btn primary">继续</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>16. 托盘右键菜单</b><span>popover</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="pop">
+          <div class="mi">打开窗口</div><div class="mi">设置…</div><div class="msep"></div><div class="mi">退出</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>全界面清单</h2>
+  <p class="lead">页面 31 个在 all-pages.html；弹窗/浮层 16 个在本页；特殊形态 3 个。</p>
+  <table>
+    <thead><tr><th>类别</th><th>界面</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>页面 / 视图</td><td>11 个页面 + 23 个页内视图 = 31 个</td><td>已画（all-pages.html）</td></tr>
+      <tr><td>供应商</td><td>行展开</td><td>已画 1</td></tr>
+      <tr><td>供应商</td><td>添加供应商 sheet</td><td>已画 2</td></tr>
+      <tr><td>供应商</td><td>行右键菜单</td><td>已画 3</td></tr>
+      <tr><td>供应商</td><td>导入配置</td><td>已画 4</td></tr>
+      <tr><td>供应商</td><td>添加账号 / 登录</td><td>已画 15</td></tr>
+      <tr><td>通用</td><td>密钥编辑</td><td>已画 5</td></tr>
+      <tr><td>通用</td><td>确认删除</td><td>已画 6</td></tr>
+      <tr><td>通用</td><td>模型选择器</td><td>已画 7</td></tr>
+      <tr><td>通用</td><td>更新提示</td><td>已画 8</td></tr>
+      <tr><td>其它</td><td>会话详情</td><td>已画 9</td></tr>
+      <tr><td>其它</td><td>资源详情</td><td>已画 10</td></tr>
+      <tr><td>其它</td><td>智能体行展开</td><td>已画 13</td></tr>
+      <tr><td>其它</td><td>网关调用详情</td><td>已画 14</td></tr>
+      <tr><td>特殊形态</td><td>托盘面板</td><td>已画 11</td></tr>
+      <tr><td>特殊形态</td><td>托盘右键菜单</td><td>已画 16</td></tr>
+      <tr><td>特殊形态</td><td>手机窄屏</td><td>已画 12</td></tr>
+      <tr><td>外部流程</td><td>OAuth 登录页、系统文件选择、浏览器授权</td><td>系统/外部页面，不画</td></tr>
+      <tr><td>提示类</td><td>状态栏提示、错误条、加载骨架</td><td>组件已覆盖</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<p class="note">弹窗/浮层都用同一套组件：sheet、modal、popover、列表行、按钮、开关、搜索框。未改动现有代码。</p>
+
+<script>
+const state = { theme:'light' };
+const qs = new URLSearchParams(location.search);
+if(qs.get('theme')==='dark'){ state.theme='dark'; document.documentElement.dataset.theme='dark'; }
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  state.theme = state.theme==='light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = state.theme==='dark' ? 'dark' : '';
+});
+</script>
+</body>
+</html>

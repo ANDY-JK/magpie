@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>magpie · 四层导航框架</title>
+<style>
+:root{
+  --bg:#f4f4f6; --card:#fff; --card-2:#f9f9fb; --pill:#f1f1f4; --pill-hover:#e9e9ee;
+  --seg-track:#e6e6eb; --seg-thumb:#fff;
+  --seg-edge:0 1px 2px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.08);
+  --line:#e3e3e8; --line-2:#ececf0; --fg:#1c1c21; --fg-2:#4b4b53; --muted:#85858d; --faint:#b9b9c2;
+  --ctl:#63636b; --accent:#4f46e5; --accent-soft:#eeedfd; --accent-fg:#fff;
+  --green:#189a58; --amber:#b45309; --red:#d64545;
+  --l1:#4f46e5; --l2:#8b5cf6; --l3:#0d9488; --l4:#b45309;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --code:ui-monospace,"SF Mono",Menlo,Consolas,"Microsoft YaHei UI",monospace;
+  --shadow:0 16px 44px rgba(20,22,30,.16),0 2px 8px rgba(20,22,30,.06),0 0 0 .5px rgba(20,22,30,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 0 0 .5px rgba(0,0,0,.07);
+  --stage:#e6e7ec; --pop:rgba(255,255,255,.94);
+}
+[data-theme="dark"]{
+  --bg:#1a1a1e; --card:#232327; --card-2:#1f1f23; --pill:#2d2d33; --pill-hover:#36363d;
+  --seg-track:rgba(255,255,255,.035); --seg-thumb:rgba(255,255,255,.15);
+  --seg-edge:inset 0 .5px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.3);
+  --line:#333339; --line-2:#2c2c32; --fg:#ededf1; --fg-2:#b9b9c1; --muted:#8b8b94; --faint:#56565f;
+  --ctl:#a1a1aa; --accent:#a5b4fc; --accent-soft:#2b2c47; --accent-fg:#14142a;
+  --green:#6fd99b; --amber:#f2b544; --red:#f28b82;
+  --l1:#a5b4fc; --l2:#c4b5fd; --l3:#5eead4; --l4:#fbbf24;
+  --shadow:0 16px 44px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.09);
+  --stage:#0f1013; --pop:rgba(38,38,43,.96);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);color:var(--fg);background:var(--stage);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:56px 12px 26px;gap:12px;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:default;appearance:none;text-align:left}
+.ic{width:16px;height:16px;flex:none;color:var(--muted)}
+
+/* 原型顶栏 */
+.proto{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:5px 8px;padding:5px 8px;border-radius:12px;background:var(--pop);box-shadow:var(--shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);max-width:calc(100% - 24px)}
+.ptitle{font-size:12px;font-weight:600;color:var(--fg-2);padding:0 2px;white-space:nowrap}
+.seg{display:inline-flex;padding:2px;border-radius:8px;background:var(--seg-track)}
+.seg button{height:24px;padding:0 9px;border-radius:6px;font-size:12px;color:var(--ctl);white-space:nowrap}
+.seg button.on{background:var(--seg-thumb);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.sep{width:1px;height:18px;background:var(--line)}
+.tbtn{height:24px;padding:0 9px;border-radius:7px;font-size:12px;color:var(--ctl);background:var(--card);box-shadow:0 0 0 .5px var(--line)}
+.tbtn:hover{color:var(--fg)}
+
+/* 窗口 */
+.win{flex:none;background:var(--bg);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.win.wide{width:1180px;max-width:100%;height:620px}
+.win.narrow{width:720px;max-width:100%;height:620px}
+.top{height:46px;display:flex;align-items:center;gap:8px;padding:0 10px;flex:none;border-bottom:.5px solid var(--line-2)}
+.lights{display:flex;gap:7px;margin-right:2px}
+.lights i{width:11px;height:11px;border-radius:50%;background:#ff5f57}
+.lights i:nth-child(2){background:#febc2e}
+.lights i:nth-child(3){background:#28c840}
+.brand{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13.5px;white-space:nowrap}
+.logo{width:18px;height:18px;color:var(--fg);display:inline-flex}
+.logo svg{display:block;width:100%;height:100%}
+.crumb{font-size:12.5px;color:var(--muted);padding-left:4px;white-space:nowrap}
+.actions{margin-left:auto;display:flex;align-items:center;gap:6px}
+.btn{height:26px;padding:0 9px;border-radius:7px;font-size:11.5px;color:var(--fg-2);background:var(--card);box-shadow:0 0 0 .5px var(--line),0 1px 1px rgba(0,0,0,.03);white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.btn.primary{background:var(--accent);color:var(--accent-fg);box-shadow:none}
+.iconbtn{width:26px;height:26px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.main{flex:1;display:flex;min-height:0}
+
+/* 侧栏 */
+.side{width:204px;flex:none;display:flex;flex-direction:column;border-right:.5px solid var(--line);background:var(--bg);padding:0 8px 8px}
+.head{height:46px;display:flex;align-items:center;gap:7px;padding:0 4px;flex:none}
+.jump{margin:0 0 6px;display:flex;align-items:center;gap:6px;height:26px;padding:0 7px;border-radius:7px;background:var(--pill);color:var(--muted);font-size:11.5px;width:100%}
+.jump .ic{width:13px;height:13px}
+.scroll{flex:1;overflow:auto;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.grp{display:flex;align-items:center;gap:5px;padding:9px 6px 3px;font-size:10px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
+.grp:first-child{padding-top:2px}
+.row{display:flex;align-items:center;gap:8px;width:100%;height:28px;padding:0 7px;border-radius:7px;font-size:12.5px;color:var(--fg-2);white-space:nowrap}
+.row:hover{background:var(--pill);color:var(--fg)}
+.row.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.row .ic{width:15px;height:15px}
+.row.on .ic{color:var(--fg)}
+.subwrap{display:flex;flex-direction:column;gap:1px;margin:2px 0 6px 12px;padding-left:7px;border-left:1px solid var(--line)}
+.srow{display:flex;align-items:center;height:24px;padding:0 7px;border-radius:6px;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.srow:hover{background:var(--pill);color:var(--fg)}
+.srow.on{color:var(--fg);font-weight:500;background:var(--card);box-shadow:var(--seg-edge)}
+.footnav{flex:none;border-top:.5px solid var(--line-2);padding:6px 0 0;margin-top:4px}
+
+/* 顶部一级标签（窄窗） */
+.tabstrip{flex:none;display:flex;align-items:center;gap:2px;padding:0 8px;height:36px;border-bottom:.5px solid var(--line-2);overflow-x:auto;scrollbar-width:none}
+.tabstrip::-webkit-scrollbar{display:none}
+.tab{flex:none;height:26px;padding:0 10px;border-radius:7px;font-size:12px;color:var(--ctl);white-space:nowrap}
+.tab:hover{background:var(--pill);color:var(--fg)}
+.tab.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+
+/* 内容 */
+.view{flex:1;min-width:0;overflow:auto;padding:10px 12px 18px;scrollbar-width:none}
+.view::-webkit-scrollbar{display:none}
+.pagehead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px}
+
+/* ---- 分层标注 ---- */
+.lvregion{--lvc:var(--l1);position:relative;border-radius:9px;padding:2px;margin:0 0 6px}
+.annot .lvregion{outline:1.6px dashed var(--lvc);outline-offset:2px}
+.lvregion.l1{--lvc:var(--l1)}
+.lvregion.l2{--lvc:var(--l2)}
+.lvregion.l3{--lvc:var(--l3)}
+.lvregion.l4{--lvc:var(--l4)}
+.lvregion.fill{display:flex;flex-direction:column;flex:1;min-height:0}
+.lvtag{display:none;align-items:center;gap:5px;height:17px;padding:0 6px;border-radius:5px;font-size:10px;font-weight:600;color:#fff;white-space:nowrap;margin-bottom:2px}
+.annot .lvtag{display:inline-flex}
+.lvtag.l1{background:var(--l1);color:#fff}
+.lvtag.l2{background:var(--l2);color:#fff}
+.lvtag.l3{background:var(--l3);color:#fff}
+.lvtag.l4{background:var(--l4);color:#fff}
+[data-theme="dark"] .lvtag{color:#14142a}
+.lvrow{display:flex;align-items:center;gap:6px;min-width:0}
+.tagline{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.tagline .lvtag{margin-bottom:0}
+
+/* 二级条 */
+.pstrip{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
+.pstrip::-webkit-scrollbar{display:none}
+.pstrip .tab{height:23px;padding:0 9px;border-radius:7px;font-size:11.5px}
+.pstrip .tab.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+/* 三级条 */
+.l3strip{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.l3strip::-webkit-scrollbar{display:none}
+.l3strip .tab{height:21px;padding:0 8px;border-radius:6px;font-size:11px;color:var(--muted)}
+.l3strip .tab.on{color:var(--fg);background:var(--card-2);box-shadow:var(--seg-edge);font-weight:500}
+/* 顶部功能 */
+.toolbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.field{height:26px;border-radius:7px;background:var(--card);box-shadow:0 0 0 .5px var(--line),0 1px 1px rgba(0,0,0,.03);display:flex;align-items:center;gap:5px;padding:0 8px;font-size:11.5px;color:var(--muted);width:170px}
+.field .ic{width:13px;height:13px}
+.segline{display:inline-flex;padding:2px;border-radius:8px;background:var(--seg-track);gap:1px}
+.segline .segbtn{height:22px;padding:0 8px;border-radius:5px;font-size:11px;color:var(--ctl);white-space:nowrap}
+.segline .segbtn.on{background:var(--seg-thumb);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+
+/* 内容示例 */
+.list{background:var(--card);border-radius:10px;box-shadow:var(--shadow-sm);overflow:hidden}
+.item{display:flex;align-items:center;gap:9px;padding:7px 10px;border-top:.5px solid var(--line-2);font-size:12px}
+.item:first-child{border-top:0}
+.item .nm{flex:1;min-width:0;color:var(--fg-2)}
+.item .v{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none}
+.dot.amber{background:var(--amber)}
+
+/* 说明区 */
+.notes{width:1180px;max-width:100%;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.rule{background:var(--card);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow-sm);border-left:4px solid var(--lvc)}
+.rule.l1{--lvc:var(--l1)} .rule.l2{--lvc:var(--l2)} .rule.l3{--lvc:var(--l3)} .rule.l4{--lvc:var(--l4)}
+.rule h3{font-size:13px;display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.rule h3 .num{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--lvc);color:#fff;font-size:10px;font-weight:700}
+[data-theme="dark"] .rule h3 .num{color:#14142a}
+.rule dl{display:grid;grid-template-columns:44px 1fr;gap:2px 8px;font-size:11.5px;line-height:1.45}
+.rule dt{color:var(--muted)}
+.rule dd{color:var(--fg-2)}
+.rule .key{color:var(--lvc);font-weight:600}
+
+.map{width:1180px;max-width:100%;background:var(--card);border-radius:12px;box-shadow:var(--shadow-sm);overflow:hidden}
+.map table{width:100%;border-collapse:collapse;font-size:11.5px}
+.map th,.map td{text-align:left;padding:6px 9px;border-top:.5px solid var(--line-2)}
+.map th{font-weight:600;color:var(--muted);font-size:10.5px;border-top:0}
+.map td:first-child{font-weight:500}
+.map .y{color:var(--green);font-weight:600}
+.map .n{color:var(--faint)}
+.map .num{font-variant-numeric:tabular-nums;color:var(--muted)}
+.footnote{font-size:11px;color:var(--muted);line-height:1.5;max-width:860px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="proto">
+  <span class="ptitle">四层导航框架</span>
+  <div class="seg" id="frameSeg">
+    <button data-f="narrow" class="on">窄窗</button>
+    <button data-f="wide">宽窗</button>
+  </div>
+  <span class="sep"></span>
+  <button class="tbtn" id="annotBtn">标注：开</button>
+  <button class="tbtn" id="themeBtn">明 / 暗</button>
+</div>
+
+<div id="stage"></div>
+
+<div class="notes">
+  <div class="rule l1">
+    <h3><span class="num">1</span>一级导航 · 页面</h3>
+    <dl>
+      <dt>放什么</dt><dd>11 个主页面 + 设置</dd>
+      <dt>宽窗</dt><dd>左侧栏的页面行</dd>
+      <dt>窄窗</dt><dd>标题栏下的横向标签</dd>
+      <dt>规则</dt><dd class="key">只放页面，不放操作；切页面就换整页内容</dd>
+    </dl>
+  </div>
+  <div class="rule l2">
+    <h3><span class="num">2</span>二级导航 · 页面内的视图</h3>
+    <dl>
+      <dt>放什么</dt><dd>用量 5 个、资源库 6 个、插件 3 个、设置 9 个</dd>
+      <dt>宽窗</dt><dd>侧栏里当前页下面的缩进行</dd>
+      <dt>窄窗</dt><dd>页面内第一条横向标签</dd>
+      <dt>规则</dt><dd class="key">只有多个视图时才出现；没有就不画</dd>
+    </dl>
+  </div>
+  <div class="rule l3">
+    <h3><span class="num">3</span>三级导航 · 视图里的分组</h3>
+    <dl>
+      <dt>放什么</dt><dd>目前只有 设置 › 额度 的 4 个</dd>
+      <dt>宽窗</dt><dd>页面内的小标签行</dd>
+      <dt>窄窗</dt><dd>页面内的小标签行（同一位置）</dd>
+      <dt>规则</dt><dd class="key">最多一层，不再往下；没有就不画</dd>
+    </dl>
+  </div>
+  <div class="rule l4">
+    <h3><span class="num">4</span>顶部功能 · 筛选与操作</h3>
+    <dl>
+      <dt>放什么</dt><dd>搜索、添加、隐藏账号、时间范围、日期、用途、刷新</dd>
+      <dt>宽窗</dt><dd>内容区顶部的工具栏</dd>
+      <dt>窄窗</dt><dd>内容区顶部的工具栏（同一位置）</dd>
+      <dt>规则</dt><dd class="key">只放当前页的筛选/操作，不放导航</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="map">
+  <table>
+    <thead><tr><th>页面</th><th>① 一级</th><th>② 二级</th><th>③ 三级</th><th>④ 顶部功能</th></tr></thead>
+    <tbody>
+      <tr><td>设置</td><td class="y">有</td><td class="num">9 个</td><td class="num">额度里 4 个</td><td class="y">搜索</td></tr>
+      <tr><td>用量</td><td class="y">有</td><td class="num">5 个</td><td class="n">—</td><td class="y">时间范围、刷新</td></tr>
+      <tr><td>资源库</td><td class="y">有</td><td class="num">6 个</td><td class="n">—</td><td class="y">搜索、发现、文件夹</td></tr>
+      <tr><td>插件</td><td class="y">有</td><td class="num">3 个</td><td class="n">—</td><td class="y">搜索</td></tr>
+      <tr><td>供应商</td><td class="y">有</td><td class="n">—</td><td class="n">—</td><td class="y">搜索、隐藏账号、添加</td></tr>
+      <tr><td>路由</td><td class="y">有</td><td class="n">—</td><td class="n">—</td><td class="y">日期、请求/会话、用途、指标、刷新</td></tr>
+      <tr><td>智能体 / 会话 / 网关 / 掩码 / 诊断 / 指标</td><td class="y">有</td><td class="n">—</td><td class="n">—</td><td class="y">各自的操作</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="footnote">示意页只用来标位置，不代表某个真实页面的全部标签。宽窗和窄窗的差别只有一处：二级导航在宽窗缩进到侧栏，在窄窗回到页面里；一级、三级、顶部功能的层级不变。</p>
+
+<script>
+const ICONS = {
+  agents:'<path d="M4 6l4 4-4 4M10 14h6"/>',
+  sessions:'<path d="M4 5h12v8H9l-4 3v-3H4z"/>',
+  library:'<path d="M5 3.5h9v13H5a1.5 1.5 0 0 1 0-3h9"/>',
+  providers:'<circle cx="7" cy="10" r="3"/><path d="M10 10h7M14 10v3M16.5 10v2"/>',
+  routing:'<path d="M3 10h5l4-5h5M8 10l4 5h5M14.5 3l2.5 2-2.5 2M14.5 13l2.5 2-2.5 2"/>',
+  gateway:'<rect x="3" y="4" width="14" height="5" rx="1.5"/><rect x="3" y="11" width="14" height="5" rx="1.5"/><path d="M6 6.5h.01M6 13.5h.01"/>',
+  usage:'<path d="M4 16V9M8 16V5M12 16v-5M16 16V7"/>',
+  shield:'<path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z"/>',
+  doctor:'<circle cx="10" cy="10" r="7"/><path d="M10 6.5v7M6.5 10h7"/>',
+  gauge:'<path d="M3.5 14a6.5 6.5 0 1 1 13 0"/><path d="M10 13l3.2-4.2"/><circle cx="10" cy="13" r="1"/>',
+  plug:'<path d="M8 3.5h4v2.5a1.5 1.5 0 0 0 3 0V3.5h1.5v13H4v-4h2.5a1.5 1.5 0 0 0 0-3H4v-6z"/>',
+  gear:'<circle cx="10" cy="10" r="2.6"/><path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.4 1.4M13.6 13.6 15 15M15 5l-1.4 1.4M6.4 13.6 5 15"/>',
+  search:'<circle cx="8" cy="8" r="4.5"/><path d="m11.5 11.5 3 3"/>',
+  chev:'<path d="m6 8 4 4 4-4"/>',
+};
+function ic(k, cls='ic'){
+  return `<svg class="${cls}" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||''}</svg>`;
+}
+function logo(){
+  return `<span class="logo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.6 12.2c4.2-.7 6.5-3.7 7.6-7.2 2 2.2 3.3 4.4 8.3 4.4-.8 4.1-3.9 7.1-8.8 7.1-2.7 0-5.2-1.3-7.1-4.3Zm10.7 2.2c2.4-1.4 4-3.3 4.7-5.6 2 .5 3.4 1.6 3.4 3.3 0 1.8-1.6 3.1-3.5 3.1-1.6 0-3.2-.3-4.6-.8Z"/></svg></span>`;
+}
+function lvTag(n, name){
+  return `<span class="lvtag l${n}">${n} ${name}</span>`;
+}
+
+const PAGES = [
+  ['agents','智能体','agents'],
+  ['usage','用量','usage'],
+  ['settings','设置','gear'],
+  ['library','资源库','library'],
+  ['plugins','插件','plug'],
+];
+const ACTIVE = 'usage';
+const SUBS = ['概览','请求','会话'];
+const L3 = ['全部','已用','剩余'];
+const ITEMS = [
+  ['Codex','1.2M','ok'],
+  ['Claude Code','842K','ok'],
+  ['Gemini CLI','318K','ok'],
+  ['Qwen Code','96K','warn'],
+];
+
+const state = { frame:'narrow', annot:true, theme:'light' };
+const qs = new URLSearchParams(location.search);
+if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
+if(qs.get('annot')==='0') state.annot = false;
+if(qs.get('theme')==='dark'){ state.theme='dark'; document.documentElement.dataset.theme='dark'; }
+const stage = document.getElementById('stage');
+
+function pageRows(){
+  return PAGES.map(([id,name,icon])=>`<button class="row${id===ACTIVE?' on':''}">${ic(icon)}<span>${name}</span></button>`).join('');
+}
+function subRows(){
+  return `<div class="subwrap">${SUBS.map((x,i)=>`<button class="srow${i===0?' on':''}">${x}</button>`).join('')}</div>`;
+}
+function strip(items, cls='pstrip'){
+  return `<div class="${cls}">${items.map((x,i)=>`<button class="tab${i===0?' on':''}">${x}</button>`).join('')}</div>`;
+}
+function toolbar(){
+  return `<div class="toolbar">
+    <div class="field">${ic('search')}<span>搜索</span></div>
+    <div class="segline"><button class="segbtn on">今天</button><button class="segbtn">7 天</button><button class="segbtn">30 天</button></div>
+    <button class="btn">刷新</button>
+    <button class="btn primary">＋ 新增</button>
+  </div>`;
+}
+function bodyContent(){
+  return `<div class="list">${ITEMS.map(([n,v,k])=>`<div class="item"><span class="dot ${k==='warn'?'amber':''}"></span><span class="nm">${n}</span><span class="v">${v}</span></div>`).join('')}</div>`;
+}
+function topbar(brand){
+  return `<header class="top">
+    <div class="lights"><i></i><i></i><i></i></div>
+    ${brand?`<div class="brand">${logo()}<span>magpie</span></div>`:`<div class="crumb">用量</div>`}
+    <div class="actions"><button class="btn">更新</button><button class="iconbtn">${ic('gear')}</button></div>
+  </header>`;
+}
+function footbar(){
+  return `<footer style="flex:none;height:30px;display:flex;align-items:center;gap:6px;padding:0 10px;border-top:.5px solid var(--line-2);font-size:11px;color:var(--muted)"><span class="dot"></span>网关运行中 · 4 个会话已连接</footer>`;
+}
+
+function shellWide(){
+  return `<div class="win wide">
+    ${topbar(false)}
+    <div class="main">
+      <aside class="side">
+        <div class="head">${logo()}<span style="font-weight:600;font-size:13px">magpie</span></div>
+        <button class="jump">${ic('search')}<span>跳转</span></button>
+        <div class="lvregion l1 fill">
+          ${lvTag(1,'一级导航')}
+          <div class="scroll">
+            ${pageRows()}
+            <div class="lvregion l2">${lvTag(2,'二级导航')}${subRows()}</div>
+          </div>
+          <div class="footnav"><button class="row">${ic('gear')}<span>设置</span></button></div>
+        </div>
+      </aside>
+      <main class="view">
+        <div class="lvregion l3">${lvTag(3,'三级导航')}${strip(L3,'l3strip')}</div>
+        <div class="lvregion l4">${lvTag(4,'顶部功能')}${toolbar()}</div>
+        ${bodyContent()}
+      </main>
+    </div>
+    ${footbar()}
+  </div>`;
+}
+function shellNarrow(){
+  return `<div class="win narrow">
+    ${topbar(true)}
+    <div class="lvregion l1" style="margin:4px 11px 0">${lvTag(1,'一级导航')}<div class="tabstrip" style="padding:0;border:0;height:32px">${PAGES.map(([id,name])=>`<button class="tab${id===ACTIVE?' on':''}">${name}</button>`).join('')}</div></div>
+    <main class="view">
+      <div class="lvregion l2">${lvTag(2,'二级导航')}${strip(SUBS)}</div>
+      <div class="lvregion l3">${lvTag(3,'三级导航')}${strip(L3,'l3strip')}</div>
+      <div class="lvregion l4">${lvTag(4,'顶部功能')}${toolbar()}</div>
+      ${bodyContent()}
+    </main>
+    ${footbar()}
+  </div>`;
+}
+
+function render(){
+  document.body.classList.toggle('annot', state.annot);
+  stage.innerHTML = state.frame==='wide' ? shellWide() : shellNarrow();
+  document.querySelectorAll('#frameSeg button[data-f]').forEach(b=>b.classList.toggle('on', b.dataset.f===state.frame));
+  document.getElementById('annotBtn').textContent = '标注：' + (state.annot ? '开' : '关');
+}
+document.getElementById('frameSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-f]');
+  if(!b) return;
+  state.frame = b.dataset.f; render();
+});
+document.getElementById('annotBtn').addEventListener('click', ()=>{ state.annot = !state.annot; render(); });
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  state.theme = state.theme==='light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = state.theme==='dark' ? 'dark' : '';
+});
+render();
+</script>
+</body>
+</html>

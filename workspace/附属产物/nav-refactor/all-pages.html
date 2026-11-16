@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>magpie · 全部页面原型（简约版）</title>
+<style>
+:root{
+  --bg:#f4f4f6; --card:#fff; --card-2:#f9f9fb; --pill:#f1f1f4; --pill-hover:#e9e9ee;
+  --seg-track:#e6e6eb; --seg-thumb:#fff;
+  --seg-edge:0 1px 2px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.08);
+  --line:#e3e3e8; --line-2:#ececf0; --fg:#1c1c21; --fg-2:#4b4b53; --muted:#85858d; --faint:#b9b9c2;
+  --ctl:#63636b; --accent:#4f46e5; --accent-soft:#eeedfd; --accent-fg:#fff;
+  --green:#189a58; --amber:#b45309; --red:#d64545;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --code:ui-monospace,"SF Mono",Menlo,Consolas,"Microsoft YaHei UI",monospace;
+  --shadow:0 16px 44px rgba(20,22,30,.16),0 2px 8px rgba(20,22,30,.06),0 0 0 .5px rgba(20,22,30,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 0 0 .5px rgba(0,0,0,.07);
+  --stage:#e6e7ec; --pop:rgba(255,255,255,.94);
+}
+[data-theme="dark"]{
+  --bg:#1a1a1e; --card:#232327; --card-2:#1f1f23; --pill:#2d2d33; --pill-hover:#36363d;
+  --seg-track:rgba(255,255,255,.035); --seg-thumb:rgba(255,255,255,.15);
+  --seg-edge:inset 0 .5px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.3);
+  --line:#333339; --line-2:#2c2c32; --fg:#ededf1; --fg-2:#b9b9c1; --muted:#8b8b94; --faint:#56565f;
+  --ctl:#a1a1aa; --accent:#a5b4fc; --accent-soft:#2b2c47; --accent-fg:#14142a;
+  --green:#6fd99b; --amber:#f2b544; --red:#f28b82;
+  --shadow:0 16px 44px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.09);
+  --stage:#0f1013; --pop:rgba(38,38,43,.96);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);color:var(--fg);background:var(--stage);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:54px 12px 24px;gap:10px;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:default;appearance:none;text-align:left}
+.ic{width:16px;height:16px;flex:none;color:var(--muted)}
+
+/* 顶栏 */
+.proto{position:fixed;top:9px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:5px 8px;padding:5px 8px;border-radius:12px;background:var(--pop);box-shadow:var(--shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);max-width:calc(100% - 24px)}
+.ptitle{font-size:12px;font-weight:600;color:var(--fg-2);white-space:nowrap}
+.seg{display:inline-flex;padding:2px;border-radius:8px;background:var(--seg-track)}
+.seg button{height:23px;padding:0 9px;border-radius:6px;font-size:11.5px;color:var(--ctl);white-space:nowrap}
+.seg button.on{background:var(--seg-thumb);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.sep{width:1px;height:17px;background:var(--line)}
+.tbtn{height:23px;padding:0 9px;border-radius:7px;font-size:11.5px;color:var(--ctl);background:var(--card);box-shadow:0 0 0 .5px var(--line)}
+.tbtn:hover{color:var(--fg)}
+.where{font-size:11px;color:var(--muted);white-space:nowrap}
+
+/* 窗口 */
+.win{flex:none;background:var(--bg);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.win.wide{width:1180px;max-width:100%;height:580px}
+.win.narrow{width:720px;max-width:100%;height:580px}
+.top{height:44px;display:flex;align-items:center;gap:8px;padding:0 10px;flex:none;border-bottom:.5px solid var(--line-2)}
+.lights{display:flex;gap:7px;margin-right:2px}
+.lights i{width:11px;height:11px;border-radius:50%;background:#ff5f57}
+.lights i:nth-child(2){background:#febc2e}
+.lights i:nth-child(3){background:#28c840}
+.brand{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;white-space:nowrap}
+.logo{width:18px;height:18px;color:var(--fg);display:inline-flex}
+.logo svg{display:block;width:100%;height:100%}
+.crumb{font-size:12px;color:var(--muted);padding-left:4px;white-space:nowrap}
+.actions{margin-left:auto;display:flex;align-items:center;gap:5px}
+.btn{height:25px;padding:0 8px;border-radius:7px;font-size:11px;color:var(--fg-2);background:var(--card);box-shadow:0 0 0 .5px var(--line),0 1px 1px rgba(0,0,0,.03);white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
+.btn.primary{background:var(--accent);color:var(--accent-fg);box-shadow:none}
+.iconbtn{width:25px;height:25px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.iconbtn.on{background:var(--pill);color:var(--fg)}
+.main{flex:1;display:flex;min-height:0}
+
+/* 宽窗侧栏：一级分区 + 二级页面 */
+.side{width:196px;flex:none;display:flex;flex-direction:column;border-right:.5px solid var(--line);background:var(--bg);padding:0 8px 7px}
+.head{height:44px;display:flex;align-items:center;gap:7px;padding:0 4px;flex:none}
+.jump{margin:0 0 5px;display:flex;align-items:center;gap:6px;height:25px;padding:0 7px;border-radius:7px;background:var(--pill);color:var(--muted);font-size:11px;width:100%}
+.jump .ic{width:12px;height:12px}
+.scroll{flex:1;overflow:auto;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+.secrow{display:flex;align-items:center;gap:7px;width:100%;height:30px;padding:0 7px;border-radius:7px;font-size:12.5px;font-weight:500;color:var(--fg-2);white-space:nowrap}
+.secrow:hover{background:var(--pill);color:var(--fg)}
+.secrow.on{color:var(--fg)}
+.secrow .chev{margin-left:auto;color:var(--faint);font-size:10px;transition:transform .15s}
+.secrow.on .chev{transform:rotate(90deg)}
+.pages{display:flex;flex-direction:column;gap:1px;margin:0 0 3px 15px;padding-left:7px;border-left:1px solid var(--line)}
+.pagerow{display:flex;align-items:center;gap:7px;height:27px;padding:0 6px;border-radius:6px;font-size:12px;color:var(--muted);white-space:nowrap;width:100%}
+.pagerow:hover{background:var(--pill);color:var(--fg)}
+.pagerow.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.pagerow .ic{width:14px;height:14px}
+.pagerow.on .ic{color:var(--fg)}
+.footnav{flex:none;border-top:.5px solid var(--line-2);padding:5px 0 0;margin-top:3px}
+
+/* 窄窗：一级分区条 + 二级页面条 */
+.secstrip{flex:none;display:flex;align-items:center;gap:2px;padding:0 8px;height:34px;border-bottom:.5px solid var(--line-2);overflow-x:auto;scrollbar-width:none}
+.secstrip::-webkit-scrollbar{display:none}
+.sec{flex:none;height:24px;padding:0 9px;border-radius:6px;font-size:11.5px;font-weight:500;color:var(--ctl);white-space:nowrap}
+.sec:hover{background:var(--pill);color:var(--fg)}
+.sec.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge)}
+.pagestrip{flex:none;display:flex;align-items:center;gap:2px;padding:0 8px;height:31px;border-bottom:.5px solid var(--line-2);overflow-x:auto;scrollbar-width:none}
+.pagestrip::-webkit-scrollbar{display:none}
+.pagestrip .tab{flex:none;height:23px;padding:0 8px;border-radius:6px;font-size:11px;color:var(--muted);white-space:nowrap}
+.pagestrip .tab.on{background:var(--card-2);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+
+/* 内容 */
+.view{flex:1;min-width:0;overflow:auto;padding:9px 12px 16px;scrollbar-width:none}
+.view::-webkit-scrollbar{display:none}
+.vtabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin-bottom:7px}
+.vtabs::-webkit-scrollbar{display:none}
+.vtabs .tab{flex:none;height:23px;padding:0 8px;border-radius:6px;font-size:11px;color:var(--muted);white-space:nowrap}
+.vtabs .tab.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.l3{display:flex;gap:2px;margin:-2px 0 7px;overflow-x:auto;scrollbar-width:none}
+.l3::-webkit-scrollbar{display:none}
+.l3 .tab{flex:none;height:21px;padding:0 7px;border-radius:6px;font-size:10.5px;color:var(--muted);white-space:nowrap}
+.l3 .tab.on{background:var(--card-2);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+
+/* 工具栏 */
+.toolbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:7px}
+.field{height:25px;border-radius:7px;background:var(--card);box-shadow:0 0 0 .5px var(--line),0 1px 1px rgba(0,0,0,.03);display:flex;align-items:center;gap:5px;padding:0 8px;font-size:10.5px;color:var(--muted);width:150px}
+.field .ic{width:12px;height:12px}
+.segline{display:inline-flex;padding:2px;border-radius:8px;background:var(--seg-track);gap:1px}
+.segline .segbtn{height:21px;padding:0 7px;border-radius:5px;font-size:10.5px;color:var(--ctl);white-space:nowrap}
+.segline .segbtn.on{background:var(--seg-thumb);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.win.narrow .toolbar .field{flex:1;width:auto}
+.win.narrow .toolbar{flex-wrap:nowrap}
+
+/* 列表与卡片 */
+.list{background:var(--card);border-radius:10px;box-shadow:var(--shadow-sm);overflow:hidden}
+.item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-top:.5px solid var(--line-2)}
+.item:first-child{border-top:0}
+.logo2{width:23px;height:23px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;flex:none}
+.who{flex:1;min-width:0}
+.nm{font-size:11.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+.dot.amber{background:var(--amber)}
+.dot.red{background:var(--red)}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:7px}
+.win.narrow .stats{grid-template-columns:repeat(2,1fr)}
+.stat{background:var(--card);border-radius:9px;padding:8px 10px;box-shadow:var(--shadow-sm)}
+.stat .k{font-size:10px;color:var(--muted)}
+.stat .v{font-size:16px;font-weight:600;margin-top:1px;font-variant-numeric:tabular-nums}
+.chart{background:var(--card);border-radius:9px;padding:9px 11px;box-shadow:var(--shadow-sm)}
+.chart .k{font-size:10px;color:var(--muted)}
+.bars{display:flex;align-items:flex-end;gap:5px;height:58px;margin-top:6px}
+.bars i{flex:1;border-radius:3px 3px 1px 1px;background:var(--accent);opacity:.85;min-height:3px}
+.bars i:nth-child(3n){opacity:.5}
+
+.cols{display:grid;grid-template-columns:1.2fr 1fr;gap:7px}
+.win.narrow .cols{grid-template-columns:1fr}
+.card{background:var(--card);border-radius:9px;box-shadow:var(--shadow-sm);overflow:hidden}
+.card h4{font-size:10.5px;font-weight:600;color:var(--muted);padding:8px 10px 5px}
+.card .item{padding:7px 10px}
+.quota{height:4px;border-radius:2px;background:var(--pill);width:54px;overflow:hidden;flex:none}
+.quota i{display:block;height:100%;background:var(--accent)}
+
+.switch{width:30px;height:18px;border-radius:999px;background:var(--pill);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.on{background:var(--accent)}
+.switch.on::after{left:14px}
+
+.uses{width:1120px;max-width:100%;background:var(--card);border-radius:10px;box-shadow:var(--shadow-sm);overflow:hidden}
+.uses table{width:100%;border-collapse:collapse;font-size:11px}
+.uses th,.uses td{padding:6px 9px;border-top:.5px solid var(--line-2);text-align:left}
+.uses th{font-size:9.5px;color:var(--muted);font-weight:600;border-top:0}
+.uses tr.on td{background:var(--accent-soft)}
+.uses td:first-child{font-weight:500}
+.uses .secn{color:var(--muted)}
+.uses .comps{color:var(--fg-2)}
+/* 标注与规格表 */
+.spec-reg{position:relative;outline:1.5px dashed var(--accent);outline-offset:2px;border-radius:8px;margin-bottom:6px;padding:1px 3px 3px}
+.spec-reg.sel{outline-color:var(--green);outline-width:2px}
+.spec-head{display:flex;align-items:center;gap:5px;font-size:9px;font-weight:600;color:var(--accent);padding:1px 0 2px;cursor:pointer}
+.spec-reg.sel .spec-head{color:var(--green)}
+.spec-badge{display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:var(--accent);color:var(--accent-fg);font-size:8.5px;font-weight:700;line-height:1}
+.spec-reg.sel .spec-badge{background:var(--green);color:#fff}
+.spec-tables{width:1120px;max-width:100%;display:flex;flex-direction:column;gap:8px}
+.spec-tables h3{font-size:12px;font-weight:600;margin:0}
+.spec-tables .tag{font-size:9.5px;color:var(--muted);font-weight:400;margin-left:6px}
+#pageSpec th:first-child,#pageSpec td:first-child{width:46px}
+#pageSpec th:nth-child(2),#pageSpec td:nth-child(2){width:96px}
+#pageSpec th:nth-child(4),#pageSpec td:nth-child(4){width:270px}
+#compIndex th:first-child,#compIndex td:first-child{width:46px}
+#compIndex th:nth-child(2),#compIndex td:nth-child(2){width:88px}
+#compIndex th:nth-child(3),#compIndex td:nth-child(3){width:120px}
+#compIndex th:nth-child(5),#compIndex td:nth-child(5){width:220px}
+.index{width:1120px;max-width:100%}
+.index summary{cursor:pointer;font-size:12px;font-weight:600;padding:6px 2px}
+.index summary::marker{color:var(--muted)}
+#allIndex th:nth-child(2),#allIndex td:nth-child(2){width:230px}
+#allIndex th:nth-child(3),#allIndex td:nth-child(3){width:300px}
+#allIndex th:nth-child(4),#allIndex td:nth-child(4){width:320px}
+.spec-hint{font-size:10px;color:var(--muted);line-height:1.5;max-width:900px;text-align:center}
+.foldrow{display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:10.5px;color:var(--muted)}
+.foldrow .note{font-size:9.5px;color:var(--faint)}
+.caption{font-size:10.5px;color:var(--muted);line-height:1.5;max-width:900px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="proto">
+  <span class="ptitle">全部页面原型</span>
+  <div class="seg" id="frameSeg">
+    <button data-f="narrow" class="on">窄窗</button>
+    <button data-f="wide">宽窗</button>
+  </div>
+  <span class="sep"></span>
+  <button class="tbtn" id="specBtn">标注：关</button>
+  <button class="tbtn" id="themeBtn">明 / 暗</button>
+  <span class="sep"></span>
+  <span class="where" id="where"></span>
+</div>
+
+<div id="stage"></div>
+
+<p class="caption" id="caption">一级导航只有 5 个分区；页面在二级。设置不在分区里，走顶栏齿轮 / 侧栏脚。点分区、页面、页内标签都能切换。</p>
+<div class="spec-tables">
+  <div><h3>本页元素<span class="tag">编号 · 区域 · 由哪些组件组成 · 改动位置</span></h3><section class="uses" id="pageSpec"></section></div>
+  <div><h3>组件索引<span class="tag">C 编号 · 组件 · 样式类 · 用在哪 · 改这里</span></h3><section class="uses" id="compIndex"></section></div>
+</div>
+<details class="index"><summary>全部视图索引（31 个）</summary><section class="uses" id="allIndex"></section></details>
+<p class="spec-hint" id="specHint">描述示例：「供应商 · 2 · 列表 的行距改小」→ 改 C01 列表行（.item）的 padding。外壳（标题栏/分区/页面/底栏）见骨架页，不重复。打开「标注」可在页面上看到区域编号；点编号可选中该区域。</p>
+
+<script>
+const ICONS = {
+  agents:'<path d="M4 6l4 4-4 4M10 14h6"/>',
+  sessions:'<path d="M4 5h12v8H9l-4 3v-3H4z"/>',
+  library:'<path d="M5 3.5h9v13H5a1.5 1.5 0 0 1 0-3h9"/>',
+  providers:'<circle cx="7" cy="10" r="3"/><path d="M10 10h7M14 10v3M16.5 10v2"/>',
+  routing:'<path d="M3 10h5l4-5h5M8 10l4 5h5M14.5 3l2.5 2-2.5 2M14.5 13l2.5 2-2.5 2"/>',
+  gateway:'<rect x="3" y="4" width="14" height="5" rx="1.5"/><rect x="3" y="11" width="14" height="5" rx="1.5"/><path d="M6 6.5h.01M6 13.5h.01"/>',
+  usage:'<path d="M4 16V9M8 16V5M12 16v-5M16 16V7"/>',
+  shield:'<path d="M8 1.8 13 3.6v4.1c0 3-2.1 5.4-5 6.5-2.9-1.1-5-3.5-5-6.5V3.6Z"/>',
+  doctor:'<circle cx="10" cy="10" r="7"/><path d="M10 6.5v7M6.5 10h7"/>',
+  gauge:'<path d="M3.5 14a6.5 6.5 0 1 1 13 0"/><path d="M10 13l3.2-4.2"/><circle cx="10" cy="13" r="1"/>',
+  plug:'<path d="M8 3.5h4v2.5a1.5 1.5 0 0 0 3 0V3.5h1.5v13H4v-4h2.5a1.5 1.5 0 0 0 0-3H4v-6z"/>',
+  gear:'<circle cx="10" cy="10" r="2.6"/><path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.4 1.4M13.6 13.6 15 15M15 5l-1.4 1.4M6.4 13.6 5 15"/>',
+  search:'<circle cx="8" cy="8" r="4.5"/><path d="m11.5 11.5 3 3"/>',
+};
+function ic(k, cls='ic'){
+  return `<svg class="${cls}" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||''}</svg>`;
+}
+function logo(){
+  return `<span class="logo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.6 12.2c4.2-.7 6.5-3.7 7.6-7.2 2 2.2 3.3 4.4 8.3 4.4-.8 4.1-3.9 7.1-8.8 7.1-2.7 0-5.2-1.3-7.1-4.3Zm10.7 2.2c2.4-1.4 4-3.3 4.7-5.6 2 .5 3.4 1.6 3.4 3.3 0 1.8-1.6 3.1-3.5 3.1-1.6 0-3.2-.3-4.6-.8Z"/></svg></span>`;
+}
+
+const SECTIONS = [
+  {id:'chat', name:'对话', pages:['agents','sessions']},
+  {id:'model', name:'模型', pages:['providers','routing','gateway']},
+  {id:'analyze', name:'分析', pages:['usage','metrics','doctor']},
+  {id:'privacy', name:'隐私', pages:['masking']},
+  {id:'extend', name:'扩展', pages:['library','plugins']},
+];
+const PAGES = {
+  agents:{name:'智能体',icon:'agents',kind:'agents',buttons:['刷新']},
+  sessions:{name:'会话',icon:'sessions',kind:'sessions',search:'搜索会话',buttons:['选择']},
+  providers:{name:'供应商',icon:'providers',kind:'providers',search:'查找供应商',buttons:['隐藏账号','＋ 添加']},
+  routing:{name:'路由',icon:'routing',kind:'routing',buttons:['今天','请求 / 会话','用途 ⌄','刷新']},
+  gateway:{name:'网关',icon:'gateway',kind:'gateway',buttons:['复制地址','刷新']},
+  usage:{name:'用量',icon:'usage',kind:'usage',tabs:['概览','请求','会话','上下文','榜单'],period:['今天','7 天','30 天'],buttons:['刷新']},
+  metrics:{name:'指标',icon:'gauge',kind:'metrics',period:['今天','7 天','30 天'],buttons:['刷新']},
+  doctor:{name:'诊断',icon:'doctor',kind:'doctor',buttons:['检查','刷新']},
+  masking:{name:'掩码',icon:'shield',kind:'masking',period:['7 天','30 天'],buttons:['刷新']},
+  library:{name:'资源库',icon:'library',kind:'library',tabs:['指令','MCP · 3','技能 · 12','钩子 · 2','子代理 · 4','RTK'],search:'搜索资源',buttons:['发现']},
+  plugins:{name:'插件',icon:'plug',kind:'plugins',tabs:['内置','发现','已安装 · 3'],search:'搜索插件',buttons:[]},
+  settings:{name:'设置',icon:'gear',kind:'settings',tabs:['通用','额度','网络与共享','模型','隐私','可观测','同步与备份','插件','关于'],search:'查找设置',buttons:[]},
+};
+const ACTIVE_SECTION = 'model';
+const USES = {
+  agents:['工具栏','列表行','状态点'],
+  sessions:['工具栏','列表行'],
+  providers:['工具栏','列表行','状态点'],
+  routing:['工具栏','卡片','列表行','状态点'],
+  gateway:['工具栏','卡片','列表行'],
+  usage:['标签条','工具栏','统计块','图表'],
+  metrics:['工具栏','统计块','图表'],
+  doctor:['工具栏','列表行','状态点'],
+  masking:['工具栏','统计块','列表行'],
+  library:['标签条','工具栏','列表行'],
+  plugins:['标签条','工具栏','列表行','开关'],
+  settings:['标签条','工具栏','列表行','开关','分段控件'],
+};
+const BODY_NAMES = {
+  providers:['列表','已关闭'],
+  usage:['统计块','图表'],
+  metrics:['统计块','图表'],
+  routing:['两栏卡片'],
+  plugins:['开关列表'],
+  doctor:['检查列表'],
+  masking:['统计块','掩码列表'],
+  settings:['设置行'],
+  agents:['列表'],
+  sessions:['列表'],
+  gateway:['列表'],
+  library:['列表'],
+};
+const SPEC_INFO = {
+  agents:{
+    '工具栏':['普通按钮（刷新）','toolbarHtml · .toolbar'],
+    '列表':['列表行 ×3、图标、状态点','listRows · .item'],
+  },
+  sessions:{
+    '工具栏':['搜索框、普通按钮','toolbarHtml · .toolbar'],
+    '列表':['列表行 ×3','listRows · .item'],
+  },
+  providers:{
+    '工具栏':['搜索框、普通按钮、主按钮','toolbarHtml · .toolbar'],
+    '列表':['列表行 ×4、图标、状态点','listRows · .item'],
+    '已关闭':['折叠行','foldRow · .foldrow'],
+  },
+  routing:{
+    '工具栏':['普通按钮 ×4（日期/视图/用途/刷新）','toolbarHtml · .toolbar'],
+    '两栏卡片':['卡片 ×2、列表行、状态点、额度条','routingCols · .cols/.card'],
+  },
+  gateway:{
+    '工具栏':['普通按钮（复制地址/刷新）','toolbarHtml · .toolbar'],
+    '列表':['列表行 ×3','listRows · .item'],
+  },
+  usage:{
+    '标签条':['页内标签 ×5','viewTabs · .vtabs'],
+    '工具栏':['分段控件、普通按钮','toolbarHtml · .toolbar'],
+    '统计块':['统计块 ×4','statsHtml · .stat'],
+    '图表':['条状图','chartHtml · .chart/.bars'],
+  },
+  metrics:{
+    '工具栏':['分段控件、普通按钮','toolbarHtml · .toolbar'],
+    '统计块':['统计块 ×4','statsHtml · .stat'],
+    '图表':['条状图','chartHtml · .chart/.bars'],
+  },
+  doctor:{
+    '工具栏':['普通按钮（检查/刷新）','toolbarHtml · .toolbar'],
+    '检查列表':['列表行 ×4、状态点','checkList · .item/.dot'],
+  },
+  masking:{
+    '工具栏':['分段控件、普通按钮','toolbarHtml · .toolbar'],
+    '统计块':['统计块 ×4','maskStats · .stat'],
+    '掩码列表':['列表行 ×3','listRows · .item'],
+  },
+  library:{
+    '标签条':['页内标签 ×6','viewTabs · .vtabs'],
+    '工具栏':['搜索框、普通按钮','toolbarHtml · .toolbar'],
+    '列表':['列表行 ×3','listRows · .item'],
+  },
+  plugins:{
+    '标签条':['页内标签 ×3','viewTabs · .vtabs'],
+    '工具栏':['搜索框','toolbarHtml · .toolbar'],
+    '开关列表':['列表行 ×4、开关','switchList · .item/.switch'],
+  },
+  settings:{
+    '标签条':['设置标签 ×9','viewTabs · .vtabs'],
+    '子标签':['额度子标签 ×4','l3Tabs · .l3'],
+    '工具栏':['搜索框','toolbarHtml · .toolbar'],
+    '设置行':['列表行 ×5、开关、分段控件','settingsList · .item/.switch/.segline'],
+  },
+};
+const COMPONENTS = [
+  ['C01','列表行','.list / .item','智能体、会话、供应商、网关、诊断、掩码、资源库、插件、设置','行高、内边距、图标大小'],
+  ['C02','图标','.logo2','供应商、路由、智能体','圆角、字号、颜色'],
+  ['C03','状态点','.dot','智能体、供应商、路由、诊断','绿/黄/红三种，不加文字色'],
+  ['C04','统计块','.stats / .stat','用量、指标、掩码','每行 4 个，窄窗变 2 个'],
+  ['C05','图表','.chart / .bars','用量、指标','条数、高度、颜色'],
+  ['C06','卡片','.card','路由','标题、内边距'],
+  ['C07','开关','.switch','插件、设置','开/关两态'],
+  ['C08','分段控件','.segline','用量、指标、掩码、设置','2–4 项'],
+  ['C09','搜索框','.field','供应商、会话、资源库、插件、设置','宽度、占位文字'],
+  ['C10','普通按钮','.btn','所有页面','高度、内边距'],
+  ['C11','主按钮','.btn.primary','供应商、会话、资源库','一屏最多一个'],
+  ['C12','页内标签','.vtabs','用量、资源库、插件、设置','标签数量、滚动'],
+  ['C13','子标签','.l3','设置 › 额度','只有这里有'],
+  ['C14','工具栏','.toolbar','所有页面','顺序、换行'],
+  ['C15','折叠行','.foldrow','供应商 · 已关闭','展开/收起'],
+  ['C16','额度条','.quota','路由','宽度、颜色'],
+];
+
+const state = {
+  frame:'narrow', section:'model', page:'providers', theme:'light',
+  tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
+  spec:false, sel:null,
+};
+const qs = new URLSearchParams(location.search);
+if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
+if(qs.get('p') && PAGES[qs.get('p')]) state.page = qs.get('p');
+if(qs.get('spec')==='1') state.spec = true;
+if(PAGES[state.page]){ const s=SECTIONS.find(x=>x.pages.includes(state.page)); if(s) state.section=s.id; }
+if(qs.get('tab')){
+  const t = qs.get('tab'), pg = PAGES[state.page];
+  if(pg.tabs){
+    if(/^\d+$/.test(t) && pg.tabs[+t]) state.tabs[state.page] = pg.tabs[+t];
+    else if(pg.tabs.includes(t)) state.tabs[state.page] = t;
+  }
+}
+if(qs.get('theme')==='dark'){ state.theme='dark'; document.documentElement.dataset.theme='dark'; }
+const stage = document.getElementById('stage');
+
+const ROWS = {
+  agents:[
+    ['Codex','3 个账号 · 运行中','','#10a37f'],
+    ['Claude Code','2 个账号 · 已连接','','#d97757'],
+    ['Gemini CLI','1 个账号 · 未连接','','#4285f4'],
+  ],
+  sessions:[
+    ['项目一','12 个会话 · 2 小时前','',''],
+    ['项目二','8 个会话 · 昨天','',''],
+    ['项目三','5 个会话 · 3 天前','',''],
+  ],
+  providers:[
+    ['Codex','3 个账号 · 12 个模型','今日 1.2M','#10a37f'],
+    ['Claude Code','2 个账号 · 9 个模型','今日 842K','#d97757'],
+    ['Gemini CLI','1 个账号 · 7 个模型','今日 318K','#4285f4'],
+    ['Qwen Code','1 个账号 · 6 个模型','今日 96K','#615ced'],
+  ],
+  gateway:[
+    ['网关地址','127.0.0.1:3425',''],
+    ['最近调用','40 条',''],
+    ['运行时长','2 小时 14 分',''],
+  ],
+  masking:[
+    ['邮箱','a***@example.com','7 天内 3 次'],
+    ['手机号','138****0000','7 天内 1 次'],
+    ['密钥','sk-****','7 天内 2 次'],
+  ],
+  library:[
+    ['代码规范','library/instructions/代码规范.md',''],
+    ['评审清单','library/instructions/评审清单.md',''],
+    ['提交信息','library/instructions/提交信息.md',''],
+  ],
+  requests:[
+    ['codex/gpt-5.6-sol','1.2s · 2.4K 令牌','','#10a37f'],
+    ['claude/opus-4.6','2.4s · 3.1K 令牌','','#d97757'],
+    ['gemini/3-pro','3.1s · 1.8K 令牌','','#4285f4'],
+    ['qwen/3-max','0.9s · 900 令牌','','#615ced'],
+  ],
+  usageSessions:[
+    ['项目一 · 12 个会话','2 小时前',''],
+    ['项目二 · 8 个会话','昨天',''],
+    ['项目三 · 5 个会话','3 天前',''],
+  ],
+  rank:[
+    ['gpt-5.6-sol','1.2M 令牌','','#10a37f'],
+    ['opus-4.6','842K 令牌','','#d97757'],
+    ['gemini-3-pro','318K 令牌','','#4285f4'],
+    ['qwen-3-max','96K 令牌','','#615ced'],
+  ],
+  mcp:[
+    ['filesystem','stdio · 运行中',''],
+    ['github','stdio · 运行中',''],
+    ['web-search','http · 未连接',''],
+  ],
+  skills:[
+    ['代码评审','~/.config/magpie/library/skills/code-review',''],
+    ['写测试','~/.config/magpie/library/skills/write-tests',''],
+    ['提交信息','~/.config/magpie/library/skills/commit-msg',''],
+  ],
+  hooks:[
+    ['提交前检查','pre-commit',''],
+    ['保存时格式化','post-save',''],
+  ],
+  subagents:[
+    ['reviewer','继承主模型',''],
+    ['explorer','读文件、搜索',''],
+    ['tester','只跑测试',''],
+  ],
+  rtk:[
+    ['token-saver','已启用',''],
+    ['prompt-cache','已启用',''],
+  ],
+};
+const PLUGINS = [
+  ['路由分组','把模型按用途或供应商分组',true],
+  ['资源库','指令、MCP、技能、钩子、子代理',true],
+  ['可观测','把请求和用量发到 OTLP',false],
+  ['会话','浏览、移动、删除会话',true],
+];
+const CHECKS = [
+  ['网关','正常','ok'],
+  ['插件宿主','正常','ok'],
+  ['磁盘空间','剩余 82 GB','ok'],
+  ['证书','3 天后到期','warn'],
+];
+
+function sectionOf(page){ return SECTIONS.find(s=>s.pages.includes(page)); }
+function listRows(kind){
+  const rows = ROWS[kind] || [];
+  return `<div class="list">${rows.map(([n,s,m,c])=>`<div class="item">
+    ${c?`<span class="logo2" style="background:${c}">${n[0]}</span>`:`<span class="logo2" style="background:var(--pill);color:var(--muted)">${n[0]}</span>`}
+    <div class="who"><div class="nm">${n}</div>${s?`<div class="sub">${s}</div>`:''}</div>
+    ${m?`<span class="meta">${m}</span>`:''}
+  </div>`).join('')}</div>`;
+}
+function statsHtml(){
+  return `<div class="stats">
+    <div class="stat"><div class="k">请求</div><div class="v">1,284</div></div>
+    <div class="stat"><div class="k">令牌</div><div class="v">8.4M</div></div>
+    <div class="stat"><div class="k">花费</div><div class="v">$12.40</div></div>
+    <div class="stat"><div class="k">失败率</div><div class="v">0.8%</div></div>
+  </div>`;
+}
+function chartHtml(){
+  return `<div class="chart"><div class="k">最近 7 天</div>
+    <div class="bars">${[42,58,36,72,64,84,50].map(v=>`<i style="height:${v}%"></i>`).join('')}</div>
+  </div>`;
+}
+function routingCols(){
+  return `<div class="cols">
+    <div class="card"><h4>请求 · 今天</h4>
+      ${[['codex/gpt-5.6-sol','1.2s','ok'],['claude/opus-4.6','2.4s','ok'],['gemini/3-pro','3.1s','warn']].map(([n,t,k])=>`<div class="item"><span class="dot ${k==='warn'?'amber':''}"></span><div class="who"><div class="nm">${n}</div></div><span class="meta">${t}</span></div>`).join('')}
+    </div>
+    <div class="card"><h4>账号与密钥</h4>
+      ${[['Codex · alex@…',62,'#10a37f'],['Claude · team@…',31,'#d97757'],['Gemini · 1 个账号',8,'#4285f4']].map(([n,w,c])=>`<div class="item"><span class="logo2" style="background:${c}">${n[0]}</span><div class="who"><div class="nm">${n}</div></div><span class="quota"><i style="width:${w}%"></i></span><span class="meta">${w}%</span></div>`).join('')}
+    </div>
+  </div>`;
+}
+function switchList(){
+  return `<div class="list">${PLUGINS.map(([n,d,on])=>`<div class="item"><div class="who"><div class="nm">${n}</div><div class="sub">${d}</div></div><span class="switch${on?' on':''}"></span></div>`).join('')}</div>`;
+}
+function checkList(){
+  return `<div class="list">${CHECKS.map(([n,v,k])=>`<div class="item"><span class="dot ${k==='warn'?'amber':''}"></span><div class="who"><div class="nm">${n}</div></div><span class="meta">${v}</span></div>`).join('')}</div>`;
+}
+function maskStats(){
+  return `<div class="stats"><div class="stat"><div class="k">7 天掩码</div><div class="v">128</div></div><div class="stat"><div class="k">涉及供应商</div><div class="v">3</div></div><div class="stat"><div class="k">本地模型发现</div><div class="v">12</div></div><div class="stat"><div class="k">拦截</div><div class="v">0</div></div></div>`;
+}
+function settingsList(){
+  return `<div class="list">
+    <div class="item"><div class="who"><div class="nm">外观</div><div class="sub">跟随系统</div></div><div class="segline"><button class="segbtn on">跟随</button><button class="segbtn">浅色</button><button class="segbtn">深色</button></div></div>
+    <div class="item"><div class="who"><div class="nm">语言</div></div><button class="btn">简体中文 ⌄</button></div>
+    <div class="item"><div class="who"><div class="nm">菜单栏额度</div><div class="sub">在菜单栏显示每个窗口的用量</div></div><span class="switch on"></span></div>
+    <div class="item"><div class="who"><div class="nm">额度显示</div><div class="sub">已用或剩余</div></div><div class="segline"><button class="segbtn on">已用</button><button class="segbtn">剩余</button></div></div>
+    <div class="item"><div class="who"><div class="nm">重置时预热</div></div><span class="switch"></span></div>
+  </div>`;
+}
+function foldRow(){
+  return `<div class="foldrow"><span>▸</span><span>已关闭</span><span class="note">2 个</span></div>`;
+}
+function settingRow(name, sub, control){
+  return `<div class="item"><div class="who"><div class="nm">${name}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>${control}</div>`;
+}
+function settingsGeneral(){
+  return [`<div class="list">
+    ${settingRow('外观','跟随系统','<div class="segline"><button class="segbtn on">跟随</button><button class="segbtn">浅色</button><button class="segbtn">深色</button></div>')}
+    ${settingRow('语言','','<button class="btn">简体中文 ⌄</button>')}
+    ${settingRow('文字大小','','<div class="segline"><button class="segbtn">小</button><button class="segbtn on">中</button><button class="segbtn">大</button></div>')}
+    ${settingRow('减少动态效果','','<span class="switch"></span>')}
+  </div>`];
+}
+function settingsAllow(){
+  return [`<div class="list">
+    ${settingRow('菜单栏额度','在菜单栏显示每个窗口的用量','<span class="switch on"></span>')}
+    ${settingRow('额度显示','已用或剩余','<div class="segline"><button class="segbtn on">已用</button><button class="segbtn">剩余</button></div>')}
+    ${settingRow('重置时预热','窗口重置后自动发一次','<span class="switch"></span>')}
+    ${settingRow('每日预热','每天 09:00','<button class="btn">09:00 ⌄</button>')}
+  </div>`];
+}
+function settingsNetwork(){
+  return [`<div class="list">
+    ${settingRow('代理','','<div class="segline"><button class="segbtn on">直连</button><button class="segbtn">系统</button><button class="segbtn">自定义</button></div>')}
+    ${settingRow('网关端口','','<button class="btn">3425 ⌄</button>')}
+    ${settingRow('浏览器访问','','<div class="segline"><button class="segbtn on">关</button><button class="segbtn">本机</button><button class="segbtn">局域网</button></div>')}
+  </div>`];
+}
+function settingsModels(){
+  return [`<div class="list">
+    ${settingRow('图片模型','','<button class="btn">gpt-image ⌄</button>')}
+    ${settingRow('搜索模型','','<button class="btn">exa ⌄</button>')}
+    ${settingRow('回复模型','','<button class="btn">跟随请求 ⌄</button>')}
+    ${settingRow('禁用模型','','<button class="btn">管理</button>')}
+  </div>`];
+}
+function settingsPrivacy(){
+  return [`<div class="list">
+    ${settingRow('掩码','','<span class="switch on"></span>')}
+    ${settingRow('查找方式','','<div class="segline"><button class="segbtn on">规则</button><button class="segbtn">本地模型</button></div>')}
+    ${settingRow('发现的值','','<div class="segline"><button class="segbtn on">掩码</button><button class="segbtn">提醒</button><button class="segbtn">拦截</button></div>')}
+  </div>`];
+}
+function settingsOtel(){
+  return [`<div class="list">
+    ${settingRow('OTLP','','<span class="switch"></span>')}
+    ${settingRow('端点','','<button class="btn">设置</button>')}
+    ${settingRow('服务名','','<button class="btn">magpie ⌄</button>')}
+  </div>`];
+}
+function settingsSync(){
+  return [`<div class="list">
+    ${settingRow('同步','','<span class="switch on"></span>')}
+    ${settingRow('立即备份','','<button class="btn">备份</button>')}
+    ${settingRow('从备份恢复','','<button class="btn">恢复…</button>')}
+  </div>`];
+}
+function settingsPlugins(){
+  return [`<div class="list">
+    ${settingRow('路由分组','','<span class="switch on"></span>')}
+    ${settingRow('资源库','','<span class="switch on"></span>')}
+    ${settingRow('可观测','','<span class="switch"></span>')}
+    ${settingRow('会话','','<span class="switch on"></span>')}
+  </div>`];
+}
+function settingsAbout(){
+  return [`<div class="list">
+    ${settingRow('版本','','<button class="btn">0.1.2400</button>')}
+    ${settingRow('日志','','<button class="btn">打开</button>')}
+    ${settingRow('检查更新','','<button class="btn">检查</button>')}
+  </div>`];
+}
+function usageContext(){
+  return [`<div class="cols">
+    <div class="card"><h4>上下文窗口</h4>
+      ${[['系统提示','12%'],['对话历史','48%'],['工具结果','26%'],['剩余','14%']].map(([n,v])=>`<div class="item"><div class="who"><div class="nm">${n}</div></div><span class="meta">${v}</span></div>`).join('')}
+    </div>
+    <div class="card"><h4>工具调用</h4>
+      ${[['read_file','32 次'],['grep','18 次'],['apply_patch','9 次']].map(([n,v])=>`<div class="item"><div class="who"><div class="nm">${n}</div></div><span class="meta">${v}</span></div>`).join('')}
+    </div>
+  </div>`];
+}
+function discoverList(){
+  return [`<div class="list">${[
+    ['filesystem','MCP 服务器 · 读写本地文件'],
+    ['github','MCP 服务器 · 仓库与 PR'],
+    ['web-search','插件 · 网页搜索'],
+  ].map(([n,d])=>`<div class="item"><div class="who"><div class="nm">${n}</div><div class="sub">${d}</div></div><button class="btn">安装</button></div>`).join('')}</div>`];
+}
+function installedList(){
+  return [`<div class="list">${[
+    ['filesystem','v1.2.0',true],
+    ['github','v0.9.4',true],
+    ['web-search','v0.3.1',false],
+  ].map(([n,v,on])=>`<div class="item"><div class="who"><div class="nm">${n}</div><div class="sub">${v}</div></div><span class="switch${on?' on':''}"></span></div>`).join('')}</div>`];
+}
+const TAB_BODIES = {
+  usage:{
+    '概览': () => [statsHtml(), chartHtml()],
+    '请求': () => [listRows('requests')],
+    '会话': () => [listRows('usageSessions')],
+    '上下文': () => usageContext(),
+    '榜单': () => [listRows('rank')],
+  },
+  library:{
+    '指令': () => [listRows('library')],
+    'MCP · 3': () => [listRows('mcp')],
+    '技能 · 12': () => [listRows('skills')],
+    '钩子 · 2': () => [listRows('hooks')],
+    '子代理 · 4': () => [listRows('subagents')],
+    'RTK': () => [listRows('rtk')],
+  },
+  plugins:{
+    '内置': () => [switchList()],
+    '发现': () => discoverList(),
+    '已安装 · 3': () => installedList(),
+  },
+  settings:{
+    '通用': () => settingsGeneral(),
+    '额度': () => settingsAllow(),
+    '网络与共享': () => settingsNetwork(),
+    '模型': () => settingsModels(),
+    '隐私': () => settingsPrivacy(),
+    '可观测': () => settingsOtel(),
+    '同步与备份': () => settingsSync(),
+    '插件': () => settingsPlugins(),
+    '关于': () => settingsAbout(),
+  },
+};
+const TAB_BODY_NAMES = {
+  usage:{'概览':['统计块','图表'],'请求':['请求列表'],'会话':['会话列表'],'上下文':['上下文卡片'],'榜单':['榜单列表']},
+  library:{'指令':['指令列表'],'MCP · 3':['MCP 列表'],'技能 · 12':['技能列表'],'钩子 · 2':['钩子列表'],'子代理 · 4':['子代理列表'],'RTK':['RTK 列表']},
+  plugins:{'内置':['开关列表'],'发现':['发现列表'],'已安装 · 3':['已安装列表']},
+  settings:{'通用':['设置行'],'额度':['设置行'],'网络与共享':['设置行'],'模型':['设置行'],'隐私':['设置行'],'可观测':['设置行'],'同步与备份':['设置行'],'插件':['设置行'],'关于':['设置行']},
+};
+const TAB_SPEC = {
+  usage:{
+    '请求列表':['列表行 ×4、状态点','listRows · .item'],
+    '会话列表':['列表行 ×3','listRows · .item'],
+    '上下文卡片':['卡片 ×2、列表行','usageContext · .cols/.card'],
+    '榜单列表':['列表行 ×4','listRows · .item'],
+  },
+  library:{
+    'MCP 列表':['列表行 ×3','listRows · .item'],
+    '技能列表':['列表行 ×3','listRows · .item'],
+    '钩子列表':['列表行 ×2','listRows · .item'],
+    '子代理列表':['列表行 ×3','listRows · .item'],
+    'RTK 列表':['列表行 ×2','listRows · .item'],
+  },
+  plugins:{
+    '发现列表':['列表行 ×3、普通按钮','discoverList · .item/.btn'],
+    '已安装列表':['列表行 ×3、开关','installedList · .item/.switch'],
+  },
+  settings:{
+    '设置行':['列表行 ×3–4、开关、分段控件','settings* · .item/.switch/.segline'],
+  },
+};
+function bodyBlocks(page, kind){
+  const p = PAGES[page];
+  const tab = p && p.tabs ? (state.tabs[page] || p.tabs[0]) : null;
+  const f = tab && TAB_BODIES[page] && TAB_BODIES[page][tab];
+  if(f) return f();
+  if(kind==='usage' || kind==='metrics') return [statsHtml(), chartHtml()];
+  if(kind==='routing') return [routingCols()];
+  if(kind==='plugins') return [switchList()];
+  if(kind==='doctor') return [checkList()];
+  if(kind==='masking') return [maskStats(), listRows('masking')];
+  if(kind==='settings') return [settingsList()];
+  if(kind==='providers') return [listRows('providers'), foldRow()];
+  return [listRows(kind)];
+}
+function bodyNamesFor(page, tab){
+  const p = PAGES[page];
+  const n = tab && TAB_BODY_NAMES[page] && TAB_BODY_NAMES[page][tab];
+  return n || BODY_NAMES[p.kind] || ['内容'];
+}
+function bodyNames(page, kind){
+  const p = PAGES[page];
+  const tab = p && p.tabs ? (state.tabs[page] || p.tabs[0]) : null;
+  return bodyNamesFor(page, tab);
+}
+function toolbarHtml(p){
+  let h = '<div class="toolbar">';
+  if(p.search) h += `<div class="field">${ic('search')}<span>${p.search}</span></div>`;
+  if(p.period) h += `<div class="segline">${p.period.map((x,i)=>`<button class="segbtn${i===0?' on':''}">${x}</button>`).join('')}</div>`;
+  (p.buttons||[]).forEach(b=>{ h += `<button class="btn${b.startsWith('＋')?' primary':''}">${b}</button>`; });
+  h += '</div>';
+  return h;
+}
+function viewTabs(p){
+  if(!p.tabs) return '';
+  const cur = state.tabs[state.page] || p.tabs[0];
+  return `<div class="vtabs">${p.tabs.map(x=>`<button class="tab${x===cur?' on':''}" data-vtab="${x}">${x}</button>`).join('')}</div>`;
+}
+function l3Tabs(){
+  if(state.page!=='settings' || (state.tabs.settings||'额度')!=='额度') return '';
+  return `<div class="l3">${['全部','菜单栏','显示与提醒','预热'].map(x=>`<button class="tab${x===state.l3?' on':''}" data-l3="${x}">${x}</button>`).join('')}</div>`;
+}
+function reg(n, name, html){
+  if(!state.spec) return html;
+  const sel = state.sel && state.sel.n===n;
+  return `<div class="spec-reg${sel?' sel':''}"><div class="spec-head" data-rn="${n}" data-rname="${name}"><span class="spec-badge">${n}</span><span>${name}</span></div>${html}</div>`;
+}
+function navSide(){
+  return `<aside class="side">
+    <div class="head">${logo()}<span style="font-weight:600;font-size:13px">magpie</span></div>
+    <button class="jump">${ic('search')}<span>跳转</span></button>
+    <div class="scroll">
+      ${SECTIONS.map(sec=>{
+        const on = state.page!=='settings' && state.section===sec.id;
+        return `<button class="secrow${on?' on':''}" data-sec="${sec.id}"><span>${sec.name}</span><span class="chev">›</span></button>`+
+          (on?`<div class="pages">${sec.pages.map(id=>`<button class="pagerow${state.page===id?' on':''}" data-page="${id}">${ic(PAGES[id].icon)}<span>${PAGES[id].name}</span></button>`).join('')}</div>`:'');
+      }).join('')}
+    </div>
+    <div class="footnav"><button class="pagerow${state.page==='settings'?' on':''}" data-page="settings" style="height:28px">${ic('gear')}<span>设置</span></button></div>
+  </aside>`;
+}
+function secStrip(){
+  return `<nav class="secstrip">${SECTIONS.map(sec=>`<button class="sec${state.page!=='settings'&&state.section===sec.id?' on':''}" data-sec="${sec.id}">${sec.name}</button>`).join('')}</nav>`;
+}
+function pageStrip(){
+  if(state.page==='settings') return '';
+  const sec = SECTIONS.find(s=>s.id===state.section);
+  if(!sec) return '';
+  return `<nav class="pagestrip">${sec.pages.map(id=>`<button class="tab${state.page===id?' on':''}" data-page="${id}">${PAGES[id].name}</button>`).join('')}</nav>`;
+}
+function topbar(brand){
+  return `<header class="top">
+    <div class="lights"><i></i><i></i><i></i></div>
+    ${brand?`<div class="brand">${logo()}<span>magpie</span></div>`:`<div class="crumb">${PAGES[state.page].name}</div>`}
+    <div class="actions"><button class="btn">更新</button><button class="iconbtn${state.page==='settings'?' on':''}" data-page="settings">${ic('gear')}</button></div>
+  </header>`;
+}
+function footerbar(){
+  return `<footer style="flex:none;height:27px;display:flex;align-items:center;gap:6px;padding:0 10px;border-top:.5px solid var(--line-2);font-size:10px;color:var(--muted)"><span class="dot"></span>网关运行中 · 4 个会话已连接</footer>`;
+}
+function regionsFor(page, p){
+  const arr = [];
+  if(p.tabs) arr.push(['标签条', viewTabs(p)]);
+  if(page==='settings' && (state.tabs.settings||'额度')==='额度') arr.push(['子标签', l3Tabs()]);
+  arr.push(['工具栏', toolbarHtml(p)]);
+  const names = bodyNames(page, p.kind);
+  bodyBlocks(page, p.kind).forEach((html,i)=>arr.push([names[i]||'内容', html]));
+  return arr;
+}
+function mainView(){
+  const p = PAGES[state.page];
+  const regions = regionsFor(state.page, p);
+  return `<main class="view">${regions.map((r,i)=>reg(i+1, r[0], r[1])).join('')}</main>`;
+}
+function renderStage(){
+  stage.innerHTML = state.frame==='wide'
+    ? `<div class="win wide">${topbar(false)}<div class="main">${navSide()}${mainView()}</div>${footerbar()}</div>`
+    : `<div class="win narrow">${topbar(true)}${secStrip()}${pageStrip()}${mainView()}${footerbar()}</div>`;
+  const sec = SECTIONS.find(s=>s.id===state.section);
+  const where = state.page==='settings' ? '设置' : ((sec ? sec.name + ' › ' : '') + PAGES[state.page].name);
+  document.getElementById('where').textContent = where;
+  document.querySelectorAll('#frameSeg button[data-f]').forEach(b=>b.classList.toggle('on', b.dataset.f===state.frame));
+  document.getElementById('specBtn').textContent = '标注：' + (state.spec ? '开' : '关');
+  const regions = regionsFor(state.page, PAGES[state.page]).map(r=>r[0]);
+  const selTxt = state.sel ? ('已选：' + where + ' · 区域 ' + state.sel.n + ' · ' + state.sel.name) : ('当前页：' + where);
+  document.getElementById('caption').textContent = selTxt + ' · 本页区域：' + regions.join(' · ') + '。';
+  const info = TAB_SPEC[state.page] || {};
+  const pinfo = SPEC_INFO[state.page] || {};
+  document.getElementById('pageSpec').innerHTML = '<table><thead><tr><th>编号</th><th>区域</th><th>由哪些组件组成</th><th>改动位置</th></tr></thead><tbody>' +
+    regions.map((name,i)=>{
+      const it = info[name] || pinfo[name] || ['内容模块','bodyBlocks · .list/.item'];
+      return '<tr class="' + (state.sel && state.sel.n===i+1 ? 'on' : '') + '"><td>' + (i+1) + '</td><td>' + name + '</td><td>' + it[0] + '</td><td class="comps">' + it[1] + '</td></tr>';
+    }).join('') + '</tbody></table>';
+
+  document.getElementById('compIndex').innerHTML = '<table><thead><tr><th>编号</th><th>组件</th><th>样式类</th><th>用在哪</th><th>改这里</th></tr></thead><tbody>' +
+    COMPONENTS.map(c=>'<tr><td>' + c[0] + '</td><td>' + c[1] + '</td><td class="comps">' + c[2] + '</td><td class="secn">' + c[3] + '</td><td class="comps">' + c[4] + '</td></tr>').join('') + '</tbody></table>';
+}
+stage.addEventListener('click', e=>{
+  const h = e.target.closest('.spec-head');
+  if(h){ state.sel = {n:+h.dataset.rn, name:h.dataset.rname}; renderStage(); return; }
+  const s = e.target.closest('[data-sec]');
+  if(s){
+    const sec = SECTIONS.find(x=>x.id===s.dataset.sec);
+    state.section = sec.id; state.page = sec.pages[0]; state.sel = null; renderStage(); return;
+  }
+  const p = e.target.closest('[data-page]');
+  if(p){
+    state.page = p.dataset.page;
+    const sec = sectionOf(state.page);
+    if(sec) state.section = sec.id;
+    state.sel = null; renderStage(); return;
+  }
+  const v = e.target.closest('[data-vtab]');
+  if(v){ state.tabs[state.page] = v.dataset.vtab; state.sel = null; renderStage(); return; }
+  const l = e.target.closest('[data-l3]');
+  if(l){ state.l3 = l.dataset.l3; state.sel = null; renderStage(); }
+});
+function renderAllIndex(){
+  const rows = [];
+  Object.keys(PAGES).forEach(id=>{
+    const p = PAGES[id];
+    const sec = sectionOf(id);
+    const tabs = p.tabs ? p.tabs : [null];
+    tabs.forEach(tab=>{
+      const regions = [];
+      if(p.tabs) regions.push('标签条');
+      if(id==='settings' && tab==='额度') regions.push('子标签');
+      regions.push('工具栏');
+      regions.push(...bodyNamesFor(id, tab));
+      const infoOf = n => (TAB_SPEC[id] && TAB_SPEC[id][n]) || (SPEC_INFO[id] && SPEC_INFO[id][n]) || ['—','—'];
+      const comps = regions.map(n=>infoOf(n)[0]).join(' / ');
+      const where = regions.map(n=>infoOf(n)[1]).join(' / ');
+      rows.push({
+        title: (sec ? sec.name + ' › ' : '') + p.name + (tab ? ' › ' + tab : ''),
+        regions: regions.map((n,i)=>(i+1)+' '+n).join(' / '),
+        comps, where,
+      });
+    });
+  });
+  document.getElementById('allIndex').innerHTML = '<table><thead><tr><th>页面 / 视图</th><th>区域（编号）</th><th>由哪些组件组成</th><th>改动位置</th></tr></thead><tbody>' +
+    rows.map(r=>'<tr><td>'+r.title+'</td><td>'+r.regions+'</td><td>'+r.comps+'</td><td class="comps">'+r.where+'</td></tr>').join('') + '</tbody></table>';
+}
+document.getElementById('frameSeg').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-f]');
+  if(!b) return;
+  state.frame = b.dataset.f; renderStage();
+});
+document.getElementById('specBtn').addEventListener('click', ()=>{
+  state.spec = !state.spec; state.sel = null; renderStage();
+});
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  state.theme = state.theme==='light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = state.theme==='dark' ? 'dark' : '';
+});
+renderStage();
+renderAllIndex();
+</script>
+</body>
+</html>

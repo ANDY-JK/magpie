@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>magpie · 界面骨架与通用组件</title>
+<style>
+:root{
+  --bg:#f4f4f6; --card:#fff; --card-2:#f9f9fb; --pill:#f1f1f4; --pill-hover:#e9e9ee;
+  --seg-track:#e6e6eb; --seg-thumb:#fff;
+  --seg-edge:0 1px 2px rgba(0,0,0,.14),0 0 0 .5px rgba(0,0,0,.08);
+  --line:#e3e3e8; --line-2:#ececf0; --fg:#1c1c21; --fg-2:#4b4b53; --muted:#85858d; --faint:#b9b9c2;
+  --ctl:#63636b; --accent:#4f46e5; --accent-soft:#eeedfd; --accent-fg:#fff;
+  --green:#189a58; --amber:#b45309; --red:#d64545;
+  --skel:#e9e9ee; --skel-2:#f2f2f5;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --code:ui-monospace,"SF Mono",Menlo,Consolas,"Microsoft YaHei UI",monospace;
+  --shadow:0 16px 44px rgba(20,22,30,.16),0 2px 8px rgba(20,22,30,.06),0 0 0 .5px rgba(20,22,30,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 0 0 .5px rgba(0,0,0,.07);
+  --stage:#e6e7ec; --pop:rgba(255,255,255,.94);
+}
+[data-theme="dark"]{
+  --bg:#1a1a1e; --card:#232327; --card-2:#1f1f23; --pill:#2d2d33; --pill-hover:#36363d;
+  --seg-track:rgba(255,255,255,.035); --seg-thumb:rgba(255,255,255,.15);
+  --seg-edge:inset 0 .5px 0 rgba(255,255,255,.08),0 1px 2px rgba(0,0,0,.3);
+  --line:#333339; --line-2:#2c2c32; --fg:#ededf1; --fg-2:#b9b9c1; --muted:#8b8b94; --faint:#56565f;
+  --ctl:#a1a1aa; --accent:#a5b4fc; --accent-soft:#2b2c47; --accent-fg:#14142a;
+  --green:#6fd99b; --amber:#f2b544; --red:#f28b82;
+  --skel:#2a2a30; --skel-2:#232327;
+  --shadow:0 16px 44px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.1);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.09);
+  --stage:#0f1013; --pop:rgba(38,38,43,.96);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);color:var(--fg);background:var(--stage);min-height:100vh;padding:58px 16px 30px;display:flex;flex-direction:column;align-items:center;gap:14px;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:default;appearance:none;text-align:left}
+h2{font-size:14px;font-weight:600;margin-bottom:2px}
+.lead{font-size:11px;color:var(--muted);margin-bottom:8px}
+.ic{width:16px;height:16px;flex:none;color:var(--muted)}
+
+/* 顶栏 */
+.proto{position:fixed;top:9px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:12px;background:var(--pop);box-shadow:var(--shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.ptitle{font-size:12px;font-weight:600;color:var(--fg-2);white-space:nowrap}
+.tbtn{height:23px;padding:0 9px;border-radius:7px;font-size:11.5px;color:var(--ctl);background:var(--card);box-shadow:0 0 0 .5px var(--line);white-space:nowrap}
+.tbtn:hover{color:var(--fg)}
+.sep{width:1px;height:17px;background:var(--line)}
+
+/* 版块 */
+section{width:1120px;max-width:100%}
+
+/* ---- 1. 已定的窗口骨架（只作容器，不再讨论） ---- */
+.skelwin{background:var(--bg);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;height:420px}
+.skelwin.narrow{width:720px;max-width:100%}
+.skelwin .sk-top{height:36px;display:flex;align-items:center;gap:7px;padding:0 10px;border-bottom:1px solid var(--line-2)}
+.skelwin .sk-foot{height:24px;display:flex;align-items:center;padding:0 10px;border-top:1px solid var(--line-2);font-size:9.5px;color:var(--faint)}
+.dots{display:flex;gap:6px}
+.dots i{width:9px;height:9px;border-radius:50%;background:#ff5f57}
+.dots i:nth-child(2){background:#febc2e}
+.dots i:nth-child(3){background:#28c840}
+.sk-title{font-size:10.5px;color:var(--muted)}
+.sk-wide,.sk-narrow{flex:1;display:flex;flex-direction:column;min-height:0}
+.skelwin.narrow .sk-wide{display:none}
+.skelwin:not(.narrow) .sk-narrow{display:none}
+.sk-body{flex:1;display:flex;min-height:0}
+.sk-side{width:174px;flex:none;border-right:1px solid var(--line-2);padding:7px;display:flex;flex-direction:column;gap:3px}
+.sk-brand{font-size:11px;font-weight:600;padding:2px 6px 4px}
+.sk-jump{height:22px;border-radius:6px;background:var(--pill);color:var(--faint);font-size:9.5px;display:flex;align-items:center;padding:0 7px;margin-bottom:2px}
+.sk-scroll{flex:1;min-height:0;overflow:hidden}
+.sk-main{flex:1;min-width:0;padding:7px 9px;display:flex;flex-direction:column;gap:4px}
+.sk-lv-tag{display:inline-flex;align-items:center;height:15px;padding:0 5px;border-radius:4px;font-size:8.5px;font-weight:600;color:#fff;align-self:flex-start;margin:1px 0}
+.sk-lv-tag.l1{background:#4f46e5}.sk-lv-tag.l2{background:#8b5cf6}.sk-lv-tag.l3{background:#0d9488}.sk-lv-tag.l4{background:#b45309}
+.sk-sec{display:flex;align-items:center;height:25px;padding:0 7px;border-radius:6px;font-size:11px;font-weight:500;color:var(--fg-2)}
+.sk-sec.on{background:var(--card);box-shadow:var(--seg-edge);color:var(--fg)}
+.sk-sec span{margin-left:auto;color:var(--faint);font-size:9px}
+.sk-page{display:flex;align-items:center;height:22px;padding:0 7px 0 17px;border-radius:6px;font-size:10px;color:var(--muted)}
+.sk-page.on{background:var(--card);box-shadow:var(--seg-edge);color:var(--fg);font-weight:500}
+.sk-footnav{margin-top:3px;border-top:1px solid var(--line-2);padding-top:4px;font-size:10.5px;color:var(--muted)}
+.sk-tabs{display:flex;gap:2px}
+.sk-tabs span{height:20px;padding:0 6px;border-radius:5px;font-size:9.5px;color:var(--muted);display:inline-flex;align-items:center;white-space:nowrap}
+.sk-tabs span.on{background:var(--card);box-shadow:var(--seg-edge);color:var(--fg)}
+.sk-toolbar{display:flex;gap:4px;align-items:center}
+.sk-search{flex:1;height:22px;border-radius:6px;background:var(--card);box-shadow:0 0 0 .5px var(--line);display:flex;align-items:center;padding:0 7px;font-size:9.5px;color:var(--faint)}
+.sk-btn{height:22px;padding:0 7px;border-radius:6px;background:var(--card);box-shadow:0 0 0 .5px var(--line);font-size:9.5px;color:var(--fg-2);display:inline-flex;align-items:center;white-space:nowrap}
+.sk-content{flex:1;border:1px dashed var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--faint);background:var(--skel-2);min-height:60px}
+.sk-strip{display:flex;gap:2px;padding:0 8px;overflow:hidden}
+.sk-strip span{height:21px;padding:0 7px;border-radius:5px;font-size:10px;color:var(--muted);display:inline-flex;align-items:center;white-space:nowrap}
+.sk-strip span.on{background:var(--card);box-shadow:var(--seg-edge);color:var(--fg);font-weight:500}
+.sk-narrow .sk-main{padding:7px 12px}
+
+/* ---- 2. 组件卡片 ---- */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.comp{background:var(--card);border-radius:11px;box-shadow:var(--shadow-sm);padding:10px 11px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.comp-h{display:flex;align-items:baseline;gap:6px}
+.comp-h b{font-size:12px}
+.comp-h span{font-size:9.5px;color:var(--faint);margin-left:auto;white-space:nowrap}
+.comp-demo{background:var(--bg);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:5px;min-height:64px;justify-content:center}
+.comp-note{font-size:10px;color:var(--muted);line-height:1.45}
+
+/* ---- 通用组件外观 ---- */
+.mg-row{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--card);border-radius:7px;box-shadow:var(--shadow-sm)}
+.mg-logo{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:600;color:#fff;flex:none}
+.mg-who{flex:1;min-width:0}
+.mg-nm{font-size:11.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mg-sub{font-size:9.5px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mg-meta{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mg-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+.mg-dot.amber{background:var(--amber)}
+.mg-dot.red{background:var(--red)}
+.mg-card{background:var(--card);border-radius:8px;box-shadow:var(--shadow-sm);padding:8px 9px}
+.mg-card h4{font-size:10px;font-weight:600;color:var(--muted);margin-bottom:5px}
+.mg-stat{background:var(--card);border-radius:7px;box-shadow:var(--shadow-sm);padding:7px 9px}
+.mg-stat .k{font-size:9.5px;color:var(--muted)}
+.mg-stat .v{font-size:15px;font-weight:600;margin-top:1px;font-variant-numeric:tabular-nums}
+.mg-bars{display:flex;align-items:flex-end;gap:4px;height:44px}
+.mg-bars i{flex:1;border-radius:3px 3px 1px 1px;background:var(--accent);opacity:.85;min-height:3px}
+.mg-bars i:nth-child(3n){opacity:.5}
+.mg-switch{width:30px;height:18px;border-radius:999px;background:var(--pill);position:relative;flex:none}
+.mg-switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.mg-switch.on{background:var(--accent)}
+.mg-switch.on::after{left:14px}
+.mg-seg{display:inline-flex;padding:2px;border-radius:7px;background:var(--seg-track);gap:1px}
+.mg-seg button{height:21px;padding:0 7px;border-radius:5px;font-size:10px;color:var(--ctl);white-space:nowrap}
+.mg-seg button.on{background:var(--seg-thumb);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.mg-search{height:24px;border-radius:6px;background:var(--card);box-shadow:0 0 0 .5px var(--line);display:flex;align-items:center;gap:5px;padding:0 7px;font-size:10px;color:var(--muted)}
+.mg-btn{height:24px;padding:0 8px;border-radius:6px;font-size:10.5px;color:var(--fg-2);background:var(--card);box-shadow:0 0 0 .5px var(--line),0 1px 1px rgba(0,0,0,.03);display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+.mg-btn.primary{background:var(--accent);color:var(--accent-fg);box-shadow:none}
+.mg-empty{border:1px dashed var(--line);border-radius:7px;padding:12px;text-align:center;font-size:10.5px;color:var(--faint)}
+.mg-skel{display:flex;flex-direction:column;gap:5px}
+.mg-skel i{height:9px;border-radius:4px;background:var(--skel);display:block}
+.mg-skel i:nth-child(2){width:78%}
+.mg-skel i:nth-child(3){width:56%}
+.mg-navsec{display:flex;align-items:center;gap:6px;height:28px;padding:0 7px;border-radius:6px;font-size:11.5px;font-weight:500;color:var(--fg-2);background:var(--card);box-shadow:var(--shadow-sm)}
+.mg-navsec .chev{margin-left:auto;color:var(--faint);font-size:10px}
+.mg-navpage{display:flex;align-items:center;gap:6px;height:25px;padding:0 7px 0 20px;border-radius:6px;font-size:10.5px;color:var(--muted)}
+.mg-navpage.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.mg-tabs{display:flex;gap:2px}
+.mg-tabs button{height:22px;padding:0 7px;border-radius:5px;font-size:10px;color:var(--muted);white-space:nowrap}
+.mg-tabs button.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.mg-toolbar{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.mg-toolbar .mg-search{flex:1;min-width:80px}
+
+/* ---- 3. 组合 ---- */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.example{background:var(--card);border-radius:11px;box-shadow:var(--shadow-sm);padding:10px 11px;display:flex;flex-direction:column;gap:7px}
+.example .ex-h{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.example .ex-h b{font-size:12px;color:var(--fg)}
+.example .frame{background:var(--bg);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px}
+.example .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+
+/* ---- 4. 规则 ---- */
+.rules{background:var(--card);border-radius:11px;box-shadow:var(--shadow-sm);padding:11px 13px}
+.rules ul{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:5px 16px}
+.rules li{font-size:11px;color:var(--fg-2);line-height:1.45;padding-left:13px;position:relative}
+.rules li::before{content:"";position:absolute;left:2px;top:6px;width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.footnote{font-size:10.5px;color:var(--muted);text-align:center;max-width:900px;line-height:1.5}
+@media (max-width:1000px){ .grid{grid-template-columns:repeat(2,1fr)} .two{grid-template-columns:1fr} .rules ul{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<div class="proto">
+  <span class="ptitle">界面骨架 · 通用组件</span>
+  <button class="tbtn" id="skelBtn">骨架：宽窗</button>
+  <span class="sep"></span>
+  <button class="tbtn" id="themeBtn">明 / 暗</button>
+</div>
+
+<section>
+  <h2>1. 窗口骨架（已定，直接复用）</h2>
+  <p class="lead">一级 5 个分区、四层导航、窄窗优先——外壳不再改。下面只把里面的模块抽出来。</p>
+  <div class="skelwin" id="skelwin">
+    <div class="sk-wide">
+      <div class="sk-top"><span class="dots"><i></i><i></i><i></i></span><span class="sk-title">标题栏 · magpie</span></div>
+      <div class="sk-body">
+        <aside class="sk-side">
+          <div class="sk-brand">magpie</div>
+          <div class="sk-jump">跳转</div>
+          <div class="sk-scroll">
+            <div class="sk-lv-tag l1">① 一级 · 5 分区</div>
+            <div class="sk-sec on">模型 <span>›</span></div>
+            <div class="sk-lv-tag l2">② 二级 · 页面</div>
+            <div class="sk-page on">供应商</div>
+            <div class="sk-page">路由</div>
+            <div class="sk-page">网关</div>
+            <div class="sk-sec">对话 <span>›</span></div>
+            <div class="sk-sec">分析 <span>›</span></div>
+            <div class="sk-sec">隐私 <span>›</span></div>
+            <div class="sk-sec">扩展 <span>›</span></div>
+          </div>
+          <div class="sk-footnav">设置</div>
+        </aside>
+        <main class="sk-main">
+          <div class="sk-lv-tag l3">③ 三级 · 页内标签</div>
+          <div class="sk-tabs"><span class="on">概览</span><span>请求</span><span>会话</span><span>上下文</span><span>榜单</span></div>
+          <div class="sk-lv-tag l4">④ 四级 · 工具栏</div>
+          <div class="sk-toolbar"><span class="sk-search">搜索</span><span class="sk-btn">刷新</span></div>
+          <div class="sk-content">内容模块</div>
+        </main>
+      </div>
+      <div class="sk-foot">底栏 · 状态</div>
+    </div>
+    <div class="sk-narrow">
+      <div class="sk-top"><span class="dots"><i></i><i></i><i></i></span><span class="sk-title">magpie</span><span style="margin-left:auto;font-size:9.5px;color:var(--muted)">更新 ⚙</span></div>
+      <div class="sk-lv-tag l1" style="margin:5px 8px 0">① 一级 · 5 分区</div>
+      <div class="sk-strip"><span>对话</span><span class="on">模型</span><span>分析</span><span>隐私</span><span>扩展</span></div>
+      <div class="sk-lv-tag l2" style="margin:3px 8px 0">② 二级 · 页面</div>
+      <div class="sk-strip"><span class="on">供应商</span><span>路由</span><span>网关</span></div>
+      <main class="sk-main">
+        <div class="sk-lv-tag l3">③ 三级 · 页内标签</div>
+        <div class="sk-tabs"><span class="on">概览</span><span>请求</span><span>会话</span><span>上下文</span><span>榜单</span></div>
+        <div class="sk-lv-tag l4">④ 四级 · 工具栏</div>
+        <div class="sk-toolbar"><span class="sk-search">搜索</span><span class="sk-btn">刷新</span></div>
+        <div class="sk-content">内容模块</div>
+      </main>
+      <div class="sk-foot">底栏 · 状态</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>2. 导航组件</h2>
+  <p class="lead">只做四个，所有页面复用；不自己造新的。</p>
+  <div class="grid">
+    <div class="comp">
+      <div class="comp-h"><b>一级 · 分区行</b><span>5 个</span></div>
+      <div class="comp-demo">
+        <div class="mg-navsec"><span>模型</span><span class="chev">›</span></div>
+        <div class="mg-navpage on">供应商</div>
+        <div class="mg-navpage">路由</div>
+      </div>
+      <div class="comp-note">折叠时只有分区；点开才露出页面。宽窗在侧栏，窄窗在顶栏。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>二级 · 页面行</b><span>2–3 个</span></div>
+      <div class="comp-demo">
+        <div class="mg-navpage on">供应商</div>
+        <div class="mg-navpage">路由</div>
+        <div class="mg-navpage">网关</div>
+      </div>
+      <div class="comp-note">当前页白底高亮；窄窗变成页内横条，样式不变。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>三级 · 标签条</b><span>可滚动</span></div>
+      <div class="comp-demo">
+        <div class="mg-tabs"><button class="on">概览</button><button>请求</button><button>会话</button><button>上下文</button></div>
+      </div>
+      <div class="comp-note">页面自己的视图。用量 5 个、资源库 6 个、插件 3 个、设置 9 个。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>顶部 · 工具栏</b><span>每页一个</span></div>
+      <div class="comp-demo">
+        <div class="mg-toolbar"><div class="mg-search">搜索</div><button class="mg-btn">隐藏账号</button><button class="mg-btn primary">＋ 添加</button></div>
+      </div>
+      <div class="comp-note">只放当前页的筛选和操作；不放导航。</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>3. 内容组件</h2>
+  <p class="lead">页面内容只用这些积木拼，尺寸和样式统一。</p>
+  <div class="grid">
+    <div class="comp">
+      <div class="comp-h"><b>列表行</b><span>最常用</span></div>
+      <div class="comp-demo">
+        <div class="mg-row"><span class="mg-logo" style="background:#10a37f">C</span><div class="mg-who"><div class="mg-nm">Codex</div><div class="mg-sub">3 个账号 · 12 个模型</div></div><span class="mg-meta">1.2M</span></div>
+      </div>
+      <div class="comp-note">图标 + 标题 + 副标题 + 右值 + 状态点。供应商、会话、资源库、插件、诊断、掩码共用。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>统计块</b><span>4 个一行</span></div>
+      <div class="comp-demo" style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <div class="mg-stat"><div class="k">请求</div><div class="v">1,284</div></div>
+        <div class="mg-stat"><div class="k">令牌</div><div class="v">8.4M</div></div>
+      </div>
+      <div class="comp-note">用量、指标、掩码共用；窄窗自动变两列。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>图表</b><span>条状</span></div>
+      <div class="comp-demo">
+        <div class="mg-card"><div class="mg-bars"><i style="height:38%"></i><i style="height:60%"></i><i style="height:32%"></i><i style="height:72%"></i><i style="height:54%"></i><i style="height:82%"></i><i style="height:46%"></i></div></div>
+      </div>
+      <div class="comp-note">用量、指标共用；只画趋势，不做复杂图表。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>卡片</b><span>分组用</span></div>
+      <div class="comp-demo">
+        <div class="mg-card"><h4>账号与密钥</h4><div class="mg-nm">Codex · alex@…</div><div class="mg-sub">62% 已用</div></div>
+      </div>
+      <div class="comp-note">路由、网关、设置共用；一个卡片只放一件事。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>开关</b><span>是/否</span></div>
+      <div class="comp-demo" style="flex-direction:row;align-items:center;gap:12px">
+        <span class="mg-switch on"></span><span class="mg-switch"></span><span class="mg-sub">开 / 关</span>
+      </div>
+      <div class="comp-note">设置、插件、预热共用；不做第三种状态。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>分段控件</b><span>2–4 项</span></div>
+      <div class="comp-demo">
+        <div class="mg-seg"><button class="on">今天</button><button>7 天</button><button>30 天</button></div>
+      </div>
+      <div class="comp-note">时间范围、已用/剩余、浅色/深色共用。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>搜索框</b><span>固定样式</span></div>
+      <div class="comp-demo"><div class="mg-search">查找供应商</div></div>
+      <div class="comp-note">所有搜索共用；窄窗里自动拉满一行。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>按钮</b><span>两种</span></div>
+      <div class="comp-demo" style="flex-direction:row;gap:6px;align-items:center">
+        <button class="mg-btn">普通</button><button class="mg-btn primary">＋ 添加</button>
+      </div>
+      <div class="comp-note">只保留普通和主按钮；一屏最多一个主按钮。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>状态点</b><span>3 种</span></div>
+      <div class="comp-demo" style="flex-direction:row;gap:14px;align-items:center">
+        <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span class="mg-dot"></span>正常</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span class="mg-dot amber"></span>注意</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span class="mg-dot red"></span>失败</span>
+      </div>
+      <div class="comp-note">供应商、诊断、路由、网关共用；不用彩色文字代替。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>空状态</b><span>没有内容时</span></div>
+      <div class="comp-demo"><div class="mg-empty">暂无内容</div></div>
+      <div class="comp-note">所有列表共用一句“暂无内容”，不加插画。</div>
+    </div>
+    <div class="comp">
+      <div class="comp-h"><b>骨架屏</b><span>加载时</span></div>
+      <div class="comp-demo"><div class="mg-skel"><i></i><i></i><i></i></div></div>
+      <div class="comp-note">列表、卡片加载时用同一种灰条，不做转圈。</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>4. 页面怎么拼</h2>
+  <p class="lead">页面 = 窗口骨架 + 二级页面 + 三级标签 + 顶部工具栏 + 内容组件。下面两页用的是同一批积木。</p>
+  <div class="two">
+    <div class="example">
+      <div class="ex-h"><b>供应商</b><span>工具栏 + 列表</span></div>
+      <div class="frame">
+        <div class="mg-toolbar"><div class="mg-search">查找供应商</div><button class="mg-btn">隐藏</button><button class="mg-btn primary">＋ 添加</button></div>
+        <div class="mg-row"><span class="mg-logo" style="background:#10a37f">C</span><div class="mg-who"><div class="mg-nm">Codex</div><div class="mg-sub">3 个账号 · 1.2M</div></div><span class="mg-dot"></span></div>
+        <div class="mg-row"><span class="mg-logo" style="background:#d97757">A</span><div class="mg-who"><div class="mg-nm">Claude Code</div><div class="mg-sub">2 个账号 · 842K</div></div><span class="mg-dot"></span></div>
+      </div>
+    </div>
+    <div class="example">
+      <div class="ex-h"><b>用量</b><span>标签 + 工具栏 + 统计 + 图表</span></div>
+      <div class="frame">
+        <div class="mg-tabs"><button class="on">概览</button><button>请求</button><button>会话</button><button>上下文</button><button>榜单</button></div>
+        <div class="mg-toolbar"><div class="mg-seg"><button class="on">今天</button><button>7 天</button></div><button class="mg-btn">刷新</button></div>
+        <div class="stats">
+          <div class="mg-stat"><div class="k">请求</div><div class="v">1,284</div></div>
+          <div class="mg-stat"><div class="k">令牌</div><div class="v">8.4M</div></div>
+          <div class="mg-stat"><div class="k">花费</div><div class="v">$12.40</div></div>
+          <div class="mg-stat"><div class="k">失败</div><div class="v">0.8%</div></div>
+        </div>
+        <div class="mg-card"><h4>最近 7 天</h4><div class="mg-bars"><i style="height:40%"></i><i style="height:62%"></i><i style="height:34%"></i><i style="height:74%"></i><i style="height:58%"></i><i style="height:84%"></i><i style="height:48%"></i></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="rules">
+  <h2>5. 复用规则</h2>
+  <ul>
+    <li>一个模块只有一种写法、一套样式，页面不另画。</li>
+    <li>层级固定：分区 → 页面 → 标签 → 工具栏。</li>
+    <li>宽窗 / 窄窗只换位置，不换模块。</li>
+    <li>新页面先找现成模块；找不到再加，加之前先说。</li>
+  </ul>
+</section>
+
+<p class="footnote">骨架上没有真实数据；灰块是占位。页面内容只是示例，重点是这些模块可以重复拼。未改动现有代码。</p>
+
+<script>
+const state = { skel:'wide', theme:'light' };
+const qs = new URLSearchParams(location.search);
+if(qs.get('skel')==='narrow') state.skel = 'narrow';
+if(qs.get('theme')==='dark'){ state.theme='dark'; document.documentElement.dataset.theme='dark'; }
+const win = document.getElementById('skelwin');
+function renderSkel(){
+  win.classList.toggle('narrow', state.skel==='narrow');
+  document.getElementById('skelBtn').textContent = '骨架：' + (state.skel==='narrow' ? '窄窗' : '宽窗');
+}
+document.getElementById('skelBtn').addEventListener('click', ()=>{
+  state.skel = state.skel==='wide' ? 'narrow' : 'wide'; renderSkel();
+});
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  state.theme = state.theme==='light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = state.theme==='dark' ? 'dark' : '';
+});
+renderSkel();
+</script>
+</body>
+</html>
