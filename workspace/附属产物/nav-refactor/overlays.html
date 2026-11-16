@@ -90,6 +90,9 @@ section{width:1120px;max-width:100%}
 .panel{position:relative;z-index:1;width:70%;background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:10px 11px;display:flex;flex-direction:column;gap:5px}
 .panel-h{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;margin-bottom:2px}
 .panel-h .grow{flex:1}
+.ptabs{display:flex;gap:2px;margin:2px 0 4px;font-size:9.5px;color:var(--muted)}
+.ptabs b,.ptabs span{padding:2px 6px;border-radius:5px}
+.ptabs b{background:var(--card-2);color:var(--fg);font-weight:600}
 .phone{position:relative;z-index:1;width:190px;height:200px;background:var(--card);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
 .phone-h{height:32px;display:flex;align-items:center;padding:0 10px;font-size:10.5px;font-weight:600;border-bottom:.5px solid var(--line-2)}
 .phone-b{flex:1;padding:8px;display:flex;flex-direction:column;gap:5px}
@@ -326,12 +329,39 @@ td:first-child{font-weight:500}
         </div>
       </div>
     </div>
+    <div class="card">
+      <div class="ch"><b>17. 托盘面板 · 四页签</b><span>另一种形态</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="panel">
+          <div class="panel-h">magpie<span class="grow"></span><button class="btn">⚙</button></div>
+          <div class="ptabs"><b>智能体</b><span>额度</span><span>用量</span><span>路由</span></div>
+          <div class="item"><span class="logo2" style="background:#10a37f">C</span><div class="who"><div class="nm">Codex</div><div class="sub">5 小时 · 62%</div></div></div>
+          <div class="item"><span class="logo2" style="background:#d97757">A</span><div class="who"><div class="nm">Claude</div><div class="sub">5 小时 · 31%</div></div></div>
+          <div class="rowbtns"><button class="btn">打开窗口</button><button class="btn">退出</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>18. 自定义供应商</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">添加自定义供应商</div>
+          <div class="formrow"><label>名称</label><div class="field">my-provider</div></div>
+          <div class="formrow"><label>地址</label><div class="field">https://api.example.com/v1</div></div>
+          <div class="formrow"><label>密钥</label><div class="field">sk-••••••••</div></div>
+          <div class="formrow"><label>模型</label><div class="field">gpt-4o, gpt-4o-mini</div></div>
+          <div class="rowbtns"><button class="btn">取消</button><button class="btn primary">保存</button></div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
 <section>
   <h2>全界面清单</h2>
-  <p class="lead">页面 31 个在 all-pages.html；弹窗/浮层 16 个在本页；特殊形态 3 个。</p>
+  <p class="lead">页面 31 个在 all-pages.html；弹窗/浮层 18 个在本页；特殊形态 4 个。</p>
   <table>
     <thead><tr><th>类别</th><th>界面</th><th>状态</th></tr></thead>
     <tbody>
@@ -350,7 +380,9 @@ td:first-child{font-weight:500}
       <tr><td>其它</td><td>智能体行展开</td><td>已画 13</td></tr>
       <tr><td>其它</td><td>网关调用详情</td><td>已画 14</td></tr>
       <tr><td>特殊形态</td><td>托盘面板</td><td>已画 11</td></tr>
+      <tr><td>特殊形态</td><td>托盘面板 · 四页签</td><td>已画 17</td></tr>
       <tr><td>特殊形态</td><td>托盘右键菜单</td><td>已画 16</td></tr>
+      <tr><td>供应商</td><td>自定义供应商表单</td><td>已画 18</td></tr>
       <tr><td>特殊形态</td><td>手机窄屏</td><td>已画 12</td></tr>
       <tr><td>外部流程</td><td>OAuth 登录页、系统文件选择、浏览器授权</td><td>系统/外部页面，不画</td></tr>
       <tr><td>提示类</td><td>状态栏提示、错误条、加载骨架</td><td>组件已覆盖</td></tr>
