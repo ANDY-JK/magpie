@@ -18,3 +18,9 @@
 # PowerShell 的分析缓存则是在 internal/gui 下跑脚本时落下的
 **/.mimosa/
 /internal/gui/Microsoft/
+
+# 本机 agent 配置、workflow 草稿、门禁日志与构建备份，不进仓库
+/.claude/
+/.zcode/
+/workspace/门禁日志/
+/magpie.exe~
