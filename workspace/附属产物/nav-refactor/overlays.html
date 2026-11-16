@@ -93,6 +93,11 @@ section{width:1120px;max-width:100%}
 .ptabs{display:flex;gap:2px;margin:2px 0 4px;font-size:9.5px;color:var(--muted)}
 .ptabs b,.ptabs span{padding:2px 6px;border-radius:5px}
 .ptabs b{background:var(--card-2);color:var(--fg);font-weight:600}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.font-preview{background:var(--bg);border-radius:6px;padding:8px 10px;font-size:14px;color:var(--fg-2);text-align:center}
+.keycap{background:var(--bg);border-radius:8px;padding:10px;text-align:center;font:13px ui-monospace,Consolas,monospace;color:var(--fg-2);box-shadow:inset 0 0 0 .5px var(--line)}
+.progress{height:6px;border-radius:3px;background:var(--pill);overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);border-radius:3px}
 .phone{position:relative;z-index:1;width:190px;height:200px;background:var(--card);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
 .phone-h{height:32px;display:flex;align-items:center;padding:0 10px;font-size:10.5px;font-weight:600;border-bottom:.5px solid var(--line-2)}
 .phone-b{flex:1;padding:8px;display:flex;flex-direction:column;gap:5px}
@@ -360,8 +365,161 @@ td:first-child{font-weight:500}
 </section>
 
 <section>
+  <h2>补齐：表单、录制、进度、确认</h2>
+  <p class="lead">审计里 P2/P3 的缺口，逐张补上。</p>
+  <div class="grid">
+    <div class="card">
+      <div class="ch"><b>19. 语言选择器</b><span>popover</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="pop">
+          <div class="mi on">简体中文</div><div class="mi">繁體中文</div><div class="mi">English</div><div class="mi">日本語</div><div class="mi">Deutsch</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>20. 字体选择器</b><span>popover</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">界面字体</div>
+          <div class="two-col">
+            <div class="pop" style="width:100%"><div class="mi on">系统默认</div><div class="mi">Microsoft YaHei UI</div><div class="mi">Segoe UI</div><div class="mi">思源黑体</div></div>
+            <div class="pop" style="width:100%"><div class="mi on">Regular</div><div class="mi">Medium</div><div class="mi">Semibold</div></div>
+          </div>
+          <div class="font-preview">Aa 0123 · 中文</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>21. 快捷键录制</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet small">
+          <div class="sheet-h">快速面板快捷键</div>
+          <div class="keycap">⌃ ⌘ Space</div>
+          <p class="hint">按下组合键；Esc 取消，Backspace 清除。</p>
+          <div class="rowbtns"><button class="btn">清除</button><button class="btn primary">保存</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>22. 会话重命名 / 移动</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">重命名会话</div>
+          <div class="formrow"><label>标题</label><div class="field">项目一 · 代码评审</div></div>
+          <div class="formrow"><label>文件夹</label><div class="field">~/work/project-one</div></div>
+          <div class="rowbtns"><button class="btn">取消</button><button class="btn primary">保存</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>23. 添加智能体</b><span>sheet</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">添加智能体</div>
+          <div class="tiles"><span class="tile">Codex</span><span class="tile">Claude Code</span><span class="tile">Gemini CLI</span><span class="tile">自定义…</span></div>
+          <div class="formrow"><label>命令</label><div class="field">codex</div></div>
+          <div class="formrow"><label>模型</label><div class="field">跟随默认</div></div>
+          <div class="rowbtns"><button class="btn">取消</button><button class="btn primary">添加</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>24. 用量 · 请求详情</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">请求 · codex/gpt-5.6-sol <span class="meta">200 · 1.2s</span></div>
+          <div class="subhead">令牌</div>
+          <div class="hint">输入 2.1K · 输出 300 · 缓存 1.2K</div>
+          <div class="subhead">时间</div>
+          <div class="hint">首字 0.4s · 总 1.2s</div>
+          <div class="rowbtns"><button class="btn">关闭</button><button class="btn">在路由页打开</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>25. 用量 · 上下文文本</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">上下文 · 系统提示</div>
+          <pre class="preview">你是 magpie 的助手……
+（最近 10 次请求，已掩码）</pre>
+          <div class="rowbtns"><button class="btn">关闭</button><button class="btn">复制</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>26. 手机 · 设置内页</b><span>窄屏</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="phone">
+          <div class="phone-h">设置</div>
+          <div class="phone-b">
+            <div class="item"><div class="who"><div class="nm">外观</div><div class="sub">跟随系统</div></div></div>
+            <div class="item"><div class="who"><div class="nm">语言</div><div class="sub">简体中文</div></div></div>
+            <div class="item"><div class="who"><div class="nm">掩码</div></div><span class="switch on"></span></div>
+          </div>
+          <div class="phone-tabs"><span>对话</span><span>模型</span><span>分析</span><b>隐私</b><span>扩展</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>27. 已关闭供应商展开</b><span>展开</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet">
+          <div class="sheet-h">已关闭 · 2 个</div>
+          <div class="item"><span class="logo2" style="background:#8b5cf6">K</span><div class="who"><div class="nm">Kiro</div><div class="sub">1 个账号 · 0%</div></div><button class="btn">启用</button></div>
+          <div class="item"><span class="logo2" style="background:#24292f">G</span><div class="who"><div class="nm">Copilot</div><div class="sub">2 个密钥</div></div><button class="btn">启用</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>28. 更新 · 下载进度</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet small">
+          <div class="sheet-h">正在下载 0.1.2401</div>
+          <div class="progress"><i style="width:64%"></i></div>
+          <p class="hint">下载完成后重启；正在运行的请求会先完成。</p>
+          <div class="rowbtns"><button class="btn">后台</button><button class="btn primary">完成即重启</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>29. 丢弃编辑确认</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet small">
+          <div class="sheet-h">放弃未保存的修改？</div>
+          <p class="hint">离开后这次编辑不会保留。</p>
+          <div class="rowbtns"><button class="btn">继续编辑</button><button class="btn danger">放弃</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><b>30. 退出确认</b><span>modal</span></div>
+      <div class="stage">
+        <div class="dim"></div><div class="skel"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sheet small">
+          <div class="sheet-h">退出 magpie？</div>
+          <p class="hint">还有 4 个会话连着网关，退出会中断它们。</p>
+          <div class="rowbtns"><button class="btn">取消</button><button class="btn danger">退出</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
   <h2>全界面清单</h2>
-  <p class="lead">页面 31 个在 all-pages.html；弹窗/浮层 18 个在本页；特殊形态 4 个。</p>
+  <p class="lead">页面 31 个在 all-pages.html；弹窗/浮层 30 个在本页；特殊形态 5 个。</p>
   <table>
     <thead><tr><th>类别</th><th>界面</th><th>状态</th></tr></thead>
     <tbody>
@@ -383,6 +541,18 @@ td:first-child{font-weight:500}
       <tr><td>特殊形态</td><td>托盘面板 · 四页签</td><td>已画 17</td></tr>
       <tr><td>特殊形态</td><td>托盘右键菜单</td><td>已画 16</td></tr>
       <tr><td>供应商</td><td>自定义供应商表单</td><td>已画 18</td></tr>
+      <tr><td>设置</td><td>语言选择器</td><td>已画 19</td></tr>
+      <tr><td>设置</td><td>字体选择器</td><td>已画 20</td></tr>
+      <tr><td>设置</td><td>快捷键录制</td><td>已画 21</td></tr>
+      <tr><td>会话</td><td>重命名 / 移动</td><td>已画 22</td></tr>
+      <tr><td>智能体</td><td>添加 / 编辑</td><td>已画 23</td></tr>
+      <tr><td>用量</td><td>请求详情</td><td>已画 24</td></tr>
+      <tr><td>用量</td><td>上下文文本</td><td>已画 25</td></tr>
+      <tr><td>特殊形态</td><td>手机内页</td><td>已画 26</td></tr>
+      <tr><td>供应商</td><td>已关闭展开</td><td>已画 27</td></tr>
+      <tr><td>更新</td><td>下载进度</td><td>已画 28</td></tr>
+      <tr><td>通用</td><td>丢弃编辑确认</td><td>已画 29</td></tr>
+      <tr><td>通用</td><td>退出确认</td><td>已画 30</td></tr>
       <tr><td>特殊形态</td><td>手机窄屏</td><td>已画 12</td></tr>
       <tr><td>外部流程</td><td>OAuth 登录页、系统文件选择、浏览器授权</td><td>系统/外部页面，不画</td></tr>
       <tr><td>提示类</td><td>状态栏提示、错误条、加载骨架</td><td>组件已覆盖</td></tr>
