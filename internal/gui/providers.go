@@ -355,6 +355,12 @@ type providerJSON struct {
 	// Move is where a built-in subscription stands with the community
 	// plugin that can run it (provider.Move): set for those that have one
 	Move *moveJSON `json:"move,omitempty"`
+	// Health is what the gateway's model-stability records say of the
+	// provider's models now (gateway.ProviderHealth): the worst score among
+	// those with a record, that model's id, how many sit under the demotion
+	// line, how many have a record. Left out when none has one: the row
+	// draws nothing for a provider nothing has asked yet.
+	Health *gateway.Health `json:"health,omitempty"`
 }
 
 type moveJSON struct {
@@ -1065,8 +1071,16 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 		}
 		out.Agents = append(out.Agents, pa)
 	}
+	// the row's health badge: what the gateway's model-stability records
+	// say of this provider's models now; none recorded, nothing said
+	if h := providerHealth([]string{p.ID}); h.Recorded > 0 {
+		out.Health = &h
+	}
 	return out
 }
+
+// providerHealth is gateway.ProviderHealth, swapped in tests.
+var providerHealth = gateway.ProviderHealth
 
 // keyRestOf is gateway.RestOf, swapped in tests.
 var keyRestOf = gateway.RestOf
@@ -1090,6 +1104,30 @@ func accountRests(id string) map[string][]provider.KeyRest {
 			out = map[string][]provider.KeyRest{}
 		}
 		out[user] = append(out[user], provider.KeyRest{Why: r.Why, Status: r.Status, Until: r.Until, Key: r.Key, Probed: r.Probed, By: r.By, Model: cmp.Or(r.Model, model), Error: r.Error})
+	}
+	return out
+}
+
+// laneRests are the rests in force of what the gateway passes over, by its
+// rest key to until in milliseconds: a key's (id, or id#key), an account's
+// (id@user) and a provider blocked as a whole's (id*, the vendor's firewall).
+// A model's own rest (…/model) is none of them: it shows on the model's
+// rows, which the whole read draws, while the row badge counts a key's or
+// account's own. The lanes' tick carries them to the page, which redraws
+// when one is gained or lifted, so a row's badge follows the gateway's
+// memory within the tick instead of waiting for the whole read's hold.
+// nil when none rests.
+func laneRests() map[string]int64 {
+	now := time.Now()
+	var out map[string]int64
+	for _, r := range restsUnder("") {
+		if !now.Before(r.Until) || strings.Contains(r.Key, "/") {
+			continue
+		}
+		if out == nil {
+			out = map[string]int64{}
+		}
+		out[r.Key] = r.Until.UnixMilli()
 	}
 	return out
 }
@@ -1258,7 +1296,11 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 	localHostsRoutes(mux)
 	// how each key's or account's requests stand under its limit on
 	// requests at once (#892), read every two seconds while a provider's
-	// rows are shown; empty when the gateway runs elsewhere
+	// rows are shown; empty when the gateway runs elsewhere. rests are the
+	// rests in force of what the gateway passes over, by rest key to until
+	// in milliseconds (laneRests): the tick compares them, so a rest gained
+	// or lifted redraws the rows at once instead of waiting for the whole
+	// read's hold
 	mux.HandleFunc("GET /api/lanes", func(rw http.ResponseWriter, r *http.Request) {
 		lanes := map[string]gateway.Lane{}
 		if gw := served.Load(); gw != nil {
@@ -1268,7 +1310,41 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			// are the ones to show (the rows read the same wherever it runs)
 			lanes = l
 		}
-		writeJSON(rw, lanes)
+		writeJSON(rw, map[string]any{"lanes": lanes, "rests": laneRests()})
+	})
+	// what a restart of the magpie serving the gateway would cut short
+	// (#577): busy is what the gateway counts in flight (its JSON is what
+	// gateway.Busy's tags say: requests, and the bridge's parked turns as
+	// tools), active each of those requests (gateway.Active). owner false
+	// when another magpie on this computer serves the gateway, and nothing
+	// else with it: busy and active have no cross-process read (the lanes'
+	// OwnerLanes is the only one), and an empty table would read as a quiet
+	// gateway rather than as one this page can't see.
+	mux.HandleFunc("GET /api/busy", func(rw http.ResponseWriter, r *http.Request) {
+		gw := served.Load()
+		if gw == nil {
+			writeJSON(rw, map[string]any{"owner": false})
+			return
+		}
+		writeJSON(rw, map[string]any{"owner": true, "busy": gw.Busy(), "active": gw.Active()})
+	})
+	// this process's own memory, CPU and goroutines (gateway.ProcessNow),
+	// and, with ?history=1, the sampler's last four hours of them
+	// (gateway.ProcessHistory, 15 seconds a reading): a look at what magpie
+	// holds and spends, without the profile paths' collection, which stay
+	// as they are. The window answers it wherever the page is served, and
+	// what it describes is the process serving the page either way — the
+	// loopback-only refusals of /v1/magpie/heap and /v1/magpie/cpu are
+	// theirs, not this route's.
+	mux.HandleFunc("GET /api/process", func(rw http.ResponseWriter, r *http.Request) {
+		out := struct {
+			gateway.ProcessStats
+			History []gateway.ProcessSample `json:"history"`
+		}{ProcessStats: gateway.ProcessNow(), History: []gateway.ProcessSample{}}
+		if r.URL.Query().Get("history") == "1" {
+			out.History = gateway.ProcessHistory()
+		}
+		writeJSON(rw, out)
 	})
 	// what the vendors' own status pages say of the APIs the providers
 	// call (#971), so a vendor's outage isn't taken for a sign-in or quota

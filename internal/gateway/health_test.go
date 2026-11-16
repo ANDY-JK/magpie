@@ -1,10 +1,13 @@
 package gateway
 
 import (
+	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
 	"github.com/yetone/magpie/internal/provider"
+	"github.com/yetone/magpie/internal/settings"
 )
 
 // two candidates of different models, as a group's plan holds them
@@ -177,5 +180,111 @@ func TestWeighedCarriesHealth(t *testing.T) {
 	good := weighed(cs[0], cs[0].p, weighing{}, false, provider.Chat)
 	if good.Health != 0 {
 		t.Fatalf("a steady model's row says health %v", good.Health)
+	}
+}
+
+// A provider's row says how its models are answering: ProviderHealth
+// finds the entries by the provider they rest by — a key's id#key, an
+// account's id@user, its one key's bare id — and never by a prefix, so
+// "ab" reads none of "a"'s records and "a" none of "ab"'s. The worst
+// score is the lowest among the records; a provider nothing has asked
+// reads 1, nothing recorded.
+func TestProviderHealthByProvider(t *testing.T) {
+	fresh(t)
+	noteID("a#k/m1", false)
+	noteID("a#k/m1", false)
+	noteID("a#k/m1", false)
+	noteID("a#k/m1", false) // 1/5: below the line
+	noteID("a#k/m2", true)  // a record, and a good one
+	noteID("a@u/m3", true)  // an account's record counts for its provider
+	noteID("a/m5", true)    // the one key's bare id
+	noteID("ab/m4", true)   // another provider's, a prefix away
+	h := ProviderHealth([]string{"a"})
+	if h.Recorded != 4 {
+		t.Fatalf("recorded %d, want the four entries resting by a", h.Recorded)
+	}
+	if h.Below != 1 {
+		t.Fatalf("below %d, want m1's alone", h.Below)
+	}
+	if h.WorstModel != "m1" {
+		t.Fatalf("worst model %q, want m1", h.WorstModel)
+	}
+	if h.Worst >= healthDemote {
+		t.Fatalf("worst %v, want m1's 1/5", h.Worst)
+	}
+	// "ab" is matched whole: its own ask carries only its own entry
+	hb := ProviderHealth([]string{"ab"})
+	if hb.Recorded != 1 || hb.WorstModel != "m4" {
+		t.Fatalf("ab's health %+v, want its one entry alone", hb)
+	}
+	// nothing asked yet: the prior, 1, with nothing recorded
+	quiet := ProviderHealth([]string{"quiet"})
+	if quiet.Worst != 1 || quiet.Recorded != 0 || quiet.Below != 0 || quiet.WorstModel != "" {
+		t.Fatalf("an unasked provider read %+v, want worst 1 and nothing recorded", quiet)
+	}
+}
+
+// NoHealthDemotion leaves the order requests are tried in alone: what the
+// records say of a provider reads the same with it on — the scores are
+// what answering did, not how the order was set.
+func TestProviderHealthReadsTheSameWithNoDemotion(t *testing.T) {
+	fresh(t)
+	noteID("a#k/m1", false)
+	noteID("a#k/m1", false)
+	noteID("a#k/m1", false)
+	noteID("a#k/m1", false)
+	noteID("a#k/m2", true)
+	st := settings.Load()
+	was := st.NoHealthDemotion
+	t.Cleanup(func() {
+		st := settings.Load()
+		st.NoHealthDemotion = was
+		settings.Save(st)
+	})
+	h := ProviderHealth([]string{"a"})
+	st.NoHealthDemotion = true
+	if err := settings.Save(st); err != nil {
+		t.Fatal(err)
+	}
+	after := ProviderHealth([]string{"a"})
+	// the two reads are moments apart, so the records decayed a little
+	// between them; the counts and the named model are exact
+	if after.Recorded != h.Recorded || after.Below != h.Below || after.WorstModel != h.WorstModel {
+		t.Fatalf("NoHealthDemotion changed the reading: %+v → %+v", h, after)
+	}
+	if math.Abs(after.Worst-h.Worst) > 1e-6 {
+		t.Fatalf("worst %v → %v over a read's decay", h.Worst, after.Worst)
+	}
+}
+
+// ProviderHealth reads the table under the one lock its writers take: a
+// note made while it reads coexists with it, and no entry goes missing.
+func TestProviderHealthReadsWhileNotesAreMade(t *testing.T) {
+	fresh(t)
+	noteID("a/m1", true)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 100; i++ {
+			noteID("a/m2", i%2 == 0)
+		}
+	}()
+	for i := 0; i < 100; i++ {
+		if h := ProviderHealth([]string{"a"}); h.Recorded < 1 {
+			t.Fatalf("a record went missing while notes were being made: %+v", h)
+		}
+	}
+	<-done
+}
+
+// The row's health is said with no model's name when there is none to
+// say: the key itself is left out rather than an empty word drawn.
+func TestProviderHealthJSONOmitsWhatIsNotThere(t *testing.T) {
+	b, err := json.Marshal(Health{Worst: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != `{"worst":1,"below":0,"recorded":0}` {
+		t.Fatalf("no model named: %s", b)
 	}
 }

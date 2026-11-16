@@ -402,6 +402,13 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
                 await current.addStyleTag({ content: '#nav button[data-view="doctor"], #view-doctor { display: none !important; }' });
                 await current.waitForTimeout(350);
               }
+              // The Metrics page is new (this change): until BASE_REF has
+              // it, the sidebar's button is taken out of the current page
+              // before the picture, which metrics-page.test.cjs covers.
+              if (!baselineFile("index.html").includes('data-view="metrics"')) {
+                await current.addStyleTag({ content: '#nav button[data-view="metrics"], #view-metrics { display: none !important; }' });
+                await current.waitForTimeout(350);
+              }
               const before = PNG.sync.read(await still(original));
               const after = PNG.sync.read(await still(current));
               const sameSize = before.width === after.width && before.height === after.height;

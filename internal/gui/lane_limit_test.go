@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yetone/magpie/internal/gateway"
 	"github.com/yetone/magpie/internal/provider"
 )
 
@@ -109,14 +110,17 @@ func TestLaneLimitRoutes(t *testing.T) {
 		t.Fatal("null kept its own limit")
 	}
 
-	// the lanes, with no gateway served here: none. Another magpie on this
-	// computer may serve the gateway (this machine's own does), and its
-	// lanes are the ones to show, so the answer is asked at an address
-	// nothing serves
+	// the lanes, with no gateway served here: none, and no rest in force.
+	// Another magpie on this computer may serve the gateway (this machine's
+	// own does), and its lanes are the ones to show, so the answer is asked
+	// at an address nothing serves
 	t.Setenv("MAGPIE_ADDR", "127.0.0.1:1")
+	was := restsUnder
+	restsUnder = func(string) []gateway.Rest { return nil }
+	defer func() { restsUnder = was }()
 	w = httptest.NewRecorder()
 	mux.ServeHTTP(w, httptest.NewRequest("GET", "/api/lanes", nil))
-	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != "{}" {
+	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"lanes":{},"rests":null}` {
 		t.Fatalf("lanes %d %s", w.Code, w.Body)
 	}
 }

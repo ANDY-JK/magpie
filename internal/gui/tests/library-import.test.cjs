@@ -1,7 +1,8 @@
 // Run with Node's test runner and Playwright on the module path; see README.md.
 // Load from files reads the export folder back: a dry run says what would
-// change, the page asks first, and Load writes the edits into the library.
-// English and Chinese, Chromium and WebKit; the API is faked.
+// change and names the folder it read, the page asks first, and Load writes
+// the edits into the library. English and Chinese, Chromium and WebKit; the
+// API is faked.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -31,7 +32,7 @@ function serve(lang, state, posts) {
       const body = req.postDataJSON();
       posts.push(body);
       if (body.apply) { state.servers = [...state.servers, server("two")]; return json({ dir: `${HOME}/.magpie/library/export`, adds: 1, updates: 0, same: 0, applied: true }); }
-      return json({ dir: `${HOME}/.magpie/library/export`, adds: 1, updates: 0, same: 0 });
+      return json(state.dry || { dir: `${HOME}/.magpie/library/export`, adds: 1, updates: 0, same: 0 });
     }
     if (url.pathname.startsWith("/api/")) return json({});
     const file = path.join(assets, url.pathname === "/" ? "index.html" : url.pathname);
@@ -39,9 +40,10 @@ function serve(lang, state, posts) {
     try { await route.fulfill({ body: await fs.readFile(file), contentType }); } catch { await route.fulfill({ status: 404, body: "" }); }
   };
 }
+const DIR = "~/.magpie/library/export";
 const L = {
-  en: { btn: "Load from files", ask: "Load the files into the library?", load: "Load", said: "1 added, 0 updated" },
-  zh: { btn: "从文件载入", ask: "把文件载入资源库？", load: "载入", said: "新增 1 项、更新 0 项" },
+  en: { btn: "Load from files", ask: "Load the files into the library?", load: "Load", said: `1 added, 0 updated from ${DIR}`, match: `The files in ${DIR} match the library` },
+  zh: { btn: "从文件载入", ask: "把文件载入资源库？", load: "载入", said: `从 ${DIR} 新增 1 项、更新 0 项`, match: `${DIR} 里的文件与资源库一致` },
 };
 
 for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
@@ -67,14 +69,41 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const dialog = page.locator("dialog.action-confirm");
       await dialog.waitFor();
       assert.equal((await dialog.locator("h2").textContent()).trim(), w.ask);
+      assert.ok((await dialog.locator("#actionConfirmMessage").textContent()).includes(DIR), "the confirm names the folder it read");
       await dialog.getByRole("button", { name: w.load, exact: true }).click();
       let said = "";
       for (let i = 0; i < 50 && said !== w.said; i++) { await page.waitForTimeout(100); said = await page.locator("#status").textContent(); }
       assert.equal(said, w.said, "the status says what was loaded");
       assert.deepEqual(posts, [{ apply: false }, { apply: true }], "asked, then loaded");
       await page.locator(".row.lib-row", { hasText: "two" }).waitFor();
-      const missing = ["Load from files", "Load the files into the library?", "Load", "{adds} added, {updates} updated"].filter((k) => !strings().I18N.zh[k]);
+      const missing = ["Load from files", "Load the files into the library?", "Load", "{adds} added, {updates} updated from {dir}.", "{adds} added, {updates} updated from {dir}", "The files in {dir} match the library"].filter((k) => !strings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every word has its Chinese");
+      assert.deepEqual(errors, []);
+      await ctx.close();
+    });
+    test(`${engine} ${lang}: the dry run names the folder it read`, async (t) => {
+      const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
+      const ctx = await browser.newContext({ viewport: { width: 980, height: 760 }, reducedMotion: "reduce", locale: lang === "zh" ? "zh-CN" : "en-US" });
+      await ctx.addInitScript(() => { try { localStorage.setItem("magpie.libTab", "mcp"); } catch {} });
+      const page = await ctx.newPage();
+      t.after(() => browser.close());
+      page.setDefaultTimeout(5000);
+      page.setDefaultNavigationTimeout(60000);
+      const errors = [], posts = [];
+      page.on("pageerror", (e) => errors.push(e.message));
+      await page.route("http://magpie.test/**", serve(lang, { servers: [server("one")], dry: { dir: `${HOME}/.magpie/library/export`, adds: 0, updates: 0, same: 1 } }, posts));
+      await page.goto("http://magpie.test/");
+      await page.locator('[data-view="library"]').click();
+      const imp = page.locator(".lib-import");
+      await imp.waitFor();
+      await imp.click();
+      // the files match, so nothing is asked and nothing is loaded: the
+      // status says where the files it compared are
+      let said = "";
+      for (let i = 0; i < 50 && said !== w.match; i++) { await page.waitForTimeout(100); said = await page.locator("#status").textContent(); }
+      assert.equal(said, w.match, "the dry run names the folder");
+      assert.equal(await page.locator("dialog.action-confirm").count(), 0, "no ask when nothing would change");
+      assert.deepEqual(posts, [{ apply: false }], "the dry run only read");
       assert.deepEqual(errors, []);
       await ctx.close();
     });

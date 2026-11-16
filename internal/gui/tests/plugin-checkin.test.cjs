@@ -26,8 +26,9 @@ test("plugin check-in saved choices take precedence over derived defaults", asyn
   assert.equal(on({ pluginCheckins: { fakeco: false }, checkinPlugins: [{ id: "fakeco", on: true }] }), false);
   assert.equal(on({ pluginCheckins: { fakeco: true }, checkinPlugins: [{ id: "fakeco", on: false }] }), true);
   assert.equal(on({ checkinPlugins: [{ id: "fakeco", on: true }] }), true);
-  assert.equal(on({ checkinPlugins: [{ id: "another", on: true }] }), false);
-  assert.equal(on({}), false);
+  assert.equal(on({ checkinPlugins: [{ id: "fakeco", on: false }] }), false);
+  assert.equal(on({ checkinPlugins: [{ id: "another", on: true }] }), true);
+  assert.equal(on({}), true);
   assert.equal(on(undefined), false);
   // a plugin that took a built-in's check-in over follows the built-in's
   // switch until its own is set, as provider.PluginCheckinOn does, also in
@@ -37,8 +38,10 @@ test("plugin check-in saved choices take precedence over derived defaults", asyn
   assert.equal(on({ workbuddyCheckin: true }, "workbuddy"), true);
   assert.equal(on({ minimaxCheckin: true }, "minimax-code-global"), true);
   assert.equal(on({ qoderCheckin: true }, "qoder-cn"), true);
-  assert.equal(on({ traeCheckin: true }, "fakeco"), false);
-  assert.equal(on({ traeCheckin: true }, "constructor"), false);
+  // another plugin that checks in itself is on unless turned off
+  assert.equal(on({ traeCheckin: true }, "fakeco"), true);
+  assert.equal(on({ traeCheckin: true }, "constructor"), true);
+  assert.equal(on({ pluginCheckins: { fakeco: false } }), false);
 });
 
 // the built-ins a plugin's check-in inherits are the ones Go's

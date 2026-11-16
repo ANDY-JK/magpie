@@ -46,13 +46,24 @@ func TestExportFiles(t *testing.T) {
 		}
 	}
 	// the README says what Load from files really does (import.go), not the
-	// old claim that magpie never reads these files back
+	// old claim that magpie never reads these files back, and says where
+	// each of the five kinds lives — and that a file put in the folder is
+	// not imported by being there. The wraps are the text's, not the
+	// wording's, so the wants are checked against one word to a line.
 	readme, err := os.ReadFile(filepath.Join(dir, "README.txt"))
 	if err != nil {
 		t.Fatalf("README: %v", err)
 	}
-	for _, want := range []string{"Load from files", "updates that entry", "no file here is removed"} {
-		if !strings.Contains(string(readme), want) {
+	flat := strings.Join(strings.Fields(string(readme)), " ")
+	for _, want := range []string{
+		"Load from files", "updates that entry", "no file here is removed",
+		"the library's skills/ folder",
+		"instruction-sets/<id>.md", "is in library.json",
+		"not imported by being here",
+		"Dropping a .md into instruction-sets/ does not make a set",
+		"A folder dropped into skills/ is not a skill either",
+	} {
+		if !strings.Contains(flat, want) {
 			t.Fatalf("README doesn't say %q: %q", want, readme)
 		}
 	}
@@ -146,5 +157,51 @@ func TestExportSaysWhatItOverwrote(t *testing.T) {
 	b, err := os.ReadFile(p)
 	if err != nil || !strings.Contains(string(b), "\"name\": \"one\"") {
 		t.Fatalf("the mirror wasn't written back: %v %q", err, b)
+	}
+}
+
+// The page's payload says whether the export folder is there, and where:
+// the header's Export folder button opens it when it is, and is disabled,
+// saying what makes one, when it isn't. The fields also name the library's
+// own skills folder and the one the instruction sets besides the first are
+// kept in, whose tabs had no way in from the page.
+func TestReadSaysWhetherTheExportFolderIsThere(t *testing.T) {
+	sandbox(t)
+	if _, err := SaveServer("", Server{Name: "one", Transport: "http", URL: "https://example.com/mcp", Agents: []string{"claude"}}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := Read(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Exported || v.Export != "" {
+		t.Fatalf("a library never exported says exported=%v export=%q", v.Exported, v.Export)
+	}
+	// exported:false has to reach the page: left out of the JSON, the
+	// button looked lit and opened nothing
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"exported":false`) {
+		t.Fatalf("exported:false was left out of the page's payload: %s", b)
+	}
+	if v.SkillsDir != skillsDir() || v.SetsDir != setsDir() {
+		t.Fatalf("skillsDir %q setsDir %q, want %q and %q", v.SkillsDir, v.SetsDir, skillsDir(), setsDir())
+	}
+
+	dir, _, _, err := ExportFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err = Read(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.Exported {
+		t.Fatal("the export folder is there, and the page isn't told")
+	}
+	if v.Export != dir {
+		t.Fatalf("export %q, want the folder ExportFiles made (%q)", v.Export, dir)
 	}
 }

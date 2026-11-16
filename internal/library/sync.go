@@ -501,8 +501,19 @@ type View struct {
 	Instructions *InstructionsView `json:"instructions"`
 	Dir          string            `json:"dir"`
 	Backups      string            `json:"backups"`
-	SkillGroups  []SkillGroup      `json:"skillGroups"`
-	CopySkills   bool              `json:"copySkills"` // the library gives skills as copies (#896)
+	// SkillsDir is the library's own skills folder and SetsDir the one the
+	// instruction sets besides the first are kept in: the folder buttons on
+	// those two tabs open them, which had no way in from the page at all
+	SkillsDir string `json:"skillsDir"`
+	SetsDir   string `json:"setsDir"`
+	// Export is the export folder Save as files writes, and Exported says
+	// whether there is one. Exported takes no omitempty: false has to reach
+	// the page, whose Export folder button is disabled while it says what
+	// makes one — left out, the button looked lit and opened nothing
+	Exported    bool         `json:"exported"`
+	Export      string       `json:"export,omitempty"`
+	SkillGroups []SkillGroup `json:"skillGroups"`
+	CopySkills  bool         `json:"copySkills"` // the library gives skills as copies (#896)
 	// SharedSkills: every skill on here is in ~/.agents/skills too
 	// (skills_shared.go), at SharedDir
 	SharedSkills bool   `json:"sharedSkills"`
@@ -578,7 +589,8 @@ func readView(problems []Problem, glance bool) (*View, error) {
 	// the agents are found once for the whole read: finding them looks
 	// through every agent's folders, in WSL too (#1624)
 	targets, asleep := targetsAsleep(false)
-	v := &View{Agents: []AgentView{}, Servers: []ServerView{}, Skills: []SkillView{}, FoundSkills: []FoundSkill{}, Instructions: l.instructionsView(targets, asleep), Dir: Dir(), Backups: BackupDir(), CopySkills: l.CopySkills, SharedSkills: l.SharedSkills, SharedDir: sharedSkillsDir(), MCPHub: l.MCPHub, HubPath: gateway.HubMCPPath, HubNote: settings.Shared().RouterNote, HubName: gateway.HostName(), Partial: glance}
+	exp, hasExport := exportThere()
+	v := &View{Agents: []AgentView{}, Servers: []ServerView{}, Skills: []SkillView{}, FoundSkills: []FoundSkill{}, Instructions: l.instructionsView(targets, asleep), Dir: Dir(), Backups: BackupDir(), SkillsDir: skillsDir(), SetsDir: setsDir(), Exported: hasExport, Export: exp, CopySkills: l.CopySkills, SharedSkills: l.SharedSkills, SharedDir: sharedSkillsDir(), MCPHub: l.MCPHub, HubPath: gateway.HubMCPPath, HubNote: settings.Shared().RouterNote, HubName: gateway.HostName(), Partial: glance}
 	for _, t := range targets {
 		av := AgentView{ID: t.Agent.ID, Name: t.Agent.Name, Icon: t.Agent.Icon, Instructions: t.Instructions, Skills: t.Skills,
 			SkillsAlso: t.SkillsAlso, Note: t.Note, MCPVia: t.MCPVia, ProjectSkills: ProjectSkillsDir(t.Agent.ID), ProjectMCP: ProjectMCPFile(t.Agent.ID),

@@ -362,6 +362,10 @@ func Merge(body []byte, cur settings.Settings, web bool) (settings.Settings, err
 	// as read (settings.DockSettled), so a save from the page doesn't
 	// read its With window as an older file's Hide
 	in.DockSettled = cur.DockSettled
+	// the daily check-ins' reading, which the page never sets: the file's
+	// as read (settings.CheckinSettled), so a save from the page doesn't
+	// read its check-ins as an older file's off
+	in.CheckinSettled = cur.CheckinSettled
 	// the version the Update pill was hidden for, set from the pill
 	in.UpdateSkip = cur.UpdateSkip
 	// the GitHub mirror updates come through, set by magpie update mirror

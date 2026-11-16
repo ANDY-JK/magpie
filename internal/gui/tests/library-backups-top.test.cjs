@@ -87,13 +87,22 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
           release();
           await head.locator(".lib-backups:not([disabled])").waitFor();
           await v.locator(".lib-body").first().waitFor({ state: "attached" }).catch((e) => { throw new Error(where + ": " + e.message); });
+          // the page can draw itself again just after (the RTK tab's count,
+          // read again once it answers, redraws the whole page): the head
+          // read below must be the one of that last drawing
+          await head.locator(".lib-backups:not([disabled])").evaluate((b) => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
 
           const got = await head.evaluate((h) => {
             const b = h.querySelector(".lib-backups"), f = h.querySelector(".lib-more"), vw = h.closest(".view");
             const r = b.getBoundingClientRect(), fr = f.getBoundingClientRect();
             const c = getComputedStyle(b);
+            // the tab's own folder button (Skills', or the instruction sets')
+            // may sit between the two on its tab
+            const prev = b.previousElementSibling;
             return {
-              label: b.textContent, title: b.title, after: b.previousElementSibling === f, sameRow: Math.abs(r.top - fr.top) < 2,
+              label: b.textContent, title: b.title,
+              after: prev === f || prev?.classList.contains("lib-skillsdir") || prev?.classList.contains("lib-setsdir"),
+              sameRow: Math.abs(r.top - fr.top) < 2,
               look: ["fontSize", "height", "color"].every((k) => getComputedStyle(f)[k] === c[k]),
               inView: r.left >= 0 && r.right <= innerWidth + 0.5 && r.width > 0,
               wrapped: b.querySelector("span:last-child").getClientRects().length > 1 || b.scrollWidth > b.clientWidth + 1,

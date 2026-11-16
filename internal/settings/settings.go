@@ -322,23 +322,23 @@ type Settings struct {
 	CodexCreditsFirst []string `json:"codexCreditsFirst,omitempty"`
 	// WorkBuddyCheckin presses WorkBuddy's daily check-in (签到) for each
 	// signed-in WorkBuddy (China) account once a Beijing day, claiming the
-	// credits it gives while its event runs.
+	// credits it gives while its event runs. On by default.
 	WorkBuddyCheckin bool `json:"workbuddyCheckin,omitempty"`
 	// TraeCheckin presses Trae CN's daily check-in (每日签到) for each
 	// signed-in Trae CN account (its plugin's) once a Beijing day, claiming
-	// the credits it gives.
+	// the credits it gives. On by default.
 	TraeCheckin bool `json:"traeCheckin,omitempty"`
 	// MiniMaxCheckin presses MiniMax Code's daily check-in (签到) for each
 	// signed-in MiniMax Code (China) account (its plugin's) once a Beijing
-	// day, claiming the credits it gives (#811).
+	// day, claiming the credits it gives (#811). On by default.
 	MiniMaxCheckin bool `json:"minimaxCheckin,omitempty"`
 	// QoderCheckin claims Qoder's daily credits for each signed-in Qoder
 	// and Qoder CN account (its plugin's) once a Beijing day (ARNO on
-	// Discord).
+	// Discord). On by default.
 	QoderCheckin bool `json:"qoderCheckin,omitempty"`
 	// PluginCheckins turns a plugin's own daily check-in (auth.checkin)
 	// on or off, by the plugin's provider id; one not set follows its
-	// vendor's switch above, which the plugin took over, else is off.
+	// vendor's switch above, which the plugin took over, else is on.
 	PluginCheckins map[string]bool `json:"pluginCheckins,omitempty"`
 	// PluginOptions are the user's values of the switches plugins declare
 	// for their providers (auth.options, #2038): provider id → the
@@ -352,6 +352,13 @@ type Settings struct {
 	// "<provider>|<display name>", which provider.adoptLegacyPluginCheckins
 	// carries over).
 	CheckinOff []string `json:"checkinOff,omitempty"`
+	// CheckinSettled says this file's daily check-ins are read with on as
+	// the default. A file written before that has none, and stored a
+	// check-in left off as nothing: a user who turned one off can't be
+	// told from one who never chose, so such a file is read as a new
+	// install's, every check-in on (settleCheckin). A new install, with no
+	// file, is settled from the start, and every save writes it.
+	CheckinSettled bool `json:"checkinSettled,omitempty"`
 	// ReplyModel is what a reply's model name says when the request went
 	// out under another name than the one asked for (a group's member, a
 	// model's own id, a provider/model id): "" the model the agent asked
@@ -1681,9 +1688,9 @@ func loadChecked() (Settings, error) {
 	b, err := through("settings", Path(), func(b []byte) ([]byte, error) { return b, nil })
 	if err != nil {
 		if os.IsNotExist(err) {
-			// a new install: With window is its default
-			s.DockSettled = true
-			return s.normal(), nil
+			// a new install: its defaults, the Dock's With window and the
+			// daily check-ins on
+			return Defaults(), nil
 		}
 		return s.settleDock().normal(), fmt.Errorf("could not read settings at %s: %w", Path(), err)
 	}
@@ -1694,7 +1701,14 @@ func loadChecked() (Settings, error) {
 // what `magpie settings list` shows as each one's default, and what
 // `magpie settings reset` puts back.
 func Defaults() Settings {
-	return Settings{DockSettled: true}.normal()
+	return Settings{
+		DockSettled:      true,
+		CheckinSettled:   true,
+		WorkBuddyCheckin: true,
+		TraeCheckin:      true,
+		MiniMaxCheckin:   true,
+		QoderCheckin:     true,
+	}.normal()
 }
 
 // settleDock reads a Dock choice written before With window was the
@@ -1707,6 +1721,19 @@ func (s Settings) settleDock() Settings {
 		s.DockNever = true
 	}
 	s.DockSettled = true
+	return s
+}
+
+// settleCheckin reads a daily check-in choice written before the switches
+// were on by default (CheckinSettled unset) as a new install has it: every
+// vendor's and plugin's check-in is on. The next save writes the mark and
+// the choices, so one turned off later stays off.
+func (s Settings) settleCheckin() Settings {
+	if s.CheckinSettled {
+		return s
+	}
+	s.WorkBuddyCheckin, s.TraeCheckin, s.MiniMaxCheckin, s.QoderCheckin = true, true, true, true
+	s.CheckinSettled = true
 	return s
 }
 
@@ -1739,7 +1766,7 @@ func parse(b []byte) (Settings, error) {
 	parses.Add(1)
 	perr := json.Unmarshal(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")), &s)
 	if perr == nil {
-		s = s.settleDock()
+		s = s.settleDock().settleCheckin()
 		// only what parsed whole is kept: a last good generation read in
 		// its place is read again, as is a file that can't be read at all
 		parsed.Lock()
@@ -1751,7 +1778,9 @@ func parse(b []byte) (Settings, error) {
 	bak, ferr := lastgood.Fallback(Path(), b, validSettings)
 	if ferr == nil {
 		s = Settings{}
-		_ = json.Unmarshal(bytes.TrimPrefix(bak, []byte("\xef\xbb\xbf")), &s)
+		if json.Unmarshal(bytes.TrimPrefix(bak, []byte("\xef\xbb\xbf")), &s) == nil {
+			s = s.settleCheckin()
+		}
 	} else if len(bytes.TrimSpace(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")))) != 0 {
 		err = fmt.Errorf("could not read settings at %s: %w", Path(), perr)
 	}

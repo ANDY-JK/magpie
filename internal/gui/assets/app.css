@@ -2717,6 +2717,12 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
    provider's name, the count; each one's name, why and back-at on hover */
 .provider .name .badge.rest-now { background: var(--amber-soft); color: var(--amber); }
 .provider .name .badge.rest-now.bad { background: var(--red-soft); color: var(--red); }
+/* what a row was asked today, and how its models answer: the usage a fact
+   in grey, the health a warning — amber, red when every model with a
+   record is under the line */
+.provider .name .badge.today-calls { background: var(--pill); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); letter-spacing: .02em; text-transform: none; font-variant-numeric: tabular-nums; }
+.provider .name .badge.hc-unstable { background: var(--amber-soft); color: var(--amber); }
+.provider .name .badge.hc-unstable.bad { background: var(--red-soft); color: var(--red); }
 .badge.free { background: var(--green-soft); color: var(--green); }
 /* a model's context, when it is a large one: grey, as it is a fact, not a warning */
 /* which way a model goes (#726): through magpie, or straight to its vendor */
@@ -3082,6 +3088,8 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
 .acc .aq { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding-left: 25px; font-size: 10.5px; color: var(--muted); min-height: 14px; }
 /* its refresh always shown, after its plan on the line that never wraps: on the readings' line it added a line where the meters filled it (the owner asked for a button here) */
 .acc-line > .quota-refresh { width: 14px; margin: 0 0 0 -5px; opacity: 1; }
+/* a key row's card carries its refresh on its own line, shown as the account's is */
+.acc .aq > .quota-refresh { width: 14px; margin: 0 0 0 -3px; opacity: 1; flex: none; }
 .acc .aq-w { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .acc .aq-until { white-space: nowrap; }
 .acc .aq-track { width: 54px; height: 4px; border-radius: 2px; background: var(--pill); overflow: hidden; }

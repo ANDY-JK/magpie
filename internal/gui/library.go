@@ -116,7 +116,11 @@ func errText(err error) string {
 // revealable is every path the Library page shows: the only ones it may
 // ask to be shown in the file manager.
 func revealable(v *library.View) []string {
-	out := []string{v.Dir, v.Backups}
+	out := []string{v.Dir, v.Backups, v.SkillsDir, v.SetsDir}
+	// the export folder is only there once Save as files has made one
+	if v.Export != "" {
+		out = append(out, v.Export)
+	}
 	for _, a := range v.Agents {
 		out = append(out, a.Instructions, a.MCP, a.Skills)
 	}

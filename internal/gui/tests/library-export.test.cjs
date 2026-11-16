@@ -2,8 +2,9 @@
 // The owner (11-10): 像技能一样建立对应得目录. The Library's header has Save
 // as files: it writes the MCP servers, hooks and subagents as files under
 // the library's export folder (a mirror magpie never reads back), says how
-// many, and opens the folder. English and Chinese, Chromium and WebKit; the
-// API is faked.
+// many, and opens the folder. The header's Export folder button opens that
+// folder itself, and is greyed, saying what makes one, until Save as files
+// has. English and Chinese, Chromium and WebKit; the API is faked.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -16,7 +17,7 @@ const HOME = "/Users/owner";
 const agent = { id: "claude", name: "Claude Code", icon: "", skills: `${HOME}/.claude/skills`, mcp: `${HOME}/.claude/mcp.json` };
 const lib = {
   dir: `${HOME}/.magpie/library`, backups: `${HOME}/.magpie/backups`, home: HOME, agents: [agent],
-  instructions: { agents: [] }, skills: [], hookAgents: [{ id: "claude" }], subagentAgents: [{ id: "claude" }],
+  instructions: { agents: [], sets: [] }, skills: [], hookAgents: [{ id: "claude" }], subagentAgents: [{ id: "claude" }],
   servers: [{ name: "github", description: "Issues", transport: "stdio", command: "npx", agents: ["claude"] }],
   hooks: [{ name: "fmt", description: "Formats", event: "after-tool", matcher: "shell", command: "fmt", timeout: 30, agents: ["claude"] }],
   subagents: [{ name: "reviewer", description: "Reviews", prompt: "You review.", skills: [], mcp: [], agents: ["claude"] }],
@@ -38,7 +39,7 @@ function server(lang, posts, data = lib) {
       return json({ dir: `${HOME}/.magpie/library/export`, files: 3, changed });
     }
     if (url.pathname === "/api/library/reveal" && req.method() === "POST") {
-      posts.push("reveal");
+      posts.push({ reveal: req.postDataJSON().path });
       return json({ dir: `${HOME}/.magpie/library/export` });
     }
     if (url.pathname.startsWith("/api/")) return json({});
@@ -86,11 +87,11 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await save.getAttribute("aria-label"), w.btn);
       await save.click();
       await page.waitForFunction((said) => document.querySelector("#status")?.textContent === said, w.said);
-      assert.deepEqual(posts, ["export", "reveal"], "written, then opened");
+      assert.deepEqual(posts, ["export", { reveal: `${HOME}/.magpie/library/export` }], "written, then opened");
       // a second export says what it wrote over
       await save.click();
       await page.waitForFunction((said) => document.querySelector("#status")?.textContent === said, w.over);
-      assert.deepEqual(posts, ["export", "reveal", "export", "reveal"]);
+      assert.deepEqual(posts, ["export", { reveal: `${HOME}/.magpie/library/export` }, "export", { reveal: `${HOME}/.magpie/library/export` }]);
       const missing = KEYS.filter((k) => !strings().I18N.zh[k]);
       assert.deepEqual(missing, [], "every word has its Chinese");
       assert.deepEqual(errors, []);
@@ -99,7 +100,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
 
     // the header's Export folder: lit when Save as files has made one, saying
     // what is in it and how Load from files reads it back; greyed with what
-    // makes one until then
+    // makes one until then. It opens the export folder itself: the reveal it
+    // sends names the export folder, not the library's own
     test(`${engine} ${lang}: the header's Export folder opens what was written`, async (t) => {
       const browser = await (engine === "webkit" ? webkit.launch() : chromium.launch({ channel: "chromium" }));
       t.after(() => browser.close());
@@ -113,10 +115,14 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
         await page.route("http://magpie.test/**", server(lang, posts, data));
         await page.goto("http://magpie.test/");
         await page.locator('[data-view="library"]').click();
+        // the page is drawn first as an outline whose header's buttons are
+        // greyed, the library not read yet: wait for the page it is drawn as
+        // once it is, before reading the Export folder button
+        await page.locator("#view-library .lib-body:not(.lib-skel)").first().waitFor();
         return { page, posts, errors };
       };
       // the folder is there: the button says what is in it, and opens it
-      const a = await open({ ...lib, exported: true });
+      const a = await open({ ...lib, exported: true, export: `${HOME}/.magpie/library/export` });
       const xp = a.page.locator(".lib-exportdir");
       await xp.waitFor();
       assert.equal((await xp.textContent()).trim(), w.xp);
@@ -125,7 +131,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       const revealed = a.page.waitForRequest((r) => r.url().endsWith("/api/library/reveal"));
       await xp.click();
       await revealed;
-      assert.deepEqual(a.posts, ["reveal"], "opened, nothing written");
+      assert.deepEqual(a.posts, [{ reveal: `${HOME}/.magpie/library/export` }], "opened the export folder itself, nothing written");
       assert.deepEqual(a.errors, []);
       // a library never saved as files: greyed, saying what makes one
       const b = await open({ ...lib, exported: false });

@@ -212,6 +212,14 @@ func TestPluginCheckinTakesOverTheVendors(t *testing.T) {
 	if n := len(qoderCheckinAccounts()); n != 0 || !HasPluginCheckin() {
 		t.Fatalf("with the hook: %d Qoder accounts, plugins that check in %v", n, HasPluginCheckin())
 	}
+}
+
+// PluginCheckinOn: an explicit choice wins over everything; a plugin that
+// took a built-in's check-in over follows that vendor's switch; another
+// plugin that checks in itself is on unless the user turned it off. It is
+// here as well as in the test above because that one needs bun and skips
+// without it.
+func TestPluginCheckinOnEachVendor(t *testing.T) {
 	for _, c := range []struct {
 		s    settings.Settings
 		id   string
@@ -223,7 +231,9 @@ func TestPluginCheckinTakesOverTheVendors(t *testing.T) {
 		{settings.Settings{WorkBuddyCheckin: true}, "workbuddy", true},
 		{settings.Settings{TraeCheckin: true}, TraeCNID, true},
 		{settings.Settings{MiniMaxCheckin: true}, MiniMaxCodeGlobalID, true},
-		{settings.Settings{QoderCheckin: true}, "fakeco", false},
+		// another plugin that checks in itself is on unless turned off
+		{settings.Settings{QoderCheckin: true}, "fakeco", true},
+		{settings.Settings{PluginCheckins: map[string]bool{"fakeco": false}}, "fakeco", false},
 		{settings.Settings{PluginCheckins: map[string]bool{"fakeco": true}}, "fakeco", true},
 	} {
 		if got := PluginCheckinOn(c.s, c.id); got != c.want {

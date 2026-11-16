@@ -6158,6 +6158,59 @@ $("#foldOff").onclick = () => {
   renderProviders();
 };
 
+// tz: the reader's zone as the ?tz= the Usage reads take, for "today" to be
+// what the Usage page's Today counts
+const tz = () => {
+  try { const z = Intl.DateTimeFormat().resolvedOptions().timeZone; return z ? "&tz=" + encodeURIComponent(z) : ""; } catch { return ""; }
+};
+
+// A row's today badge: today's calls and cost, the Usage page's Today is.
+// Read every 30s at most (readLoads's pattern); a thin ranking entry carries
+// no totals, so a quiet provider draws none.
+let providerToday = {}, todayAt = 0;
+function readToday() {
+  if (Date.now() - todayAt < 3e4) return;
+  todayAt = Date.now();
+  api("usage/rank?period=today" + tz()).then((r) => {
+    const next = r || {};
+    if (JSON.stringify(next) === JSON.stringify(providerToday)) return;
+    providerToday = next;
+    // an editor or a sheet open is someone typing: the badges wait for the
+    // next render of the page
+    if (document.hidden || editing !== null || adding) return;
+    if (view === "providers" || providersPage(view)) renderProviders();
+  }).catch(() => { todayAt = 0; });
+}
+function todayBadge(p) {
+  const e = (providerToday.providers || []).find((x) => x.id === p.id);
+  if (!e || !e.calls) return null;
+  const cost = fmtCost(e);
+  return el("span", "badge today-calls", t("Today {n} calls", { n: e.calls }) + (cost ? " · " + cost : ""));
+}
+// The key rows' day and allowance card live in keyusage.js (imported as an
+// editor first draws its keys), adding nothing to the core's scripts.
+let keyUsageMod = null, keyUsageAsked = false;
+function readKeyUsage() {
+  if (keyUsageMod) return keyUsageMod.read();
+  if (keyUsageAsked) return;
+  keyUsageAsked = true;
+  import("./keyusage.js").then(() => { keyUsageMod = window.keyUsageMod; keyUsageMod.read(); }, statusErr);
+}
+const keyRows = (p, k, claim) => keyUsageMod ? keyUsageMod.rows(p, k, claim) : [];
+// A row's health badge: how many of its models the gateway's stability
+// records hold below the demotion line just now — amber, red when every
+// model with a record is one of them. A provider with records but none
+// below draws nothing, and neither does one never asked (no health).
+function healthBadge(p) {
+  const h = p.health;
+  if (!h?.below) return null;
+  const bad = h.recorded > 0 && h.below >= h.recorded;
+  const b = el("span", "badge hc-unstable" + (bad ? " bad" : ""), t("{n} unstable models", { n: h.below }));
+  b.title = t("{model} is the least steady of this provider's models just now: {pct}% of its calls succeed",
+    { model: h.worstModel, pct: Math.round(h.worst * 100) });
+  return b;
+}
+
 // One row per provider: logo, name, the agents pointed at it, key status.
 // Everything else lives in the editor, a dialog over the page.
 let keptEditing = null; // the editor opened on a kept row, filled in by the fresh one
@@ -6165,6 +6218,7 @@ let providersBehind = false;
 function renderProviders(quiet) {
   if (accountArranging || providerArranging) { accountRenderPending = true; return; }
   providersBehind = false;
+  readToday(); // the rows' today badge: read every 30s at most, redrawn on a change
   // a rebuild clamps the scroll to the top: put it back
   const view = $("#view-providers"), top = view.scrollTop;
   markNewPartners();
@@ -6206,6 +6260,13 @@ function renderProviders(quiet) {
       if (failed) name.append(Object.assign(el("span", "badge rest-now bad", t("{n} failed", { n: failed })), { title }));
       if (rests.length > failed) name.append(Object.assign(el("span", "badge rest-now", t("{n} resting", { n: rests.length - failed })), { title }));
     }
+    // what it was asked today, and how its models are answering: the
+    // usage a 30s-throttled rank read brings (readToday), the health the
+    // whole read carries (gateway.ProviderHealth)
+    const today = todayBadge(p);
+    if (today) name.append(today);
+    const hc = healthBadge(p);
+    if (hc) name.append(hc);
     // a provider that only draws images (Settings → Image generation) says so
     const models = n ? t(n === 1 ? "{n} model" : "{n} models", { n })
       : p.draws ? t(p.draws === 1 ? "{n} image model" : "{n} image models", { n: p.draws }) : t(p.noModels ? "usage only" : "no models exposed");
@@ -13888,6 +13949,10 @@ function renderLoginImport(sub) {
   return box;
 }
 
+// typingInEditor: someone typing into the editor — a redraw would take the
+// input they are in away mid-word
+const typingInEditor = () => document.querySelector(".editor .rename-in, .editor input:focus, .signing.import textarea:focus");
+
 // Each account's allowance loads on its own and fills the rows in.
 const loginUsage = {}; // agent → { at, data: { user: quota }, loading }
 function loginUsageOf(agent) {
@@ -13897,7 +13962,7 @@ function loginUsageOf(agent) {
       .then((d) => { u.data = d || {}; }, () => { u.data = u.data || {}; })
       .finally(() => {
         u.at = Date.now(); u.loading = null;
-        if (providers?.providers.find((p) => p.id === editing)?.account?.agent === agent && !document.querySelector(".editor .rename-in, .editor input:focus, .signing.import textarea:focus")) renderProviders(true);
+        if (providers?.providers.find((p) => p.id === editing)?.account?.agent === agent && !typingInEditor()) renderProviders(true);
       });
   }
   return u.data;
@@ -14416,6 +14481,7 @@ function accountCapPill(p, user, cap, direct) {
 // the app's menu: the provider's, none, a number, or the user's own.
 const LANE_LIMITS = [1, 2, 3, 5, 10];
 let lanesNow = {}, lanesRead = false, lanesTick;
+let laneRests; // the rests the lanes' tick last saw, undefined before its first read
 function laneOwnOf(p, ref) {
   const m = p?.accountConcurrency || {};
   const k = String(ref).toLowerCase();
@@ -14476,13 +14542,30 @@ function laneLimitPill(p, ref, who, name) {
   };
   return pill;
 }
+// restChange: a rest key gained or gone from the lanes' rests — its until
+// alone moving is not one (the badge counts rests, not when they end)
+function restChange(was, now) {
+  const a = Object.keys(was || {}), b = now || {};
+  return a.length !== Object.keys(b).length || a.some((k) => !b[k]);
+}
 // refreshLanes rewrites the pills in place, so nothing moves; with none
-// in sight its tick stops (#3185) until one is drawn
+// in sight its tick stops (#3185) until one is drawn. The answer's rests
+// are the rests the gateway is passing over: one the gateway just gained
+// or lifted reaches the rows only with a whole read, which the 5s hold
+// delays, so a change in the keys asks for it at once — once, not again
+// every tick, and no row is rewritten here, which would take the editor
+// and the scroll away
 async function refreshLanes() {
   if (document.hidden || view !== "providers" || !document.querySelector(".alane")) return lanesTick = clearInterval(lanesTick);
   let lanes;
   try { lanes = await api("lanes"); } catch { return; }
-  lanesNow = lanes || {};
+  lanesNow = lanes?.lanes || {};
+  const rests = lanes?.rests || null;
+  // laneRests is undefined until the first read, and null once read with
+  // none in force: only then does a gained rest count as a change (the
+  // rows a page opens with were drawn whole just now)
+  if (laneRests !== undefined && restChange(laneRests, rests)) loadProviders(true).catch(statusErr);
+  laneRests = rests;
   lanesRead = true;
   for (const pill of document.querySelectorAll(".alane")) laneText(pill);
 }
@@ -14841,6 +14924,7 @@ function keyWeight(p, k, w, total, path = "keys/weight", body = { id: p.id, ref:
 // a subscription has. addingKey holds the half-typed new one.
 let addingKey = null, keyHeld;
 function renderKeyAccounts(p) {
+  readKeyUsage();
   const list = el("div", "accts keys");
   list.dataset.provider = p.id;
   list.classList.toggle("weighted", (draft?.routing ?? (p.routing || "")) === "weight");
@@ -14871,6 +14955,7 @@ function renderKeyAccounts(p) {
       renderProviders();
     } catch (e) { for (const id of ids) delete got[id]; testErr(e); }
   };
+  let claimed = new Set(); // two keys of one name: each takes its own card
   for (const k of fold.shown) {
     const row = el("div", "acc" + (k.on ? " in-use" : " off") + (k.id === justAdded ? " new" : ""));
     row.dataset.accountId = k.id;
@@ -14983,6 +15068,12 @@ function renderKeyAccounts(p) {
     }
     row.append(acts);
     if (restLine) row.append(restLine);
+    // the key's day (the local log alone) and its card (only what has been
+    // read already; the editor reads no vendor, #1518), a line each
+    const [day, line, card] = keyRows(p, k, claimed);
+    if (day || card) row.classList.add("with-aq");
+    if (line) row.append(line);
+    if (card) row.append(card);
     if (amBox) row.append(amBox), row.classList.add("with-am");
     list.append(row);
   }
@@ -18304,14 +18395,14 @@ const PLUGIN_CHECKIN_INHERITS = {
   qoder: "qoderCheckin", "qoder-cn": "qoderCheckin",
 };
 function pluginCheckinOn(id) {
-  // /api/state carries the saved map, without /api/settings's plugin list.
-  // An explicit false must win over the list's inherited vendor default,
-  // and with neither the built-in's own switch is that default (#1912).
+  // /api/state carries the saved map; an explicit off wins over the list's
+  // resolved default, else a built-in's switch it took over, else on (#1912).
   const prefs = state.settings;
-  const own = prefs?.pluginCheckins?.[id] ?? prefs?.checkinPlugins?.find((p) => p.id === id)?.on;
+  if (!prefs) return false;
+  const own = prefs.pluginCheckins?.[id] ?? prefs.checkinPlugins?.find((p) => p.id === id)?.on;
   if (own !== undefined) return !!own;
   const inherits = Object.hasOwn(PLUGIN_CHECKIN_INHERITS, id) ? PLUGIN_CHECKIN_INHERITS[id] : "";
-  return !!(inherits && prefs?.[inherits]);
+  return inherits ? !!prefs[inherits] : true;
 }
 function checkinRow(q, first, subs) {
   const by = q.checkinBy || "";

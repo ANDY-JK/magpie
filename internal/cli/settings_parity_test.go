@@ -322,9 +322,11 @@ var notYet = map[string]string{
 	"GET /api/privacy-model":                     S2, // privacymodel.go
 	"POST /api/privacy-model":                    S2, // privacymodel.go
 	"GET /api/claude/mode":                       P,  // providers.go
+	"GET /api/busy":                              W,  // providers.go: what a restart would cut short, read where the page is
 	"GET /api/gateway/call":                      P,  // providers.go
 	"GET /api/icons/{name}":                      W,  // providers.go
 	"GET /api/lanes":                             P,  // providers.go
+	"GET /api/process":                           W,  // providers.go: this process's own memory and CPU, read where the page is
 	"GET /api/signin/{id}":                       P,  // providers.go
 	"GET /api/upstream":                          P,  // providers.go
 	"POST /api/codex/app/reopen":                 W,  // providers.go
@@ -378,6 +380,7 @@ var notYet = map[string]string{
 	"POST /api/uninstall/finish":                 A,  // uninstall.go
 	"GET /api/usage/deleted/into":                U,  // usage.go
 	"GET /api/usage/heatmap":                     U,  // usage.go
+	"GET /api/usage/hourly":                      U,  // usage.go
 	"GET /api/usage/quotas/history/holds":        U,  // usage.go
 	"GET /api/usage/requests":                    U,  // usage.go
 	"GET /api/usage/rank":                        U,  // usage.go: the Ranking tab's period, providers and models

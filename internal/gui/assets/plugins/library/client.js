@@ -51,6 +51,8 @@ magpie.plugin("library", (ctx) => {
     // a clock with an arrow going back round it, as macOS draws backups
     backup: "M3.2 8a4.8 4.8 0 1 0 1.4-3.4 M2.8 2.6v2.4h2.4 M8 5.3V8l1.9 1.2",
     power: "M8 2.5v5 M4.7 4.6a4.8 4.8 0 1 0 6.6 0",
+    // the Plugins page's piece: the sidebar's own icon, at this grid's size
+    plugin: "M6.4 2.8h3.2v2a1.2 1.2 0 0 0 2.4 0V2.8h1.2v10.4H3.2v-3.2h2a1.2 1.2 0 0 0 0-2.4H3.2v-4.8z",
   };
 
   const tilde = (p) => (lib?.home && p?.startsWith(lib.home) ? "~" + p.slice(lib.home.length) : p || "");
@@ -812,6 +814,20 @@ magpie.plugin("library", (ctx) => {
     more.setAttribute("aria-label", t("Library folder"));
     if (lib) more.title = tilde(lib.dir);
     else more.disabled = true;
+    // the two tabs whose resources are folders of the library's own: the
+    // skills, and the instruction sets besides the first. Neither tab had
+    // a way in from the page at all. A folder not made yet is no matter:
+    // the reveal endpoint opens the folder it would be in
+    const tabDirs = [];
+    const tabDir = (cls, key, why, p) => {
+      const b = button("", cls, () => reveal(p));
+      b.append(glyph(GLYPH.folder, "lib-mini"), el("span", "", t(key)));
+      b.setAttribute("aria-label", t(key));
+      b.title = t(why) + "\n" + tilde(p);
+      tabDirs.push(b);
+    };
+    if (lib && tab === "skills") tabDir("lib-skillsdir", "Skills folder", "The skills the library keeps are here, one folder to a skill.", lib.skillsDir);
+    if (lib && tab === "instructions") tabDir("lib-setsdir", "Instruction sets folder", "The instruction sets besides the first are kept here, one file to a set.", lib.setsDir);
     // magpie's backups beside it, on every tab: at the foot of a long
     // page they were hard to find (Dade on Discord: 备份在最底部)
     const back = button("", "lib-backups", () => lib && reveal(lib.backups));
@@ -822,8 +838,9 @@ magpie.plugin("library", (ctx) => {
     // the export folder Save as files made, on every tab: what is in it,
     // and the README that says how Load from files reads it back (#11). A
     // library never saved as files has none, and the button says what makes
-    // one; the library says whether it has one with the page's own payload
-    const xp = button("", "lib-exportdir", () => lib && reveal(lib.dir));
+    // one; the library says whether it has one with the page's own payload.
+    // The button opens the export folder itself now, not the library's
+    const xp = button("", "lib-exportdir", () => lib && reveal(lib.export || lib.dir));
     xp.append(glyph(GLYPH.doc, "lib-mini"), el("span", "", t("Export folder")));
     xp.setAttribute("aria-label", t("Export folder"));
     if (!lib || lib.exported === false) xp.disabled = true;
@@ -847,20 +864,21 @@ magpie.plugin("library", (ctx) => {
     exp.append(glyph(GLYPH.doc, "lib-mini"), el("span", "", t("Save as files")));
     exp.setAttribute("aria-label", t("Save as files"));
     exp.title = t("Write the servers, hooks and subagents as files under the library's export folder, to read and copy");
-    // the export folder read back: what was edited by hand updates its entry
+    // the export folder read back: what was edited by hand updates its
+    // entry, and every word names the folder it read
     const imp = button("", "lib-import", async () => {
       imp.disabled = true;
       try {
         const rep = await api("library/import", { apply: false });
         if (rep.problems?.length) { status(t("Not loaded: {why}", { why: rep.problems[0] }), "err", 8000); return; }
-        if (!rep.adds && !rep.updates) { status(t("The files match the library"), "ok", 4000); return; }
+        if (!rep.adds && !rep.updates) { status(t("The files in {dir} match the library", { dir: tilde(rep.dir) }), "ok", 4000); return; }
         if (!(await confirmAction(t("Load the files into the library?"),
-          t("{adds} added, {updates} updated from the export folder.", { adds: rep.adds, updates: rep.updates }), t("Load")))) return;
+          t("{adds} added, {updates} updated from {dir}.", { adds: rep.adds, updates: rep.updates, dir: tilde(rep.dir) }), t("Load")))) return;
         const done = await api("library/import", { apply: true });
         if (done.problems?.length) { status(t("Not loaded: {why}", { why: done.problems[0] }), "err", 8000); return; }
         take(await api("library"));
         render();
-        status(t("{adds} added, {updates} updated", { adds: done.adds, updates: done.updates }), "ok", 6000);
+        status(t("{adds} added, {updates} updated from {dir}", { adds: done.adds, updates: done.updates, dir: tilde(done.dir) }), "ok", 6000);
       } catch (e) {
         status(e.message, "err");
       }
@@ -869,7 +887,12 @@ magpie.plugin("library", (ctx) => {
     imp.append(glyph(GLYPH.up, "lib-mini"), el("span", "", t("Load from files")));
     imp.setAttribute("aria-label", t("Load from files"));
     imp.title = t("Read the export folder back into the library: files changed by hand update their entries, new ones are added; nothing in the library is removed");
-    acts.append(more, back, xp, exp, imp);
+    // the Plugins page: a plugin that gives tools is a server of the
+    // library's own, installed or removed there (plugin_tools.go)
+    const plg = button("", "lib-plugins", () => show("plugins"));
+    plg.append(glyph(GLYPH.plugin, "lib-mini"), el("span", "", t("Plugins")));
+    plg.setAttribute("aria-label", t("Plugins"));
+    acts.append(more, ...tabDirs, back, xp, exp, imp, plg);
     head.append(acts);
     return head;
   }
@@ -2127,6 +2150,10 @@ magpie.plugin("library", (ctx) => {
     else if (s.signIn?.signedIn) nm.append(tag(t("Signed in"), "lib-signed", t("The agents given it use magpie's sign-in")));
     // kept to this computer: sync carries it nowhere (huhuy72219405 on X)
     if (s.local) nm.append(tag(t("Not synced"), "lib-local", t("Sync never carries it to your other computers")));
+    // the tools a plugin serves, named for it (plugin_tools.go): the row
+    // says which plugin it comes from, and that it goes with the plugin
+    if (s.plugin) nm.append(tag(t("From the plugin {name}", { name: s.plugin }), "lib-plugin",
+      t("The plugin serves it: it comes and goes with the plugin, and is installed or removed on the Plugins page")));
     // out of the hub, each agent's own entry (#4382): said only while the hub is on
     if (lib.mcpHub && s.hub === "direct") nm.append(tag(t("Not through the router"), "lib-direct", t("Each agent is given its own entry for it, as with the MCP router off")));
     // its status beside the name, not in it: the name is still the name

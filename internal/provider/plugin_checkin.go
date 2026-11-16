@@ -246,7 +246,8 @@ func pluginChecksIn(pp plugin.Provider) bool { return pp.Checkin }
 
 // PluginCheckinOn says whether a plugin provider's accounts are checked in
 // each day: as the user set it for the provider, else as the built-in
-// check-in of its vendor is set, which the plugin took over.
+// check-in of its vendor is set, which the plugin took over; another
+// plugin that checks in itself is on unless the user turned it off.
 func PluginCheckinOn(s settings.Settings, id string) bool {
 	if on, ok := s.PluginCheckins[id]; ok {
 		return on
@@ -261,7 +262,7 @@ func PluginCheckinOn(s settings.Settings, id string) bool {
 	case "qoder", QoderCNID:
 		return s.QoderCheckin
 	}
-	return false
+	return true
 }
 
 // pluginRechecks says whether a plugin provider's check-in is asked again

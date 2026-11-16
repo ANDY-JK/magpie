@@ -49,7 +49,7 @@ function serve(lang, posts, lanes) {
     if (url.pathname === "/wails/runtime.js") return route.fulfill({ contentType: "text/javascript", body: "export const Window = {};" });
     if (url.pathname === "/api/state") return json(state);
     if (url.pathname === "/api/providers") return json(providers);
-    if (url.pathname === "/api/lanes") { lanes.reads++; return json(lanes.now); }
+    if (url.pathname === "/api/lanes") { lanes.reads++; return json({ lanes: lanes.now, rests: null }); }
     if (url.pathname === "/api/groups") return json({ groups: [] });
     if (url.pathname === "/api/plugins") return json({ plugins: [] });
     if (url.pathname.startsWith("/api/provider/") && route.request().method() === "POST") {

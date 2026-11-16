@@ -30,12 +30,16 @@ const (
 // where the one shared text always was.
 const defaultSet = "default"
 
+// setsDir is where the instruction sets besides the first are kept as
+// files; the first is instructions.md in the library's own folder.
+func setsDir() string { return filepath.Join(Dir(), "instruction-sets") }
+
 // setPath is where a set's text is kept.
 func setPath(id string) string {
 	if id == "" || id == defaultSet {
 		return filepath.Join(Dir(), "instructions.md")
 	}
-	return filepath.Join(Dir(), "instruction-sets", id+".md")
+	return filepath.Join(setsDir(), id+".md")
 }
 
 // sets are the sets there are, the default first.

@@ -24,11 +24,26 @@ func ExportFiles() (string, int, int, error) {
 	return writeExport(l)
 }
 
+// exportDir is the export folder Save as files writes the library to, under
+// the library's own folder.
+func exportDir() string { return filepath.Join(Dir(), "export") }
+
+// exportThere is the export folder and whether there is one: the page's
+// Export folder button is disabled, saying what makes one, until Save as
+// files has.
+func exportThere() (string, bool) {
+	p := exportDir()
+	if _, err := os.Stat(p); err != nil {
+		return "", false
+	}
+	return p, true
+}
+
 // syncExport keeps a folder the reader asked for current after a change: a
 // library without one isn't given one, so nothing is written until Save as
 // files is used once. Errors are the reader's next export to show.
 func syncExport(l *Library) {
-	if _, err := os.Stat(filepath.Join(Dir(), "export")); err != nil {
+	if _, err := os.Stat(exportDir()); err != nil {
 		return
 	}
 	_, _, _, _ = writeExport(l)
@@ -36,7 +51,7 @@ func syncExport(l *Library) {
 
 // writeExport is ExportFiles for a library already read.
 func writeExport(l *Library) (string, int, int, error) {
-	root := filepath.Join(Dir(), "export")
+	root := exportDir()
 	kinds := []struct {
 		dir string
 		do  func(string) (int, int, error)
@@ -59,13 +74,29 @@ func writeExport(l *Library) (string, int, int, error) {
 	}
 	// what the README says follows what ImportFiles does, sentence by
 	// sentence: an edited file updates its entry, a file the library has
-	// no entry for adds one, and an entry with no file isn't removed
+	// no entry for adds one, and an entry with no file isn't removed. It
+	// lives once, at the root: each kind's cleanup in exportEach below
+	// removes the files in its folder it didn't write, so a README beside
+	// the JSONs would not survive the next export.
 	readme := "These files are a mirror of magpie's library.json, written for reading and copying —\n" +
 		"and for reading back: Load from files on the Library page takes them into the library.\n" +
 		"A file whose entry differs from the library's updates that entry, the agents it names\n" +
 		"included; a file named for an entry the library doesn't have adds one. Nothing in the\n" +
 		"library that has no file here is removed. A file that can't be read, or whose entry\n" +
-		"fails magpie's check, stops the whole load: the page says what would change first, and asks.\n"
+		"fails magpie's check, stops the whole load: the page says what would change first, and asks.\n" +
+		"\n" +
+		"Where each kind lives: the servers, hooks and subagents are kept in library.json, and\n" +
+		"these mcp/, hooks/ and subagents/ folders mirror it, one JSON to an entry. A skill is\n" +
+		"a folder of its own under the library's skills/ folder (one folder to a skill, its\n" +
+		"SKILL.md first); skills are installed from the Skills page or brought in from an\n" +
+		"agent, and there is no file for one here. An instruction set's text is kept at\n" +
+		"instruction-sets/<id>.md in the library's folder (the first set is instructions.md\n" +
+		"there); which sets there are, and which agents get which, is in library.json.\n" +
+		"\n" +
+		"Files placed here are not imported by being here: Load from files reads only the .json\n" +
+		"files in mcp/, hooks/ and subagents/. Dropping a .md into instruction-sets/ does not\n" +
+		"make a set — add the set on the Library page or with magpie library. A folder dropped\n" +
+		"into skills/ is not a skill either: install or bring it in from the Skills page.\n"
 	if err := os.WriteFile(filepath.Join(root, "README.txt"), []byte(readme), 0o644); err != nil {
 		return "", 0, 0, err
 	}

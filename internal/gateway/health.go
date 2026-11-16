@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -113,6 +114,76 @@ func healthOf(id string, now time.Time) float64 {
 	h = h.decayed(now)
 	modelHealth.m[id] = h
 	return (h.wins + healthPrior) / (h.wins + h.loss + healthPrior)
+}
+
+// providerOfRestID cuts a table key to the provider it rests by: the id
+// before the model ("/…"), then before a key's or an account's own seat
+// ("#…", "@…"). The match is whole, never a prefix: an entry of "a" says
+// nothing of a provider "ab".
+func providerOfRestID(key string) string {
+	if i := strings.IndexByte(key, '/'); i >= 0 {
+		key = key[:i]
+	}
+	if i := strings.IndexAny(key, "#@"); i >= 0 {
+		key = key[:i]
+	}
+	return key
+}
+
+// modelOfRestID is the model a table key is a record of: the part after
+// the first "/", the key whole when it has none (restID always carries a
+// model; nothing else writes here).
+func modelOfRestID(key string) string {
+	if _, model, ok := strings.Cut(key, "/"); ok {
+		return model
+	}
+	return key
+}
+
+// Health is a provider's models' health as its row shows it: Worst the
+// lowest score among the entries with a record, WorstModel that entry's
+// model, Below how many sit under healthDemote, Recorded how many have a
+// record. A model with no record reads as 1 (healthOf's prior), so a
+// provider nothing has asked yet reads Worst 1, Recorded 0.
+type Health struct {
+	Worst      float64 `json:"worst"`
+	WorstModel string  `json:"worstModel,omitempty"`
+	Below      int     `json:"below"`
+	Recorded   int     `json:"recorded"`
+}
+
+// ProviderHealth aggregates the health of ids' models, the whole table
+// read under one lock (markOf's pattern), each matching entry's score
+// decayed to now as every reader of an old record does. It adds no
+// recording of its own; healthOf's semantics are untouched. Two entries
+// tied at the worst score go to the one that sorts first, so the row's
+// hover names the same model however the map happens to iterate.
+func ProviderHealth(ids []string) Health {
+	out := Health{Worst: 1}
+	want := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		want[id] = true
+	}
+	worstKey := ""
+	now := time.Now()
+	modelHealth.Lock()
+	defer modelHealth.Unlock()
+	for key, h := range modelHealth.m {
+		if !want[providerOfRestID(key)] || h.wins+h.loss <= 0 {
+			continue // no record: the prior reads it as 1, nothing to say
+		}
+		h = h.decayed(now)
+		modelHealth.m[key] = h
+		s := scoreOf(h)
+		out.Recorded++
+		if s < healthDemote {
+			out.Below++
+		}
+		if s < out.Worst || (s == out.Worst && (worstKey == "" || key < worstKey)) {
+			out.Worst, out.WorstModel, worstKey = s, modelOfRestID(key), key
+		}
+	}
+	return out
 }
 
 // noteUnstable counts one intermittent failure of c's model.

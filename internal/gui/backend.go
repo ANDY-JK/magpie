@@ -40,6 +40,10 @@ func stopServing() {
 // model lists kept warm.
 func startBackend() (gw *gateway.Server) {
 	gateway.Window = true // the routing this process serves is shown on its page
+	// this process's own memory and CPU, sampled every 15 seconds for the
+	// window's /api/process: a process without the gateway served elsewhere
+	// still keeps a history of its own (gateway.StartProcessStats)
+	gateway.StartProcessStats()
 	gw = serveGateway()
 	go watchGateway(backendCtx, gatewayWatch)
 	// the usage log parsed now, not when the tray panel first asks for

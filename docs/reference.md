@@ -598,6 +598,10 @@ says its auto check-in is off. The choice is kept in `checkinOff` in
 (`workbuddy|<uid>`), and set with `POST /api/settings/checkin-account
 {key, on}`.
 
+Daily check-in is on by default for every vendor and plugin that offers
+one, so adding an account needs no trip to Settings; turn it off under its
+switch, or leave one account out as above.
+
 A plugin whose `auth` hook has `checkin` checks its own accounts in the same
 way: once a day while its switch under **Settings → Usage → Plugins** is on,
 with the result on each account's Usage card. A check-in the vendor wants a

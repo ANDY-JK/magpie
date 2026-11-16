@@ -183,6 +183,31 @@ func usageRoutes(mux *http.ServeMux, w Windows) {
 		limit, _ := strconv.Atoi(q.Get("limit"))
 		writeJSON(rw, ledgerPage(periodOf(q.Get("period")), ledgerFilter(r), offset, limit))
 	}))
+	// the last hours by hour (usageapi.HourlyOf): the same rows the ledger
+	// reads, summed into hours, for a chart of when the calls came and how
+	// many failed; ?by=key|account|model splits each hour by the vendor
+	// key, the account or the model. ?hours= is 24 unless it says
+	// otherwise, a week at most; the hours are the reader's (tz=), as the
+	// ledger's own are. A chart's req/min is a point's calls over 60,
+	// derived there, not counted again here.
+	mux.HandleFunc("GET /api/usage/hourly", coldTurn(func(rw http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		hours := 0
+		if v := q.Get("hours"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 || n > 168 {
+				http.Error(rw, "hours is a whole number from 1 to 168", http.StatusBadRequest)
+				return
+			}
+			hours = n
+		}
+		switch by := q.Get("by"); by {
+		case "", "key", "account", "model":
+			writeJSON(rw, usageapi.HourlyOf(hours, by, usageapi.ZoneOf(r)))
+		default:
+			http.Error(rw, "by is key, account or model", http.StatusBadRequest)
+		}
+	}))
 	// the ranking: each provider's and each of its models' standing in a
 	// period, read in the browser's zone like the ledger is. It reads the
 	// same log, through the same clears and filters, and names a provider
