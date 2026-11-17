@@ -43,6 +43,7 @@ func fresh(t *testing.T) {
 	restingUntil.Lock()
 	restingUntil.m = map[string]time.Time{}
 	restingUntil.Unlock()
+	allDownSaid()
 	sticks.Lock()
 	sticks.m = map[string]stick{}
 	sticks.Unlock()

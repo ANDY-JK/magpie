@@ -1158,6 +1158,8 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "A notification this long before a weekly or monthly window renews with under 85% of it used, or before unused resets expire": "週間・月間の枠が 85% 未満の使用でリセットされる前、または未使用のリセットが期限切れになる前に、この時間だけ早く通知します",
     "{n} h before": "{n} 時間前",
     "Task done alert": "タスク完了通知",
+    "All-down alert": "全チャネル停止通知",
+    "A notification when every key or account of a model rests after a failure, so none can answer: on the way into the outage, at most one a minute while it holds": "モデルの全キー・アカウントが失敗後の休止中で応答できないときに通知：停止の始まりで一度、停止中は最大1分間に1度",
     "Masking alert": "マスク通知",
     "A notification when masking swaps a value for the first time: its kind and how many, never the value itself": "値を初めてマスクしたときに通知：種類と件数だけで、値そのものは表示しません",
     "A notification when Claude Code, Codex, OpenCode or another agent going through magpie finishes a task that ran at least this long": "Claude Code、Codex、OpenCode など magpie を通るエージェントが、少なくともこの時間かかったタスクを終えたときに通知",

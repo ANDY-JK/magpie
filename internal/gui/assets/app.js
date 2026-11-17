@@ -20396,7 +20396,7 @@ function renderSettingsUsage(s, keep) {
   renderPluginCheckins(s);
   renderTrayUsage(s, keep);
   // and the alerts its desktop would show
-  for (const r of [$("#usageAlertRow"), $("#balanceAlertRow"), $("#resetReminderRow"), $("#turnDoneRow")]) r.hidden = gatewayMode;
+  for (const r of [$("#usageAlertRow"), $("#balanceAlertRow"), $("#resetReminderRow"), $("#turnDoneRow"), $("#allDownAlertRow")]) r.hidden = gatewayMode;
 }
 
 function renderSettingsNetwork(s, keep) {
@@ -21795,6 +21795,11 @@ function renderAlerts(s, keep) {
   const turnOpts = [["0", t("Off")], ...mins.map((m) => [String(m * 60), t("{n} min", { n: m })])];
   if (d && !mins.some((m) => m * 60 === d)) turnOpts.push([String(d), d % 60 ? t("{n} s", { n: d }) : t("{n} min", { n: d / 60 })]);
   $("#turnDoneSegs").replaceChildren(segs(turnOpts, String(d), (v) => savePrefs({ ...keep, turnDoneAlert: Number(v) })));
+  // every channel of a model resting (the review's D-01, 11-16): Off, or
+  // on — a notification on the way into the outage, at most one a minute
+  sub("#allDownAlertSub", t("A notification when every key or account of a model rests after a failure, so none can answer: on the way into the outage, at most one a minute while it holds"));
+  $("#allDownAlertSegs").replaceChildren(segs([["off", t("Off")], ["on", t("On")]], s.allDownAlert ? "on" : "off",
+    (v) => savePrefs({ ...keep, allDownAlert: v === "on" })));
 }
 
 // AGENT_PREFS: an agent's own settings, by its id, each a row kept in
@@ -23415,7 +23420,7 @@ function prefsKeep(s) {
     noUpdatePill: !!s.noUpdatePill, noAutoUpdate: !!s.noAutoUpdate, updateEvery: s.updateEvery || 360, autoRestart: !!s.autoRestart, noAutoDownload: !!s.noAutoDownload, updateChannel: s.updateChannel || "",
     trayUsage: s.trayUsage || "", trayUsageEvery: s.trayUsageEvery || 3, trayNoLogos: !!s.trayNoLogos, trayNoBird: !!s.trayNoBird, trayNoNumber: !!s.trayNoNumber, trayPace: !!s.trayPace, trayNoCost: !!s.trayNoCost, trayWindows: s.trayWindows || {}, vision: s.vision || "", visionEffort: s.visionEffort || "", searcherEffort: s.searcherEffort || "", imageGen: s.imageGen || "", imageTimeout: s.imageTimeout || 0, classifyTimeout: s.classifyTimeout || 0, searcher: s.searcher || "", searchFirst: s.searchFirst || "", currency: s.currency || "usd",
     chineseUnits: !!s.chineseUnits, usageAlert: s.usageAlert || 0, balanceAlert: s.balanceAlert || 0, resetReminder: s.resetReminder || 0,
-    turnDoneAlert: s.turnDoneAlert || 0, maskAlert: !!s.maskAlert };
+    turnDoneAlert: s.turnDoneAlert || 0, maskAlert: !!s.maskAlert, allDownAlert: !!s.allDownAlert };
 }
 
 // savePrefs sends what the page was drawn with (prefsBase) and the choice

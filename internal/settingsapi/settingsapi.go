@@ -35,7 +35,7 @@ var Keys = []string{
 	// the menu bar's allowance cards
 	"trayUsages", "trayUsage", "trayUsageEvery", "trayNoLogos", "trayNoBird", "trayNoNumber", "trayPace", "trayNoCost", "trayWindows",
 	// usage and alerts
-	"currency", "chineseUnits", "usageAlert", "balanceAlert", "resetReminder", "turnDoneAlert", "maskAlert",
+	"currency", "chineseUnits", "usageAlert", "balanceAlert", "resetReminder", "turnDoneAlert", "maskAlert", "allDownAlert",
 	// network
 	"proxy",
 	// privacy
@@ -240,6 +240,10 @@ func Merge(body []byte, cur settings.Settings, web bool) (settings.Settings, err
 	// nor whether a value masked for the first time is told (Must2333)
 	if _, sent := fields["maskAlert"]; !sent {
 		in.MaskAlert = cur.MaskAlert
+	}
+	// nor whether every channel's going out is told (the review's D-01)
+	if _, sent := fields["allDownAlert"]; !sent {
+		in.AllDownAlert = cur.AllDownAlert
 	}
 	// nor whether unstable models are left in the order they were set (the
 	// Models tab's toggle, noHealthDemotion): the toggle's own save sends

@@ -94,10 +94,12 @@ func (n *notifier) problem() string {
 
 // turnNotice is the id a turn's end is notified under, an alert's
 // "magpie-alert-"; maskNotice a value masked for the first time, followed
-// by its record's key and "-"
+// by its record's key and "-"; downNotice every channel's resting, its
+// click opening the Providers page
 const (
 	turnNotice = "magpie-turn-"
 	maskNotice = "magpie-mask-"
+	downNotice = "magpie-down-"
 )
 
 func (n *notifier) send(title, body string) { n.sendAs("magpie-alert-", title, body) }
@@ -155,6 +157,9 @@ func clickView(goos string, r notifications.NotificationResponse) string {
 		}
 		return "masking&key=" + key
 	}
+	if strings.HasPrefix(r.ID, downNotice) {
+		return "providers" // what rested is a channel, on the Providers page
+	}
 	return "usage"
 }
 
@@ -176,7 +181,7 @@ func (h *host) watchAlerts() {
 	go func() {
 		<-h.ready
 		// set before this run: asked now, so Settings can say if it was refused
-		if s := settings.Load(); s.UsageAlert > 0 || s.BalanceAlert > 0 || s.ResetReminder > 0 || s.TurnDoneAlert > 0 || s.MaskAlert {
+		if s := settings.Load(); s.UsageAlert > 0 || s.BalanceAlert > 0 || s.ResetReminder > 0 || s.TurnDoneAlert > 0 || s.MaskAlert || s.AllDownAlert {
 			go n.allowed()
 		}
 		// a value masked for the first time (Must2333 on X)
@@ -189,6 +194,16 @@ func (h *host) watchAlerts() {
 		gateway.TurnDone = func(t gateway.TurnEnd) {
 			title, body := turnDoneText(trayLang(settings.Load().Lang, systemLang), agentName(t.Agent), t)
 			n.sendAs(turnNotice, title, body)
+		}
+		// every key and account of a model resting, as a request for it
+		// found it (the review's D-01, 11-16): the outage's notice, once
+		// on the way in and at most once a minute while it holds
+		gateway.AllDownAlert = func(model string) {
+			if !settings.Load().AllDownAlert {
+				return
+			}
+			title, body := allDownText(trayLang(settings.Load().Lang, systemLang), model)
+			n.sendAs(downNotice, title, body)
 		}
 		// until this one has handed the gateway to the new version,
 		// which alerts from then on (#4938)

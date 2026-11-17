@@ -649,6 +649,13 @@ type Settings struct {
 	// never the value, a burst said once and at most once a minute. Only
 	// requests the app's own gateway serves; off until turned on.
 	MaskAlert bool `json:"maskAlert,omitempty"`
+	// AllDownAlert has magpie say with a notification when a request finds
+	// every key or account that can answer its model resting (the review's
+	// D-01, 11-16: the channels went out, and the user had to open the
+	// Providers page to learn it). Said once on the way into the outage
+	// and at most once a minute while it holds; the recovery is not said.
+	// Only requests the app's own gateway serves; off until turned on.
+	AllDownAlert bool `json:"allDownAlert,omitempty"`
 	// PlainNames has the model lists magpie gives agents name each model
 	// by its name alone, without its provider's or "routing group" after it
 	// (#335) — but for two in one list that would read the same, which keep

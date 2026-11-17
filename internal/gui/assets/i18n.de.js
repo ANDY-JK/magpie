@@ -1168,6 +1168,8 @@ I18N.de = Object.assign(I18N.de || {}, {
     "A notification this long before a weekly or monthly window renews with under 85% of it used, or before unused resets expire": "Eine Benachrichtigung so lange bevor ein wöchentliches oder monatliches Fenster mit unter 85 % Verbrauch erneuert wird oder ungenutzte Resets verfallen",
     "{n} h before": "{n} Std. vorher",
     "Task done alert": "Benachrichtigung bei fertiger Aufgabe",
+    "All-down alert": "Benachrichtigung bei allen Kanälen gestoppt",
+    "A notification when every key or account of a model rests after a failure, so none can answer: on the way into the outage, at most one a minute while it holds": "Eine Benachrichtigung, wenn jeder Schlüssel und jedes Konto eines Modells nach einer Störung ruht und keiner antworten kann: einmal zu Beginn der Störung, während sie hält höchstens eine pro Minute",
     "Masking alert": "Benachrichtigung beim Maskieren",
     "A notification when masking swaps a value for the first time: its kind and how many, never the value itself": "Eine Benachrichtigung, wenn ein Wert zum ersten Mal maskiert wird: Art und Anzahl, nie der Wert selbst",
     "A notification when Claude Code, Codex, OpenCode or another agent going through magpie finishes a task that ran at least this long": "Eine Benachrichtigung, wenn Claude Code, Codex, OpenCode oder ein anderer Agent über magpie eine Aufgabe beendet, die mindestens so lange lief",

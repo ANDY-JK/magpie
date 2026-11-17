@@ -1181,6 +1181,8 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "A notification this long before a weekly or monthly window renews with under 85% of it used, or before unused resets expire": "每週或每月時段用量不到 85% 即將重置時，或重置卡將過期未用時，提前這麼久通知",
     "{n} h before": "提前 {n} 小時",
     "Task done alert": "任務完成提醒",
+    "All-down alert": "渠道全停提醒",
+    "A notification when every key or account of a model rests after a failure, so none can answer: on the way into the outage, at most one a minute while it holds": "某個模型的每個金鑰或帳號故障後都在休眠、暫無渠道可應答時通知：故障開始時一次，持續期間每分鐘至多一次",
     "Masking alert": "脫敏提醒",
     "A notification when masking swaps a value for the first time: its kind and how many, never the value itself": "首次脫敏某個值時通知：只說類型和個數，從不顯示值本身",
     "A notification when Claude Code, Codex, OpenCode or another agent going through magpie finishes a task that ran at least this long": "Claude Code、Codex、OpenCode 等經由 magpie 的智慧體完成一個至少跑了這麼久的任務時通知",

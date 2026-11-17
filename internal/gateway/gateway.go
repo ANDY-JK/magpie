@@ -4613,6 +4613,10 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			}
 		} else if call.Status < 400 {
 			servedCandidate(c, call.Usage.Input+call.Usage.Output+call.Usage.CacheRead+call.Usage.CacheWrite)
+			// an answer says model's all-down, if one was said, is over
+			// (all_down.go); the recovery is silent, downSaid says the
+			// next episode
+			upSaid(call.Model)
 			// a thinking reply that went on to an answer is one more in the
 			// row that trusts the member's reasoning as it comes
 			// (holdsThinking, #4512); one whose filter's content_filter
@@ -4681,6 +4685,14 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 	}
 	if len(skipped) > 0 {
 		call.Fallback = strings.Join(skipped, "; ")
+	}
+	// every candidate of the model resting and the request failed: the
+	// channels went out (#review D-01), said once on the way in and at
+	// most once a minute while the outage holds; a failure the agent
+	// itself caused (its 499) isn't one. The notice is the outage's, not
+	// the recovery's: an answer resets the state without a word.
+	if call.Status >= 400 {
+		downSaid(all, call.Model, call.Status)
 	}
 	call.Millis = time.Since(start).Milliseconds()
 	if !ended.IsZero() {
