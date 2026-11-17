@@ -90,7 +90,14 @@ func setAgain(as []*Agent) (moved []string, errs []error) {
 			continue
 		}
 		if a.Sync != nil {
-			_ = a.Sync()
+			// the rewire's own moved-and-error reply says a reset's
+			// failure; the model list's is no one's, kept and said
+			// once (noteSyncFailure), a write again drops it
+			if err := a.Sync(); err != nil {
+				noteSyncFailure(a.ID, err)
+			} else {
+				clearSyncFailure(a.ID)
+			}
 		}
 		moved = append(moved, a.Name)
 	}

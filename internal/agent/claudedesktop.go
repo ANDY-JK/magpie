@@ -179,13 +179,22 @@ func claudeDesktop(home string) *Agent {
 				}
 				// its Code tab is Claude Code, told what Desktop's ids for
 				// magpie's models can do while that one runs on magpie
-				_ = claude(home).Sync()
+				// (a failure is kept and said once, noteSyncFailure)
+				if err := claude(home).Sync(); err != nil {
+					noteSyncFailure(claude(home).ID, err)
+				} else {
+					clearSyncFailure(claude(home).ID)
+				}
 				// and a running distro's, which a Code tab session with
 				// WSL as its host runs on (a stopped one is written on
 				// the round after it starts)
 				for _, a := range wslAgents() {
 					if strings.HasPrefix(a.ID, "claude@wsl:") && a.Sync != nil {
-						_ = a.Sync()
+						if err := a.Sync(); err != nil {
+							noteSyncFailure(a.ID, err)
+						} else {
+							clearSyncFailure(a.ID)
+						}
 					}
 				}
 				return nil
@@ -397,7 +406,15 @@ func desktopTierFields(home string, ps []desktopPaths) []Field {
 					}
 				}
 				if desktopWiredAny(ps) {
-					_ = claude(home).Sync()
+					// a failure of the list's write is kept and said once
+					// (noteSyncFailure), not dropped: the tab's models are as
+					// they were
+					if err := claude(home).Sync(); err != nil {
+						errs = append(errs, fmt.Errorf("the Code tab's list: %w", err))
+						noteSyncFailure(claude(home).ID, err)
+					} else {
+						clearSyncFailure(claude(home).ID)
+					}
 				}
 				return joinErrs(errs)
 			},
