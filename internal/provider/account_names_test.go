@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/plugin"
+	"github.com/yetone/magpie/internal/seal"
 	"github.com/yetone/magpie/internal/testenv"
 )
 
@@ -36,7 +37,7 @@ func TestAccountNameOfAPluginAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := PluginID("fakeco")
-	read := func(p string) []byte { b, _ := os.ReadFile(p); return b }
+	read := func(p string) []byte { b, _ := os.ReadFile(p); return seal.Plain(b) }
 	auth, logins := read(plugin.AuthPath()), read(loginsPath())
 	if len(auth) == 0 || len(logins) == 0 {
 		t.Fatalf("no sign-in to keep: auth %d bytes, logins %d", len(auth), len(logins))

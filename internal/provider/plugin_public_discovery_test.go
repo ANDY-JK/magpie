@@ -63,7 +63,7 @@ func TestPublicPluginListedWithAccountsOff(t *testing.T) {
 		t.Fatalf("with accounts on: %v", got)
 	}
 
-	before, _ := os.ReadFile(loginsPath())
+	before, _ := readPlain(loginsPath())
 	if err := settings.Save(settings.Settings{NoAccountDiscovery: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestPublicPluginListedWithAccountsOff(t *testing.T) {
 	if _, err := PluginAPIKey(context.Background(), "opencode-zen-free", 0, nil, ""); errors.Is(err, errAccountDiscoveryOff) {
 		t.Errorf("Zen Free's keyless sign-in refused with accounts off")
 	}
-	if after, _ := os.ReadFile(loginsPath()); string(after) != string(before) {
+	if after, _ := readPlain(loginsPath()); string(after) != string(before) {
 		t.Errorf("logins.json written with accounts off:\n%s\nwas\n%s", after, before)
 	}
 }

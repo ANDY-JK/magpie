@@ -176,14 +176,14 @@ func TestCodexListTagFollowsChanges(t *testing.T) {
 
 	// the providers' file as another magpie (the CLI) leaves it: nothing
 	// in this process is told
-	before, err := os.ReadFile(Path())
+	before, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := Save(Provider{ID: "elsewhere", Name: "elsewhere", Chat: "https://elsewhere.test/v1", Key: "k", Models: []string{"e-1"}}); err != nil {
 		t.Fatal(err)
 	}
-	after, err := os.ReadFile(Path())
+	after, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

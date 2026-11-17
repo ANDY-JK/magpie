@@ -2,7 +2,6 @@ package provider
 
 import (
 	"bytes"
-	"os"
 	"testing"
 
 	"github.com/yetone/magpie/internal/catalog"
@@ -18,7 +17,7 @@ func TestSaveUnchangedTellsNoAgent(t *testing.T) {
 	if err := Save(in); err != nil {
 		t.Fatal(err)
 	}
-	before, err := os.ReadFile(Path())
+	before, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +31,7 @@ func TestSaveUnchangedTellsNoAgent(t *testing.T) {
 	if told != 0 {
 		t.Errorf("an unchanged save told the agents %d times; want none", told)
 	}
-	after, err := os.ReadFile(Path())
+	after, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

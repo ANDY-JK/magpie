@@ -34,6 +34,7 @@ import (
 	"github.com/yetone/magpie/internal/lastgood"
 	"github.com/yetone/magpie/internal/netproxy"
 	"github.com/yetone/magpie/internal/plugin"
+	"github.com/yetone/magpie/internal/seal"
 	"github.com/yetone/magpie/internal/settings"
 	"github.com/yetone/magpie/internal/steady"
 )
@@ -201,10 +202,11 @@ var (
 	loginsKnown  bool
 )
 
-// parseLogins is logins.json's accounts.
+// parseLogins is logins.json's accounts, a sealed or plain generation alike
+// (seal.Plain, the last good reader).
 func parseLogins(b []byte) ([]savedLogin, error) {
 	var out []savedLogin
-	if err := json.Unmarshal(b, &out); err != nil {
+	if err := json.Unmarshal(seal.Plain(b), &out); err != nil {
 		return nil, err
 	}
 	// DimAgent's accounts: magpie no longer signs in to it (DimAgent
@@ -214,11 +216,13 @@ func parseLogins(b []byte) ([]savedLogin, error) {
 	return nameAlike(dedupeLogins(out)), nil
 }
 
-// validLogins is logins.json's contents read as accounts: valid JSON can
-// still have field types they don't take.
+// validLogins is logins.json's contents read as accounts, in either
+// generation it may be on the disk: a plain JSON one, or a sealed one
+// (Windows), unsealed first. Valid JSON can still have field types they
+// don't take.
 func validLogins(b []byte) bool {
 	var ls []savedLogin
-	return json.Unmarshal(b, &ls) == nil
+	return json.Unmarshal(seal.Plain(b), &ls) == nil
 }
 
 func readLogins() []savedLogin {
@@ -297,7 +301,18 @@ func writeLogins(ls []savedLogin) error {
 	if err := lastgood.Keep(loginsPath(), validLogins, 0o600); err != nil {
 		return err
 	}
-	if err := writePrivate(loginsPath(), append(b, '\n')); err != nil {
+	// the new generation is sealed for the user (Windows): refresh
+	// tokens are the account's, and a file another account of the machine
+	// can read is one they could turn. A seal that fails (a DPAPI that is
+	// down) is not a write failure: the generation goes plain, at the
+	// permissions it had before the seal, said once a minute (sealFellBack)
+	plain := append(b, '\n')
+	sealed, err := seal.Seal(plain)
+	if err != nil {
+		sealFellBack("logins.json", err)
+		sealed = plain
+	}
+	if err := writePrivate(loginsPath(), sealed); err != nil {
 		return err
 	}
 	lastLoginsMu.Lock()

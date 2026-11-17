@@ -36,14 +36,14 @@ func TestClaudeLoginKeychainWriteFailureKeepsLoginsFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, err := os.ReadFile(loginsPath())
+	before, err := readPlain(loginsPath())
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
 	if _, err := addLogin(l); err == nil {
 		t.Fatal("a sign-in whose keychain write failed was kept")
 	}
-	after, err := os.ReadFile(loginsPath())
+	after, err := readPlain(loginsPath())
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}

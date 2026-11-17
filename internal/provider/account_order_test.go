@@ -57,12 +57,12 @@ func TestAccountOrderKeysAllRoutingModes(t *testing.T) {
 		if load().Providers[0].Key != "extra" {
 			t.Fatal("priority not persisted")
 		}
-		before, _ := os.ReadFile(Path())
+		before, _ := readPlain(Path())
 		for _, invalid := range [][]string{{order[0], order[0], order[2], order[3]}, {order[2], order[0], order[1], order[3]}, order[:3]} {
 			if err := SetAccountOrder(p.ID, invalid); err == nil {
 				t.Fatalf("accepted %v", invalid)
 			}
-			after, _ := os.ReadFile(Path())
+			after, _ := readPlain(Path())
 			if !bytes.Equal(before, after) {
 				t.Fatal("invalid order changed the store")
 			}
@@ -125,11 +125,11 @@ func TestAccountOrderSideLoginsAllRoutingModes(t *testing.T) {
 				t.Fatal("enabled an off account")
 			}
 		}
-		before, _ := os.ReadFile(loginsPath())
+		before, _ := readPlain(loginsPath())
 		if err := SetAccountOrder("antigravity", []string{users[3], users[2], users[1], users[0]}); err == nil {
 			t.Fatal("silently enabled an off account")
 		}
-		after, _ := os.ReadFile(loginsPath())
+		after, _ := readPlain(loginsPath())
 		if !bytes.Equal(before, after) {
 			t.Fatal("rejected drag changed logins")
 		}

@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
@@ -22,7 +21,7 @@ func TestDimAgentLoginDropped(t *testing.T) {
 	if err := writeLogins(readLogins()); err != nil {
 		t.Fatal(err)
 	}
-	b, err := os.ReadFile(loginsPath())
+	b, err := readPlain(loginsPath())
 	if err != nil {
 		t.Fatal(err)
 	}

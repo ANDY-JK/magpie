@@ -95,7 +95,7 @@ func TestCodexDuplicateLoginsCollapse(t *testing.T) {
 	if got := readLogins(); len(got) != 1 || !got[0].Seen.Equal(now) || !got[0].On || !got[0].First {
 		t.Fatalf("saved logins were not deduped: %+v", got)
 	}
-	raw, err := os.ReadFile(loginsPath())
+	raw, err := readPlain(loginsPath())
 	if err != nil {
 		t.Fatal(err)
 	}

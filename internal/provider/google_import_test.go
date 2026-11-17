@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -182,7 +181,7 @@ func TestImportGoogleAccounts(t *testing.T) {
 	if len(users) != 4 || users["a@x.com"] != "found-proj" || users["c@x.com"] != "found-proj" || users["b@x.com"] != "pb" {
 		t.Errorf("logins = %v", users)
 	}
-	b, _ := os.ReadFile(loginsPath())
+	b, _ := readPlain(loginsPath())
 	if !strings.Contains(string(b), `"1//a"`) {
 		t.Error("a's sign-in not kept in logins.json")
 	}

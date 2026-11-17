@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
@@ -45,7 +44,7 @@ func TestSetAccountWeight(t *testing.T) {
 	if err := SetAccountWeight("codex", "me@example.com", 1); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := os.ReadFile(Path())
+	b, _ := readPlain(Path())
 	if strings.Contains(string(b), "accountWeights") {
 		t.Fatalf("1 was written: %s", b)
 	}

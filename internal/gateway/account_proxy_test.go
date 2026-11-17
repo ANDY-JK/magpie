@@ -144,7 +144,9 @@ func TestAccountProxy(t *testing.T) {
 		p.AccountProxies["me@example.com"] != ownProxy.URL || p.AccountProxies["spare@example.com"] != "direct" {
 		t.Fatalf("kept %q %v", p.Proxy, p.AccountProxies)
 	}
-	b, _ := os.ReadFile(provider.Path())
+	// the file magpie's own writes, sealed for the user on Windows: read
+	// it back as the JSON it holds, not the sealed bytes
+	b, _ := provider.ReadPlain(provider.Path())
 	if !strings.Contains(string(b), `"accountProxies"`) || strings.Contains(string(b), "third@example.com") {
 		t.Fatalf("providers.json: %s", b)
 	}

@@ -92,7 +92,9 @@ func TestDshRoundAfterAChangeWritesAgain(t *testing.T) {
 	})
 	t.Run("another magpie", func(t *testing.T) {
 		r, web := dshSettled(t)
-		b, err := os.ReadFile(provider.Path())
+		// the file magpie's own writes, sealed for the user on Windows:
+		// read it back as the JSON it holds, not the sealed bytes
+		b, err := provider.ReadPlain(provider.Path())
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -2,7 +2,6 @@ package provider
 
 import (
 	"encoding/json"
-	"os"
 	"slices"
 	"testing"
 )
@@ -61,7 +60,7 @@ func TestGroupOrder(t *testing.T) {
 	if e := Catalog(); len(e) == 0 || e[0].Group != found {
 		t.Fatalf("the catalog's first model isn't %s", GroupPrefix+found)
 	}
-	b, err := os.ReadFile(Path())
+	b, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

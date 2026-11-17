@@ -147,7 +147,7 @@ func TestProviderWritesKeepValidFile(t *testing.T) {
 	if added, replaced, err := Restore([]Provider{second}); err != nil || added != 0 || replaced != 1 {
 		t.Fatalf("restore into valid file: %d %d %v", added, replaced, err)
 	}
-	b, err := os.ReadFile(Path())
+	b, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

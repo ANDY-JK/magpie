@@ -150,7 +150,7 @@ func TestAccountsAreProviders(t *testing.T) {
 	if err := Save(Provider{ID: "codex", Name: "x", Chat: "https://ignored", Key: "ignored", Models: []string{"gpt-5.5"}}); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := os.ReadFile(Path())
+	b, _ := readPlain(Path())
 	if strings.Contains(string(b), "ignored") || !strings.Contains(string(b), `"gpt-5.5"`) {
 		t.Fatalf("stored: %s", b)
 	}
@@ -353,7 +353,7 @@ func TestClaudeAccountIsProvider(t *testing.T) {
 	if err := Save(Provider{ID: "claude", Name: "x", Models: []string{"claude-opus-5-5"}}); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := os.ReadFile(Path())
+	b, _ := readPlain(Path())
 	if strings.Contains(string(b), "sk-ant-") || !strings.Contains(string(b), `"claude-opus-5-5"`) {
 		t.Fatalf("stored: %s", b)
 	}

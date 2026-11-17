@@ -2,7 +2,6 @@ package provider
 
 import (
 	"encoding/json"
-	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -57,7 +56,7 @@ func TestGroupPatterns(t *testing.T) {
 		t.Fatalf("routed: %v", got)
 	}
 	// what was matched is not written into the group
-	b, _ := os.ReadFile(Path())
+	b, _ := readPlain(Path())
 	var f struct{ Groups []Group }
 	json.Unmarshal(b, &f)
 	if len(f.Groups) != 1 || !slices.Equal(f.Groups[0].Members, []string{"zen/y", "or/c:free"}) || len(f.Groups[0].Matched) != 0 {
@@ -175,7 +174,7 @@ func TestGroupPatternMembersKeepTheirPlace(t *testing.T) {
 	if err := SaveGroup(g); err != nil {
 		t.Fatal(err)
 	}
-	if b, _ := os.ReadFile(Path()); strings.Contains(string(b), `"placed"`) {
+	if b, _ := readPlain(Path()); strings.Contains(string(b), `"placed"`) {
 		t.Fatalf("placed kept: %s", b)
 	}
 }

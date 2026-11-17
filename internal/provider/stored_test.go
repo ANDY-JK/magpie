@@ -59,7 +59,7 @@ func TestStoredParsedOnceUntilTheFileChanges(t *testing.T) {
 
 	// another process's edit, of the same size and an older time: the
 	// time alone tells it apart
-	b, err := os.ReadFile(Path())
+	b, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

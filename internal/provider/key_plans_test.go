@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -126,7 +125,7 @@ func TestKeyPlanOldConfigsUnchanged(t *testing.T) {
 	if err := Save(p); err != nil {
 		t.Fatal(err)
 	}
-	b, err := os.ReadFile(Path())
+	b, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

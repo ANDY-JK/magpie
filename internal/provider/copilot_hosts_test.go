@@ -290,7 +290,7 @@ func oldGHEFiles(t *testing.T, providers string) {
 
 func savedCopilotUsers(t *testing.T) string {
 	t.Helper()
-	b, err := os.ReadFile(loginsPath())
+	b, err := readPlain(loginsPath())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,7 +397,7 @@ func TestCopilotRenameWaitsForSettings(t *testing.T) {
 	if got := savedCopilotUsers(t); !strings.Contains(got, "mona ") && !strings.HasSuffix(got, "mona") {
 		t.Fatalf("logins.json renamed without its settings: %s", got)
 	}
-	if b, _ := os.ReadFile(Path()); string(b) != `{"providers": [` {
+	if b, _ := readPlain(Path()); string(b) != `{"providers": [` {
 		t.Fatalf("providers.json written over: %s", b)
 	}
 	if err := os.WriteFile(Path(), []byte(`{"providers": [{"id": "copilot", "accountProxies": {"mona": "http://127.0.0.1:9"}, "accountCaps": {"mona": 70}}]}`), 0o600); err != nil {

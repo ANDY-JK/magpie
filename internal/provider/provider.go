@@ -1,10 +1,12 @@
 // Package provider holds the model vendors magpie can reach: where each one
-// lives, which protocols it speaks, the API key the user typed in, and which
+// lives, which protocols it speaks, the API key the user entered, and which
 // of its models should show up in the agents' pickers.
 //
 // Provider keys are never read from environment variables. A provider is
 // exactly what the user entered, kept in ~/.config/magpie/providers.json
-// (mode 0600).
+// (mode 0600, sealed for the user on Windows: a file read by another
+// account of the machine, or copied to another machine, is unknown, never
+// the keys).
 package provider
 
 import (
@@ -13,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"maps"
 	"net"
 	"net/url"
@@ -29,6 +32,7 @@ import (
 	"github.com/yetone/magpie/internal/catalog"
 	"github.com/yetone/magpie/internal/filememo"
 	"github.com/yetone/magpie/internal/lastgood"
+	"github.com/yetone/magpie/internal/seal"
 	"github.com/yetone/magpie/internal/settings"
 	"github.com/yetone/magpie/internal/steady"
 )
@@ -604,6 +608,19 @@ type file struct {
 // Path is the file the user's providers live in.
 func Path() string { return appdir.Join(appdir.Config(), "providers.json") }
 
+// ReadPlain is the bytes at path read as the generation they are on the
+// disk in: on Windows magpie's own files (providers.json, logins.json) are
+// sealed for the user (DPAPI), so a byte read back through the seal is the
+// JSON it holds; everywhere else the seal is the identity and the bytes are
+// as they are on the disk, as they always were. err is the read's, as-is.
+// What lists the providers reads them through read(), which is the same
+// bytes as catalog entries; ReadPlain is for a test or a mirror that wants
+// the file's own bytes to look at, not the catalog.
+func ReadPlain(path string) ([]byte, error) {
+	b, err := steady.ReadFile(path)
+	return seal.Plain(b), err
+}
+
 // load is the file for a read that goes on without it: start-up, the
 // gateway, the catalog. One that can't be read is taken as empty there;
 // what lists the providers to the user says so (FileError), and an edit
@@ -631,7 +648,9 @@ func storedFile() file {
 
 func parseProviders(b []byte) (file, error) {
 	var f file
-	err := json.Unmarshal(bytes.TrimPrefix(b, utf8BOM), &f)
+	// the file may be a sealed generation (Windows) or a plain one, read
+	// through either; lastgood keeps each as it is
+	err := json.Unmarshal(bytes.TrimPrefix(seal.Plain(b), utf8BOM), &f)
 	return f, err
 }
 
@@ -663,8 +682,13 @@ func read() (file, error) {
 	}
 	// An editor that saves with a byte-order mark leaves JSON that Go's
 	// decoder refuses; read as broken, the file fell back to its .bak, an
-	// older generation without what was saved since (#1821).
-	b = bytes.TrimPrefix(b, utf8BOM)
+	// older generation without what was saved since (#1821). On Windows the
+	// file is sealed for the user (DPAPI), and the seal is read off before
+	// the JSON is looked at: a sealed blob of another's (a copy the file
+	// was made on another machine, or by another account) unseals to
+	// nothing and reads as broken, as an all-zero one does — unknown,
+	// never empty, the last good generation kept.
+	b = bytes.TrimPrefix(seal.Plain(b), utf8BOM)
 	if err := json.Unmarshal(b, &f); err != nil {
 		// one left all zero by a crash (#1505) is its last good generation
 		bak, ferr := lastgood.Fallback(Path(), b, validProviders)
@@ -672,17 +696,21 @@ func read() (file, error) {
 			return file{}, &unreadableError{Path(), err}
 		}
 		f = file{}
-		if err := json.Unmarshal(bak, &f); err != nil {
+		// the .bak is kept as it was on the disk: a sealed generation
+		// (Windows) or a plain one, read through either
+		if err := json.Unmarshal(bytes.TrimPrefix(seal.Plain(bak), utf8BOM), &f); err != nil {
 			return file{}, &unreadableError{Path(), err}
 		}
 	}
 	return f, nil
 }
 
-// validProviders is providers.json's contents read as the catalog.
+// validProviders is providers.json's contents read as the catalog, in
+// either generation it may be on the disk: a plain JSON one, or a sealed
+// one (Windows), unsealed first.
 func validProviders(b []byte) bool {
 	var f file
-	return json.Unmarshal(bytes.TrimPrefix(b, utf8BOM), &f) == nil
+	return json.Unmarshal(bytes.TrimPrefix(seal.Plain(b), utf8BOM), &f) == nil
 }
 
 var utf8BOM = []byte("\xef\xbb\xbf")
@@ -718,7 +746,12 @@ func Routings() ([]string, error) {
 
 // store replaces providers.json whole, through a file renamed over it, so
 // that a read at that moment sees the old catalog or the new one, never a
-// file cut short.
+// file cut short. On Windows the new generation is sealed for the user
+// (DPAPI): another account of the machine, or a copy on another machine,
+// reads it as unknown, never as the keys. A seal that fails (a DPAPI that
+// is down) is not a save failure: the generation is written plain, at the
+// permissions it had before the seal (0600), and the fallback is said once
+// a minute (sealFellBack), not on every save.
 func store(f file) error {
 	p := Path()
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -737,13 +770,40 @@ func store(f file) error {
 	if err := lastgood.Keep(p, validProviders, 0o600); err != nil {
 		return err
 	}
-	if err := writePrivate(p, append(b, '\n')); err != nil {
+	plain := append(b, '\n')
+	sealed, err := seal.Seal(plain)
+	if err != nil {
+		sealFellBack("providers.json", err)
+		sealed = plain
+	}
+	if err := writePrivate(p, sealed); err != nil {
 		return err
 	}
 	pruneIcons(f)
 	// what agents were handed of the catalog may be out of date now
 	catalog.Touched()
 	return nil
+}
+
+// sealFellBackMu guards sealFellBackLast, when a plain generation was last
+// written because the seal failed: the fallback is said once a minute, and
+// a seal that works again resets it, so a DPAPI that healed stops being
+// spoken of.
+var (
+	sealFellBackMu   sync.Mutex
+	sealFellBackLast time.Time
+)
+
+// sealFellBack says of a generation written plain instead of sealed, at
+// most once a minute, and names why the seal failed.
+func sealFellBack(what string, err error) {
+	sealFellBackMu.Lock()
+	defer sealFellBackMu.Unlock()
+	if time.Since(sealFellBackLast) < time.Minute {
+		return
+	}
+	sealFellBackLast = time.Now()
+	log.Printf("%s: the generation was written plain, the seal for the user failed: %v", what, err)
 }
 
 // All lists the configured providers in the order they were added, then

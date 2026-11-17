@@ -46,7 +46,7 @@ func relaySaved(t *testing.T) {
 // entry carries them.
 func capsOnDisk(t *testing.T, id string) map[string]ModelCaps {
 	t.Helper()
-	b, err := os.ReadFile(Path())
+	b, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

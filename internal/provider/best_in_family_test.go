@@ -2,7 +2,6 @@ package provider
 
 import (
 	"encoding/json"
-	"os"
 	"slices"
 	"testing"
 
@@ -52,7 +51,7 @@ func TestBestInFamilyExposed(t *testing.T) {
 	if got := find(); got.BestInFamily || !slices.Equal(ids(got.Exposed()), all) {
 		t.Fatalf("before: best %v exposed %v", got.BestInFamily, ids(got.Exposed()))
 	}
-	raw, err := os.ReadFile(Path())
+	raw, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

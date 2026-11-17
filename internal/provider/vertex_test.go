@@ -425,7 +425,7 @@ func TestVertexKeyKeptDropped(t *testing.T) {
 	var f struct {
 		Providers []map[string]any `json:"providers"`
 	}
-	if b, err := os.ReadFile(Path()); err != nil || json.Unmarshal(b, &f) != nil || f.Providers[0]["id"] != "vertex-prod" || f.Providers[0]["off"] != true {
+	if b, err := readPlain(Path()); err != nil || json.Unmarshal(b, &f) != nil || f.Providers[0]["id"] != "vertex-prod" || f.Providers[0]["off"] != true {
 		t.Fatalf("providers.json: %v (%v)", f.Providers, err)
 	}
 	for _, k := range []string{"key", "keyName", "keys"} {
@@ -460,7 +460,7 @@ func TestVertexSaveNormalizes(t *testing.T) {
 	if err := Save(Provider{ID: "relay", Name: "Relay", Chat: "https://relay.example.com/v1", Key: "sk-relay", Vertex: &Vertex{Project: "acme-vertex"}}); err != nil {
 		t.Fatal(err)
 	}
-	b, err := os.ReadFile(Path())
+	b, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

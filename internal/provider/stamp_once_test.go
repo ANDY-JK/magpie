@@ -36,7 +36,7 @@ func TestStampLooksOnceARequest(t *testing.T) {
 	release()
 
 	// another process rewrites the providers' file: a size of its own
-	b, err := os.ReadFile(Path())
+	b, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

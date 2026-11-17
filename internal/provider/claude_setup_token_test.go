@@ -40,7 +40,7 @@ func TestClaudeSetupTokenAccount(t *testing.T) {
 		t.Fatal("adding a setup-token wrote Claude Code's own sign-in")
 	}
 	// kept as a credential is, in logins.json
-	if b, _ := os.ReadFile(loginsPath()); !strings.Contains(string(b), testSetupToken) {
+	if b, _ := readPlain(loginsPath()); !strings.Contains(string(b), testSetupToken) {
 		t.Fatal("the token isn't kept in logins.json")
 	}
 	var got *Login

@@ -109,8 +109,9 @@ func TestAutoVisionSeesEachChange(t *testing.T) {
 	}
 
 	// the providers' file written by another magpie (magpie provider
-	// edit in a terminal): Haiku taken out
-	b, err := os.ReadFile(provider.Path())
+	// edit in a terminal): Haiku taken out. Read it back as the JSON it
+	// holds, not the sealed bytes magpie's own writes are on Windows
+	b, err := provider.ReadPlain(provider.Path())
 	if err != nil {
 		t.Fatal(err)
 	}

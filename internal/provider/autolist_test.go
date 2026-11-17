@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"slices"
 	"sync/atomic"
@@ -134,11 +133,11 @@ func TestAutoIncludeTakesNewlyListedMatches(t *testing.T) {
 	}
 
 	// nothing new: nothing taken, and providers.json isn't written
-	before, _ := os.ReadFile(Path())
+	before, _ := readPlain(Path())
 	if got := refetchRelay(t, "relay"); len(got) != 0 {
 		t.Fatalf("a fetch with nothing new took %v", got)
 	}
-	if after, _ := os.ReadFile(Path()); string(after) != string(before) {
+	if after, _ := readPlain(Path()); string(after) != string(before) {
 		t.Fatalf("providers.json written by a fetch with nothing to take:\n%s\n%s", before, after)
 	}
 }

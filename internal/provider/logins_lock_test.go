@@ -28,7 +28,7 @@ var seenAgoCalls int
 func seenAgo(t *testing.T, d time.Duration) (raw []byte, mod time.Time) {
 	t.Helper()
 	var ls []map[string]any
-	b, err := os.ReadFile(loginsPath())
+	b, err := readPlain(loginsPath())
 	if err != nil || json.Unmarshal(b, &ls) != nil || len(ls) == 0 {
 		t.Fatalf("logins.json: %v %s", err, b)
 	}
@@ -43,13 +43,13 @@ func seenAgo(t *testing.T, d time.Duration) (raw []byte, mod time.Time) {
 	if err := os.Chtimes(loginsPath(), mod, mod); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ = os.ReadFile(loginsPath())
+	raw, _ = readPlain(loginsPath())
 	return raw, mod
 }
 
 func loginsUnchanged(t *testing.T, raw []byte, mod time.Time) bool {
 	t.Helper()
-	b, err := os.ReadFile(loginsPath())
+	b, err := readPlain(loginsPath())
 	fi, ferr := os.Stat(loginsPath())
 	if err != nil || ferr != nil {
 		t.Fatal(err, ferr)
@@ -82,7 +82,7 @@ func TestReadOnlyRunLeavesLogins(t *testing.T) {
 		All()
 	}
 	if !loginsUnchanged(t, raw, mod) {
-		b, _ := os.ReadFile(loginsPath())
+		b, _ := readPlain(loginsPath())
 		t.Fatalf("a run that only listed the accounts wrote logins.json:\nwas %s\nnow %s", raw, b)
 	}
 
@@ -102,7 +102,7 @@ func TestReadOnlyRunLeavesLogins(t *testing.T) {
 	if loginsUnchanged(t, raw, mod) {
 		t.Fatal("Codex's refreshed sign-in wasn't saved")
 	}
-	if b, _ := os.ReadFile(loginsPath()); !bytes.Contains(b, []byte("r-refreshed")) {
+	if b, _ := readPlain(loginsPath()); !bytes.Contains(b, []byte("r-refreshed")) {
 		t.Fatalf("logins.json: %s", b)
 	}
 }
@@ -142,7 +142,7 @@ func TestLoginsKeepAnotherMagpiesWrite(t *testing.T) {
 	rememberLogins(true)
 	codexSignIn(t, home, "me@example.com", "r-me")
 	rememberLogins(true)
-	if b, _ := os.ReadFile(loginsPath()); !bytes.Contains(b, []byte("r-work")) {
+	if b, _ := readPlain(loginsPath()); !bytes.Contains(b, []byte("r-work")) {
 		t.Fatalf("work@example.com not saved: %s", b)
 	}
 
@@ -186,7 +186,7 @@ func TestLoginsKeepAnotherMagpiesWrite(t *testing.T) {
 		t.Fatal("the other magpie failed")
 	}
 
-	b, _ := os.ReadFile(loginsPath())
+	b, _ := readPlain(loginsPath())
 	if !bytes.Contains(b, []byte("r-rotated")) || bytes.Contains(b, []byte(`r-work"`)) {
 		t.Fatalf("the other magpie's renewed sign-in was written over:\n%s", b)
 	}
@@ -209,7 +209,7 @@ func TestLoginsReadAfreshUnderLock(t *testing.T) {
 	readLogins()
 
 	// another magpie's write, which this one's filememo.Forget never hears of
-	b, _ := os.ReadFile(loginsPath())
+	b, _ := readPlain(loginsPath())
 	if err := os.WriteFile(loginsPath(), bytes.ReplaceAll(b, []byte("r-work"), []byte("r-rotated")), 0o600); err != nil {
 		t.Fatal(err)
 	}

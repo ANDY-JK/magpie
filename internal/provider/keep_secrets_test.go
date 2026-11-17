@@ -105,7 +105,7 @@ func TestProvidersFileWithBOM(t *testing.T) {
 	if err := Save(Provider{ID: "volcengine", Name: "Volcengine Ark", Chat: "https://ark.cn-beijing.volces.com/api/coding/v3", Key: "ark-k", AccessKeyID: "AK1", SecretAccessKey: "SK1"}); err != nil {
 		t.Fatal(err)
 	}
-	b, err := os.ReadFile(Path())
+	b, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

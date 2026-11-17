@@ -142,7 +142,7 @@ func TestFoldCopiesIntoOneOn(t *testing.T) {
 func TestFoldCopiesUnreadable(t *testing.T) {
 	foldHome(t)
 	saveAll(t, nvidiaCopy("nvidia", "NVIDIA #001", "nvapi-1"), nvidiaCopy("nvidia-2", "NVIDIA #002", "nvapi-2"))
-	b, _ := os.ReadFile(Path())
+	b, _ := readPlain(Path())
 	bad := append(slices.Clone(b[:len(b)/2]), '}')
 	if err := os.WriteFile(Path(), bad, 0o600); err != nil {
 		t.Fatal(err)
@@ -150,7 +150,7 @@ func TestFoldCopiesUnreadable(t *testing.T) {
 	if n, err := FoldCopies(); n != 0 || err == nil {
 		t.Fatalf("%d %v", n, err)
 	}
-	if got, _ := os.ReadFile(Path()); string(got) != string(bad) {
+	if got, _ := readPlain(Path()); string(got) != string(bad) {
 		t.Fatal("written over")
 	}
 }

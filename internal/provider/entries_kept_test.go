@@ -62,7 +62,7 @@ func TestCatalogKeptAcrossRequests(t *testing.T) {
 	}
 
 	// providers.json written by another process (the CLI): seen at once
-	b, err := os.ReadFile(Path())
+	b, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}

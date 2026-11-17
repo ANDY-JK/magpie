@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
 )
@@ -47,10 +46,10 @@ func TestCopilotEntitlementRefresh(t *testing.T) {
 		if !found {
 			t.Fatalf("entitlement not refreshed for %s", app.User)
 		}
-		before, _ := os.ReadFile(loginsPath())
+		before, _ := readPlain(loginsPath())
 		refreshCopilotEntitlement(app, "Education", "free_educational_quota")
 		refreshCopilotEntitlement(copilotApp{User: app.User, Token: "replaced-token"}, "Enterprise", "new")
-		after, _ := os.ReadFile(loginsPath())
+		after, _ := readPlain(loginsPath())
 		if string(before) != string(after) {
 			t.Fatal("unchanged or stale credentials changed login")
 		}

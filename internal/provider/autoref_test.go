@@ -139,7 +139,7 @@ func TestProviderNamedAuto(t *testing.T) {
 	}
 
 	// one in providers.json from before
-	raw, err := os.ReadFile(Path())
+	raw, err := readPlain(Path())
 	if err != nil {
 		t.Fatal(err)
 	}
