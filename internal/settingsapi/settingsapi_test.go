@@ -56,6 +56,13 @@ func sample(t reflect.Type, key string, was reflect.Value) reflect.Value {
 		v.Set(reflect.New(t.Elem()))
 		v.Elem().Set(sample(t.Elem(), key, elem))
 	case reflect.Slice:
+		if t.Elem().Kind() == reflect.Uint8 {
+			// a []byte, or json.RawMessage: the slice is a JSON value in
+			// its own right (ModelExtraBody's), so a valid object of it,
+			// not a byte of the zero value, which no marshal takes
+			v.Set(reflect.ValueOf([]byte("{}")).Convert(t))
+			break
+		}
 		el := sample(t.Elem(), key, reflect.Zero(t.Elem()))
 		v.Set(reflect.Append(reflect.MakeSlice(t, 0, 1), el))
 	case reflect.Map:
