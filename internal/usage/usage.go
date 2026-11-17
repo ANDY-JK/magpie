@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"maps"
 	"math"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yetone/magpie/internal/catalog"
@@ -282,8 +284,39 @@ var mu sync.Mutex
 // reads the gateway's calls from its index instead.
 var loads int
 
-// Append writes one record. Errors are swallowed: accounting must never
-// break a call.
+// writesFailed counts every record Append has not been able to write since
+// start: a dropped record is a number the user would quote, not "maybe".
+// saidWhen, guarded by mu, is when a drop was last said, so a long failure
+// is spoken of once a minute, and sayEvery how often; a test shrinks it.
+// A success resets saidWhen, so the next drop is said at once.
+var (
+	writesFailed atomic.Int64
+	saidWhen     time.Time
+	sayEvery     = time.Minute
+)
+
+// AppendsFailed is how many records Append has not written since start, for
+// a test and, when it is nonzero, the log.
+func AppendsFailed() int64 { return writesFailed.Load() }
+
+// resetAppendsFailed is a test's seam back to nothing dropped.
+func resetAppendsFailed() { writesFailed.Store(0) }
+
+// sayFailed says, at most every sayEvery, of the records Append hasn't
+// been able to write: a disk that fills or a folder that goes read-only is
+// not silent. The caller holds mu.
+func sayFailed(why error) {
+	if time.Since(saidWhen) < sayEvery {
+		return
+	}
+	saidWhen = Clock()
+	log.Printf("usage.jsonl: %d record(s) not written since start, latest: %v; calls go on, the ledger keeps what it could open", writesFailed.Load(), why)
+}
+
+// Append writes one record. A write that can't land is not written, and the
+// call is never broken by it: the failure is counted (writesFailed) and
+// said once a minute (sayFailed), which a success quietens until the next
+// drop.
 func Append(r Record) {
 	if r.Time.IsZero() {
 		r.Time = Clock()
@@ -301,6 +334,8 @@ func Append(r Record) {
 	path := Path()
 	f, before := openLog(path)
 	if f == nil {
+		writesFailed.Add(1)
+		sayFailed(errors.New("the log couldn't be opened"))
 		return
 	}
 	if !holdLog {
@@ -311,8 +346,11 @@ func Append(r Record) {
 			f.Close()
 			heldLog.f = nil
 		}
+		writesFailed.Add(1)
+		sayFailed(err)
 		return
 	}
+	saidWhen = time.Time{} // a healed log is quiet: the next drop is said at once
 	after, _ := statLogHandle(f)
 	noteLogAppend(path, before, after)
 }
@@ -330,9 +368,24 @@ var heldLog struct {
 
 const holdLog = runtime.GOOS != "windows"
 
+// openFail, when set, makes openLog fail its open: a test's seam, as
+// steady's stat and readFile are, so a write that can't land is read back
+// on every platform (a read-only folder's enforcement is not one).
+var openFail func() error
+
 // openLog returns the log to append to and its state before the write,
 // or nil when it can't be opened.
 func openLog(path string) (*os.File, os.FileInfo) {
+	// openFail, when set (a test's seam, as steady's are), fails the open,
+	// so a failure of the log's write is what a test reads back on every
+	// platform: a read-only folder's enforcement is not one (a filesystem
+	// that doesn't enforce it would make the test a skip, and a skip is
+	// not the check)
+	if openFail != nil {
+		if openFail() != nil {
+			return nil, nil
+		}
+	}
 	if f := heldLog.f; f != nil {
 		heldLog.f = nil
 		if heldLog.path == path {

@@ -667,7 +667,13 @@ however old, so a client's history can be backfilled.
   lines that carry the reported mark, and each later post reads only what
   was appended since. The reply counts `accepted` and `skipped` and gives
   each record's `index`, `rid` and `status`, so a re-run of a batch is
-  safe.
+  safe. A record `usage.Append` can't write (the log's folder
+  unreadable or a disk that takes no file) is not written, and the call
+  is never broken by it: the drop is counted since start
+  (`usage.AppendsFailed`), said once a minute (`sayFailed`, `usage.jsonl:
+  N record(s) not written since start, latest: …`), and quieted by a
+  write that lands, so a log that heals stops being spoken of
+  (`TestAppendFailureCounted`, through the `openFail` test seam).
 - **Pricing:** a record with `cost` keeps it (`Record.OwnCost`, the
   `rowOwnCost` flag on a packed row). Without one it is priced at magpie's
   own prices, like a gateway row.
