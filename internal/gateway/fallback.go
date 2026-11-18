@@ -509,8 +509,9 @@ func (s *Server) planPaused(p provider.Provider, model string, from provider.Pro
 		}
 		pl.order = append(pl.order, asideOf(aside, q, fallback, from)...)
 		cs = append(cs, aside...)
+		hw := healthWeighing(append(slices.Clip(aside), left...))
 		for _, c := range left {
-			w := weighed(c, q, weighing{}, fallback, from)
+			w := weighed(c, q, hw, fallback, from)
 			w.Unlisted = true
 			pl.left = append(pl.left, w)
 			pl.unlisted = append(pl.unlisted, c)
@@ -662,12 +663,13 @@ func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.
 		// is said on the plan's left, held, as a gateway key's are
 		if by := append(slices.Clip(hold), m.Via...); slices.ContainsFunc(by, func(h provider.Group) bool { return len(h.Accounts) > 0 }) {
 			out := func(l []candidate) []candidate {
+				hw := healthWeighing(l)
 				return slices.DeleteFunc(l, func(c candidate) bool {
 					name := groupHeld(c, by)
 					if name == "" {
 						return false
 					}
-					w := weighed(c, m.Provider, weighing{}, false, from)
+					w := weighed(c, m.Provider, hw, false, from)
 					w.Held, w.HeldBy, w.Via = true, name, m.Groups()
 					pl.left = append(pl.left, w)
 					return true
@@ -695,8 +697,9 @@ func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.
 			w.Via = m.Groups()
 			*wAsides = append(*wAsides, w)
 		}
+		hw := healthWeighing(left)
 		for _, c := range left {
-			w := weighed(c, m.Provider, weighing{}, false, from)
+			w := weighed(c, m.Provider, hw, false, from)
 			w.Unlisted, w.Via = true, m.Groups()
 			pl.left = append(pl.left, w)
 			pl.unlisted = append(pl.unlisted, c)
@@ -1060,8 +1063,9 @@ func capHeldOnly(cs []candidate) []candidate {
 // to serve the model: left out, as those not listing it are.
 func barredOf(cs []candidate, q provider.Provider, fallback bool, from provider.Protocol, via []string) []Weighed {
 	var out []Weighed
+	hw := healthWeighing(cs) // one health read for all the rows, not one per candidate
 	for _, c := range cs {
-		w := weighed(c, q, weighing{}, fallback, from)
+		w := weighed(c, q, hw, fallback, from)
 		w.Unlisted, w.Via = true, via
 		if h := c.capped; h != nil {
 			w.Capped, w.Used, w.NoCredits, w.Unread = h.cap, h.used, h.noCredits, h.unread
@@ -1092,8 +1096,9 @@ func barredError(model string, ws []Weighed) string {
 // those routed over: after them, in the order they suit the request.
 func asideOf(cs []candidate, q provider.Provider, fallback bool, from provider.Protocol) []Weighed {
 	var out []Weighed
+	hw := healthWeighing(cs) // one health read for all the rows, not one per candidate
 	for _, c := range cs {
-		w := weighed(c, q, weighing{}, fallback, from)
+		w := weighed(c, q, hw, fallback, from)
 		w.Aside = true
 		out = append(out, w)
 	}

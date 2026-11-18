@@ -2264,6 +2264,12 @@ type weighing struct {
 	// answered, by rest key, for those that have (routes.Seat.Failures):
 	// nil when none has
 	fails map[string]int
+
+	// health is each candidate's model score, read once under one lock
+	// (healthSeats in health.go) instead of per candidate (healthOf): a
+	// plan of many members would otherwise take the health lock once per
+	// row it builds. Absent when nothing has a record.
+	health map[string]float64
 }
 
 // seatPrice is a seat's price at the request's time, as Cheapest weighed
@@ -2365,6 +2371,10 @@ func weighRouted(p provider.Provider, cs []candidate, model string, from provide
 	if len(cs) == 0 {
 		return cs, wg
 	}
+	// every candidate's model score read under one lock, for the rows
+	// weighed builds of them (health.go): a plan of many members would
+	// otherwise take the health lock once per row
+	wg.health = healthSeats(cs, time.Now())
 	// each account's own agent's: a group weighs accounts of several. One
 	// alone is weighed against nobody, but what it has left is still
 	// told: the Routing page shows it (#1016)

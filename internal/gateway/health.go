@@ -84,7 +84,20 @@ func restIDOf(ctx context.Context) string {
 var modelHealth = struct {
 	sync.Mutex
 	m map[string]healthPoint
+	// lastSweep is when the over-limit sweep last ran: no table has to
+	// be swept on every note until a minute has passed since that one.
+	lastSweep time.Time
+	// swept is how many times the over-limit sweep has run: a count the
+	// tests read, so the throttling is checked without a clock.
+	swept int
 }{m: map[string]healthPoint{}}
+
+// staleSweepEvery is how far apart the over-limit sweeps of a table run
+// when it stays over the limit: a table at its limit whose every entry is
+// fresh would otherwise be swept whole on every note, finding nothing and
+// paying the scan each time. health and sticks sweep expired entries out;
+// the trace's session folders evict the oldest back down to their limit.
+const staleSweepEvery = time.Minute
 
 // decayed brings h's counts up to now.
 func (h healthPoint) decayed(now time.Time) healthPoint {
@@ -103,7 +116,9 @@ func (h healthPoint) decayed(now time.Time) healthPoint {
 }
 
 // healthOf is id's score now: its observed success rate, smoothed by the
-// prior. With no observation at all it is 1.
+// prior. With no observation at all it is 1. A read is pure: the decay is
+// worked out on a copy and nothing is written back, so two reads moments
+// apart say the same and no reader pays a write's lock.
 func healthOf(id string, now time.Time) float64 {
 	modelHealth.Lock()
 	defer modelHealth.Unlock()
@@ -111,9 +126,7 @@ func healthOf(id string, now time.Time) float64 {
 	if !ok {
 		return 1
 	}
-	h = h.decayed(now)
-	modelHealth.m[id] = h
-	return (h.wins + healthPrior) / (h.wins + h.loss + healthPrior)
+	return scoreOf(h.decayed(now))
 }
 
 // providerOfRestID cuts a table key to the provider it rests by: the id
@@ -155,9 +168,11 @@ type Health struct {
 // ProviderHealth aggregates the health of ids' models, the whole table
 // read under one lock (markOf's pattern), each matching entry's score
 // decayed to now as every reader of an old record does. It adds no
-// recording of its own; healthOf's semantics are untouched. Two entries
-// tied at the worst score go to the one that sorts first, so the row's
-// hover names the same model however the map happens to iterate.
+// recording of its own; healthOf's semantics are untouched — the decay is
+// worked out on a copy and never written back, so a reading changes
+// nothing. Two entries tied at the worst score go to the one that sorts
+// first, so the row's hover names the same model however the map happens
+// to iterate.
 func ProviderHealth(ids []string) Health {
 	out := Health{Worst: 1}
 	want := make(map[string]bool, len(ids))
@@ -172,9 +187,7 @@ func ProviderHealth(ids []string) Health {
 		if !want[providerOfRestID(key)] || h.wins+h.loss <= 0 {
 			continue // no record: the prior reads it as 1, nothing to say
 		}
-		h = h.decayed(now)
-		modelHealth.m[key] = h
-		s := scoreOf(h)
+		s := scoreOf(h.decayed(now))
 		out.Recorded++
 		if s < healthDemote {
 			out.Below++
@@ -223,13 +236,28 @@ func noteID(id string, ok bool) {
 	}
 	h.at = now
 	if len(modelHealth.m) > 4096 {
-		for k, v := range modelHealth.m {
-			if now.Sub(v.at) > healthForget {
-				delete(modelHealth.m, k)
-			}
-		}
+		sweepHealthLocked(now)
 	}
 	modelHealth.m[id] = h
+}
+
+// sweepHealthLocked forgets entries untouched past healthForget, so a
+// table over the limit comes back down. A table whose every entry is
+// active finds nothing, so the sweep waits for staleSweepEvery since
+// the last one rather than scanning the whole table on every note —
+// the scan is paid at most once a minute however much is being noted.
+// modelHealth is held.
+func sweepHealthLocked(now time.Time) {
+	if modelHealth.lastSweep.Add(staleSweepEvery).After(now) {
+		return
+	}
+	modelHealth.lastSweep = now
+	modelHealth.swept++
+	for k, v := range modelHealth.m {
+		if now.Sub(v.at) > healthForget {
+			delete(modelHealth.m, k)
+		}
+	}
 }
 
 // resetHealth forgets every score: a test starts as a fresh process
@@ -238,6 +266,8 @@ func noteID(id string, ok bool) {
 func resetHealth() {
 	modelHealth.Lock()
 	modelHealth.m = map[string]healthPoint{}
+	modelHealth.lastSweep = time.Time{}
+	modelHealth.swept = 0
 	modelHealth.Unlock()
 }
 
@@ -261,6 +291,8 @@ type healthMark struct {
 // markOf is the mark for cs now: every candidate's record read under one
 // lock, and the highest score among them. Taking the snapshot once keeps
 // a plan of many members from taking the lock per member per comparison.
+// A read is pure: the decay is worked out on a copy and nothing is
+// written back.
 func markOf(cs []candidate, now time.Time) healthMark {
 	m := healthMark{at: now, known: map[string]healthPoint{}}
 	modelHealth.Lock()
@@ -281,7 +313,6 @@ func markOf(cs []candidate, now time.Time) healthMark {
 			continue
 		}
 		h = h.decayed(now)
-		modelHealth.m[id] = h
 		m.known[id] = h
 		if s := scoreOf(h); s > m.best {
 			m.best = s
@@ -289,6 +320,41 @@ func markOf(cs []candidate, now time.Time) healthMark {
 	}
 	modelHealth.Unlock()
 	return m
+}
+
+// healthSeats is every id's score now, read under one lock (markOf's
+// pattern): the plan's rows are filled from a snapshot instead of taking
+// the health lock per candidate, which a plan of many members would
+// otherwise do on every request. A read is pure — the decay is worked
+// out on a copy and never written back — so the snapshot says what
+// healthOf would for every id at once. Missing ids are absent from it.
+func healthSeats(cs []candidate, now time.Time) map[string]float64 {
+	modelHealth.Lock()
+	defer modelHealth.Unlock()
+	var out map[string]float64
+	for _, c := range cs {
+		id := c.restID()
+		if _, seen := out[id]; seen {
+			continue
+		}
+		h, ok := modelHealth.m[id]
+		if !ok {
+			continue // no record: the prior reads it as 1, nothing to say
+		}
+		if out == nil {
+			out = map[string]float64{}
+		}
+		out[id] = scoreOf(h.decayed(now))
+	}
+	return out
+}
+
+// healthWeighing is a weighing with nothing but the health snapshot of
+// cs, for the rows the plan builds of candidates its own weighing has
+// nothing to say of (the left-out, the barred, a group's held): one read
+// under one lock instead of per candidate, as weigh's does for the order.
+func healthWeighing(cs []candidate) weighing {
+	return weighing{health: healthSeats(cs, time.Now())}
 }
 
 // scoreOf is a record's observed success rate, smoothed by the prior.

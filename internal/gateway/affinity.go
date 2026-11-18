@@ -181,6 +181,9 @@ func (h hourCache) warm(now time.Time) bool {
 var sticks = struct {
 	sync.Mutex
 	m map[string]stick // scope|conversation → who answered it last
+	// lastSweep is when the over-limit sweep last ran (staleSweepEvery
+	// throttles it, as health's does)
+	lastSweep time.Time
 	// opening: scope|conversation → who a conversation that nobody has
 	// answered yet was sent to, while its first request is out. In turn,
 	// leastHeld counts them with those answered, so a burst of new
@@ -1000,7 +1003,11 @@ func answeredStanding(key string, c candidate, turn int, u Usage, stoodIn bool) 
 	hour = hour.after(u, now)
 	sticks.m[key] = stick{rest: c.rest, who: c.who(), model: c.model, effort: c.effort, turn: turn, at: now, cacheRead: cacheRead, cacheWrite: cacheWrite, hour: hour, stoodIn: stoodIn}
 	delete(sticks.opening, key)
-	if len(sticks.m) > 4096 {
+	if len(sticks.m) > 4096 && sticks.lastSweep.Add(staleSweepEvery).Before(now) {
+		// a table whose every entry is active finds nothing, so the sweep
+		// runs at most once a minute however much is being answered, not
+		// whole on every answer past the limit
+		sticks.lastSweep = now
 		for k, st := range sticks.m {
 			if now.Sub(st.at) > stickKeep {
 				delete(sticks.m, k)
@@ -1064,6 +1071,9 @@ var foreignReasoning = regexp.MustCompile(`(?i)invalid_encrypted_content|invalid
 var refusedSeals = struct {
 	sync.Mutex
 	m map[string]sealsRefused // scope|conversation|who → what it refused
+	// lastSweep is when the over-limit sweep last ran (staleSweepEvery
+	// throttles it, as health's does)
+	lastSweep time.Time
 }{m: map[string]sealsRefused{}}
 
 type sealsRefused struct {
@@ -1128,7 +1138,11 @@ func noteRefused(key, who string, ss [][sha256.Size]byte) {
 	}
 	r.at = now
 	refusedSeals.m[k] = r
-	if len(refusedSeals.m) > 4096 {
+	if len(refusedSeals.m) > 4096 && refusedSeals.lastSweep.Add(staleSweepEvery).Before(now) {
+		// a table whose every entry is active finds nothing, so the sweep
+		// runs at most once a minute however much is being refused, not
+		// whole on every refusal past the limit
+		refusedSeals.lastSweep = now
 		for k, r := range refusedSeals.m {
 			if now.Sub(r.at) > stickKeep {
 				delete(refusedSeals.m, k)

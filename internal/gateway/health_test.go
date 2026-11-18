@@ -2,7 +2,9 @@ package gateway
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
+	"reflect"
 	"testing"
 	"time"
 
@@ -167,17 +169,26 @@ func equalStrings(a, b []string) bool {
 }
 
 // The routing page says a model is unstable: the weighed row carries the
-// health, absent while it is fine.
+// health, absent while it is fine. The score comes from the snapshot the
+// routing's weighing took under one lock (healthSeats), as a plan's rows
+// are filled from it.
 func TestWeighedCarriesHealth(t *testing.T) {
 	cs := healthCandidates()
 	c := cs[1]
 	noteUnstable(c)
 	noteUnstable(c)
-	w := weighed(c, c.p, weighing{}, false, provider.Chat)
+	at := time.Now()
+	wg := weighing{health: healthSeats(cs, at)}
+	w := weighed(c, c.p, wg, false, provider.Chat)
 	if w.Health == 0 || w.Health >= 0.5 {
 		t.Fatalf("health %v, want below 0.5", w.Health)
 	}
-	good := weighed(cs[0], cs[0].p, weighing{}, false, provider.Chat)
+	// the snapshot says exactly what a per-candidate read would, asked of
+	// the same moment
+	if h := healthOf(c.restID(), at); w.Health != h {
+		t.Fatalf("the row's health %v is not the score healthOf answers, %v", w.Health, h)
+	}
+	good := weighed(cs[0], cs[0].p, wg, false, provider.Chat)
 	if good.Health != 0 {
 		t.Fatalf("a steady model's row says health %v", good.Health)
 	}
@@ -228,13 +239,14 @@ func TestProviderHealthByProvider(t *testing.T) {
 // records say of a provider reads the same with it on — the scores are
 // what answering did, not how the order was set.
 //
-// A read decays a record in place as a side effect (a lazy refresh whose
-// score is unchanged for the same instant), so the two reads below are
-// moments apart and the worst score drifts a little toward the prior. The
-// gap is injected rather than left to the machine: how long two reads really
-// take depends on the runner. The allowed drift is derived from the elapsed
-// time actually measured, with room for a little more, so a slow machine
-// passes while a real change to the score (a demotion, a fresh note) fails.
+// A read is pure — the decay is worked out on a copy and the record is
+// left as it was — so the two reads below differ only by the real decay
+// of the elapsed time between them, a little toward the prior. The gap
+// is injected rather than left to the machine: how long two reads really
+// take depends on the runner. The allowed drift is derived from the
+// elapsed time actually measured, with room for a little more, so a slow
+// machine passes while a real change to the score (a demotion, a fresh
+// note) fails.
 func TestProviderHealthReadsTheSameWithNoDemotion(t *testing.T) {
 	fresh(t)
 	noteID("a#k/m1", false)
@@ -310,5 +322,124 @@ func TestProviderHealthJSONOmitsWhatIsNotThere(t *testing.T) {
 	}
 	if string(b) != `{"worst":1,"below":0,"recorded":0}` {
 		t.Fatalf("no model named: %s", b)
+	}
+}
+
+// A table over the limit with every entry fresh is not swept on every
+// note: an active table never had an entry to forget, so the sweep is
+// throttled to once a minute rather than paid whole (O(n)) on every one
+// of the ten thousand observations a busy table takes. The count of
+// sweeps is read from the table's own state (modelHealth.swept), so no
+// clock is involved, and it is the same at twice the table's size.
+func TestSweepOfAnActiveOverLimitTableIsThrottledNotPerNote(t *testing.T) {
+	fresh(t)
+	fill := func(n int) {
+		modelHealth.Lock()
+		modelHealth.m = map[string]healthPoint{}
+		for i := 0; i < n; i++ {
+			modelHealth.m[fmt.Sprintf("p%d/m", i)] = healthPoint{wins: 1, at: time.Now()}
+		}
+		modelHealth.Unlock()
+	}
+	observe := func(n int) int {
+		before := modelHealth.swept
+		for i := 0; i < n; i++ {
+			noteID("p0/m", true)
+		}
+		return modelHealth.swept - before
+	}
+	// a table just over the limit: one sweep (the first note), then none
+	// for the rest of the run's ten thousand notes
+	fill(4097)
+	if got := observe(10000); got != 1 {
+		t.Fatalf("%d sweeps for 10000 notes on a 4097-entry table, want the one throttled in a minute", got)
+	}
+	if len(modelHealth.m) != 4097 {
+		t.Fatalf("an active table lost entries: %d of 4097", len(modelHealth.m))
+	}
+	// twice the entries, the same count: the sweep does not grow with the
+	// table
+	modelHealth.Lock()
+	modelHealth.lastSweep = time.Time{}
+	modelHealth.Unlock()
+	fill(8192)
+	if got := observe(10000); got != 1 {
+		t.Fatalf("%d sweeps for 10000 notes on a 8192-entry table, want the same one as the 4097-entry table", got)
+	}
+	if len(modelHealth.m) != 8192 {
+		t.Fatalf("an active table lost entries: %d of 8192", len(modelHealth.m))
+	}
+}
+
+// A read of the table changes nothing in it: healthOf, ProviderHealth and
+// markOf all worked their decay out on a copy, so two reads a moment apart
+// of a record an hour old say the same — and the record is left exactly
+// as it was, not rewritten with the decayed counts as a read's side
+// effect (the lazy refresh the tests below once had to make room for).
+func TestAReadLeavesTheHealthTableAlone(t *testing.T) {
+	fresh(t)
+	hourAgo := time.Now().Add(-time.Hour)
+	modelHealth.Lock()
+	modelHealth.m = map[string]healthPoint{
+		"a/good":   {wins: 9, loss: 1, at: hourAgo},
+		"b/flaky":  {wins: 1, loss: 4, at: hourAgo},
+		"ab/other": {wins: 2, at: hourAgo},
+	}
+	modelHealth.Unlock()
+	was := map[string]healthPoint{}
+	modelHealth.Lock()
+	for k, v := range modelHealth.m {
+		was[k] = v
+	}
+	modelHealth.Unlock()
+	now := time.Now()
+	healthOf("b/flaky", now)
+	ProviderHealth([]string{"a", "b"})
+	markOf(healthCandidates(), now)
+	healthSeats(healthCandidates(), now)
+	modelHealth.Lock()
+	unchanged := reflect.DeepEqual(modelHealth.m, was)
+	modelHealth.Unlock()
+	if !unchanged {
+		t.Fatalf("a read rewrote the table: %+v, want it left as %+v", modelHealth.m, was)
+	}
+	// and two reads a moment apart say the same: no drift toward the
+	// prior from a record being refreshed as it is read
+	if a, b := healthOf("b/flaky", now), healthOf("b/flaky", now); a != b {
+		t.Fatalf("two reads of the same moment said %v and %v", a, b)
+	}
+}
+
+// The one-lock snapshot the plan's rows read their health from says what
+// the per-candidate read would: for every candidate with a record, at
+// the same moment, exactly healthOf's answer; a candidate with no record
+// is absent from it, as healthOf's prior reads it as 1 and the row stays
+// quiet about a model nothing has asked.
+func TestHealthSeatsSayWhatHealthOfDoes(t *testing.T) {
+	fresh(t)
+	cs := []candidate{
+		{p: provider.Provider{ID: "a", Key: "k"}, model: "asked", rest: "a"},
+		{p: provider.Provider{ID: "b", Key: "k"}, model: "asked-too", rest: "b"},
+		{p: provider.Provider{ID: "c", Key: "k"}, model: "never-asked", rest: "c"},
+	}
+	now := time.Now()
+	modelHealth.Lock()
+	modelHealth.m = map[string]healthPoint{
+		"a/asked":     {wins: 9, loss: 1, at: now.Add(-time.Hour)},
+		"b/asked-too": {wins: 1, loss: 4, at: now.Add(-time.Minute)},
+	}
+	modelHealth.Unlock()
+	seats := healthSeats(cs, now)
+	for _, c := range cs[:2] {
+		want := healthOf(c.restID(), now)
+		if got, ok := seats[c.restID()]; !ok || got != want {
+			t.Fatalf("%s's seat said %v (found %v), want healthOf's %v", c.restID(), got, ok, want)
+		}
+	}
+	if _, ok := seats[cs[2].restID()]; ok {
+		t.Fatalf("a model with no record took a seat: %v", seats[cs[2].restID()])
+	}
+	if healthOf(cs[2].restID(), now) != 1 {
+		t.Fatal("a model with no record does not read as the prior, 1")
 	}
 }

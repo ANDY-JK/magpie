@@ -586,8 +586,10 @@ func weighed(c candidate, p provider.Provider, wg weighing, fallback bool, from 
 		w.Price = &SeatPrice{Input: pr.in, Output: pr.out, CacheRead: pr.cache, Peak: pr.peak}
 	}
 	// an unstable model is said so: the Routing page's story tells why it
-	// was tried late (health.go)
-	if h := healthOf(c.restID(), time.Now()); h < 0.999 {
+	// was tried late (health.go). The score comes from the snapshot the
+	// routing's weighing took under one lock, and what it says is what
+	// healthOf would
+	if h, ok := wg.health[c.restID()]; ok && h < 0.999 {
 		w.Health = h
 	}
 	if sinks(p.Sink, p.Routing) {
@@ -614,6 +616,9 @@ type trace struct {
 	// folders: each session's folder, as its requests said it last, for
 	// the requests that don't say it (a title, a topic check)
 	folders map[string]sessionFolder
+	// foldersSwept is when the over-limit eviction of folders last ran
+	// (staleSweepEvery throttles it, as health's sweep is)
+	foldersSwept time.Time
 	// liftSeq is the seq a rest was last lifted by hand at (lifted): a
 	// page waiting hears of it, though no route changed
 	liftSeq int64
@@ -745,14 +750,20 @@ func (t *trace) sessionFolder(r *Route, now time.Time) {
 		t.folders = map[string]sessionFolder{}
 	}
 	t.folders[own] = sessionFolder{r.Folder, now}
-	for len(t.folders) > foldersKeep {
-		oldest := ""
-		for k, f := range t.folders {
-			if oldest == "" || f.at.Before(t.folders[oldest].at) {
-				oldest = k
+	if len(t.folders) > foldersKeep && t.foldersSwept.Add(staleSweepEvery).Before(now) {
+		// evicting the oldest is a whole-table scan: once a minute is
+		// enough for a table kept at its limit by sessions that come and
+		// go, rather than one per request past it
+		t.foldersSwept = now
+		for len(t.folders) > foldersKeep {
+			oldest := ""
+			for k, f := range t.folders {
+				if oldest == "" || f.at.Before(t.folders[oldest].at) {
+					oldest = k
+				}
 			}
+			delete(t.folders, oldest)
 		}
-		delete(t.folders, oldest)
 	}
 }
 
