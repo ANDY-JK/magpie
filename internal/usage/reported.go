@@ -96,8 +96,8 @@ func IngestReported(recs []Record) ([]bool, error) {
 	if err := catchUpReported(path); err != nil {
 		return nil, err
 	}
-	mu.Lock()
-	defer mu.Unlock()
+	openWriteMu.Lock()
+	defer openWriteMu.Unlock()
 	if err := catchUpReported(path); err != nil {
 		return nil, err
 	}

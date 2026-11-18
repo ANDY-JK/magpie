@@ -280,15 +280,22 @@ func Path() string { return filepath.Join(filepath.Dir(provider.Path()), "usage.
 
 var mu sync.Mutex
 
+// openWriteMu serializes the log's open, stat and write across Append and
+// IngestReported. It is separate from mu, which LastSeen and Load take on a
+// read: a slow write no longer holds up a reader that needs the log's path or
+// a fresh view of the ledger. A record is still written before Append returns,
+// so nothing the ledger could not take is dropped.
+var openWriteMu sync.Mutex
+
 // loads counts Load's reads of the whole log, for the tests: the ledger
 // reads the gateway's calls from its index instead.
 var loads int
 
 // writesFailed counts every record Append has not been able to write since
 // start: a dropped record is a number the user would quote, not "maybe".
-// saidWhen, guarded by mu, is when a drop was last said, so a long failure
-// is spoken of once a minute, and sayEvery how often; a test shrinks it.
-// A success resets saidWhen, so the next drop is said at once.
+// saidWhen, guarded by openWriteMu, is when a drop was last said, so a long
+// failure is spoken of once a minute, and sayEvery how often; a test shrinks
+// it. A success resets saidWhen, so the next drop is said at once.
 var (
 	writesFailed atomic.Int64
 	saidWhen     time.Time
@@ -304,7 +311,7 @@ func resetAppendsFailed() { writesFailed.Store(0) }
 
 // sayFailed says, at most every sayEvery, of the records Append hasn't
 // been able to write: a disk that fills or a folder that goes read-only is
-// not silent. The caller holds mu.
+// not silent. The caller holds openWriteMu.
 func sayFailed(why error) {
 	if time.Since(saidWhen) < sayEvery {
 		return
@@ -329,8 +336,8 @@ func Append(r Record) {
 	if err != nil {
 		return
 	}
-	mu.Lock()
-	defer mu.Unlock()
+	openWriteMu.Lock()
+	defer openWriteMu.Unlock()
 	path := Path()
 	f, before := openLog(path)
 	if f == nil {
@@ -355,7 +362,7 @@ func Append(r Record) {
 	noteLogAppend(path, before, after)
 }
 
-// heldLog is the log Append keeps open between calls, under mu: every
+// heldLog is the log Append keeps open between calls, under openWriteMu: every
 // request appends, and an open and a close of usage.jsonl each time was
 // most of Append's time (#3725). It is written to only while Path still
 // names that same file, so a log moved, removed or replaced is opened
@@ -1174,8 +1181,11 @@ func LastSeen(agent string) time.Time {
 	if t, ok := seen.Load(agent); ok {
 		last = t.(time.Time)
 	}
-	mu.Lock()
-	defer mu.Unlock()
+	// Read the tail without the write lock: a slow write holds openWriteMu,
+	// not the reads below, so a request's ledger scan is not queued behind it.
+	// A tail boundary may land mid-line; the partial first line fails to
+	// unmarshal and is skipped, and that record is still read from the kept
+	// seen note or on the next call.
 	f, err := os.Open(Path())
 	if err != nil {
 		return last

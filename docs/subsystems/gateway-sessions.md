@@ -659,8 +659,8 @@ however old, so a client's history can be backfilled.
   needs a key there too, #2242), and a held key is refused. `TestUsageIngestAccess`.
 - **Writing:** `usage.IngestReported`
   ([`internal/usage/reported.go`](../../internal/usage/reported.go))
-  appends under the same mutex and to the same file as `usage.Append`,
-  each row with `source: "reported"` and no caller key. A `rid` the log
+  appends under the same write lock (`openWriteMu`) and to the same file as
+  `usage.Append`, each row with `source: "reported"` and no caller key. A `rid` the log
   already has as reported, or one repeated in the post, is skipped. The
   set of reported rids is read from the log itself, so it survives a
   restart: the first post after one scans the log once, keeping only
@@ -674,6 +674,17 @@ however old, so a client's history can be backfilled.
   N record(s) not written since start, latest: …`), and quieted by a
   write that lands, so a log that heals stops being spoken of
   (`TestAppendFailureCounted`, through the `openFail` test seam).
+- **A slow write does not hold up a reader.** `usage.Append` and
+  `IngestReported` open, write and stat the log under `openWriteMu`; the
+  record is still on disk before the call returns, so no accounting is
+  dropped or deferred to a background worker. `usage.LastSeen`, asked on
+  the agent-applied path, reads the log's last 256 KB under no lock, so
+  a write an open holds open (a busy disk) does not queue that read behind
+  it. A tail boundary may cut a line in two; the partial line fails to
+  unmarshal and is skipped, and the request is still found through
+  `usage.Saw`'s in-process note or the next scan. `TestLastSeenTailScanNotBlockedBySlowAppend`
+  injects a held write through `openFail` and fails when the scan waits for
+  it or any of the three records is lost.
 - **Pricing:** a record with `cost` keeps it (`Record.OwnCost`, the
   `rowOwnCost` flag on a packed row). Without one it is priced at magpie's
   own prices, like a gateway row.
