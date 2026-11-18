@@ -41,6 +41,8 @@ var Keys = []string{
 	// privacy
 	"redact", "redactPersonal", "redactKinds", "redactWords", "redactWordsAnyCase", "redactWordsWhole", "redactShape",
 	"noStats", "noUsageStats", "otel",
+	// the gateway's access lines in the log (L-02)
+	"debugLog",
 	// warm-ups and check-ins
 	"codexWarmup", "claudeWarmup", "codexWarmAt", "claudeWarmAt", "codexWarmAts", "claudeWarmAts",
 	"workbuddyCheckin", "traeCheckin", "minimaxCheckin", "qoderCheckin",

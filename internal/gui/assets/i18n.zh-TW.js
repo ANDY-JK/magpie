@@ -3509,6 +3509,8 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "Config folder": "設定目錄",
     "Log": "日誌",
     "What magpie has logged, to send with a bug report": "magpie 記下的日誌，回報問題時可附上",
+    "Log every call": "記錄每一次呼叫",
+    "Off, only calls that fail are logged. On, each call is logged as it finishes — its model, providers and status — for debugging while something goes wrong; app.log is rotated at 5 MB either way": "關：只記錄失敗的呼叫。開：每次呼叫結束都記一行——模型、供應商與狀態——便於排查；無論開關，app.log 都按 5 MB 輪轉",
     "Command line": "命令列",
     "Checking your shells…": "正在檢查你的 shell…",
     "Add to PATH": "新增到 PATH",

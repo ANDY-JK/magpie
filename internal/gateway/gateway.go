@@ -637,7 +637,10 @@ func (s *Server) record(c Call) {
 	s.calls++
 	c.ID = s.calls
 	s.recent = keepRecent(s.recent, c)
-	if s.debug {
+	// the access line, when it is asked for (L-02): the Settings switch —
+	// read as the call ends, so turning it on or off needs no restart — or
+	// MAGPIE_DEBUG as before. A failure is logged whatever they are.
+	if s.debug || settings.Load().DebugLog {
 		log.Printf("%s %s → %s (%s→%s) %d %dms %s", c.Model, c.Provider, c.Provider, c.From, c.To, c.Status, c.Millis, c.Error)
 	} else if line, ok := failedCallLine(c, time.Now()); ok {
 		log.Print(line)

@@ -3510,6 +3510,8 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "Config folder": "設定フォルダ",
     "Log": "ログ",
     "What magpie has logged, to send with a bug report": "magpie が記録したログ。不具合の報告に添えてください",
+    "Log every call": "すべての呼び出しを記録",
+    "Off, only calls that fail are logged. On, each call is logged as it finishes — its model, providers and status — for debugging while something goes wrong; app.log is rotated at 5 MB either way": "オフ：失敗した呼び出しのみ記録。オン：各呼び出しの終了時に 1 行——モデル・プロバイダー・状態——を記録し、トラブルの調査に使えます。いずれの場合も app.log は 5 MB で交代します",
     "Command line": "コマンドライン",
     "Checking your shells…": "シェルを確認しています…",
     "Add to PATH": "PATH に追加",

@@ -2635,7 +2635,7 @@ cached. Clicked, one opens the Requests tab at that period.
 
 The *Gateway* tab in the app has this as copy buttons and ready-made
 snippets (shell, curl, Python, Node) for each API, the list of model ids,
-and the recent calls; `MAGPIE_DEBUG=1` logs every call to the terminal.
+and the recent calls; `MAGPIE_DEBUG=1` logs every call to the terminal, as Settings › About's Log every call does without a restart (a failed call is logged either way).
 
 **Claude Code** gets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` and the
 model variables in the `env` block of `settings.json`; picking a native
@@ -3061,7 +3061,8 @@ HOME=/tmp/magpie-home XDG_CONFIG_HOME=/tmp/magpie-home/.config make dev
 ```
 
 `MAGPIE_THEME=light|dark` forces the palette and `MAGPIE_DEBUG=1` prints what the
-gateway translates.
+gateway translates (Settings › About's Log every call is the same, saved and
+live).
 
 ## Use
 

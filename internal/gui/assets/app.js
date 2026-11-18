@@ -20535,6 +20535,10 @@ function renderSettingsAbout(s, keep) {
     const o = el("button", "text", t("Open"));
     o.onclick = () => api("settings/log/reveal", {}).catch(statusErr);
     row(t("Log"), t("What magpie has logged, to send with a bug report"), s.log, copyBtn(s.log, t("Path")), o).id = "logRow";
+    // every call logged as it finishes (L-02), where only failures were: on
+    // from here, no restart needed
+    row(t("Log every call"), t("Off, only calls that fail are logged. On, each call is logged as it finishes — its model, providers and status — for debugging while something goes wrong; app.log is rotated at 5 MB either way"),
+      "", segs([["off", t("Off")], ["on", t("On")]], s.debugLog ? "on" : "off", (v) => savePrefs({ ...keep, debugLog: v === "on" }))).id = "debugLogRow";
   }
   renderCLI(row(t("Command line"), t("Checking your shells…"), ""));
   // served to other machines (magpie web), the one they reach (noahhrreion)

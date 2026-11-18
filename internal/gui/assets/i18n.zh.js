@@ -3534,6 +3534,8 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "Config folder": "配置目录",
     "Log": "日志",
     "What magpie has logged, to send with a bug report": "magpie 记下的日志，报告问题时可附上",
+    "Log every call": "记录每一次调用",
+    "Off, only calls that fail are logged. On, each call is logged as it finishes — its model, providers and status — for debugging while something goes wrong; app.log is rotated at 5 MB either way": "关：只记录失败的调用。开：每次调用结束都记录一行——模型、供应商与状态——便于排查；无论开关，app.log 都按 5 MB 轮转",
     "Command line": "命令行",
     "Checking your shells…": "正在检查你的 shell…",
     "Add to PATH": "添加到 PATH",

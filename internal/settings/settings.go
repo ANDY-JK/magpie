@@ -444,6 +444,12 @@ type Settings struct {
 	// NoUsageStats keeps which agents, providers and models magpie is
 	// used with out of that event, which then counts the user only.
 	NoUsageStats bool `json:"noUsageStats,omitempty"`
+	// DebugLog has the gateway log every call to app.log as it finishes
+	// (L-02: the access lines MAGPIE_DEBUG turned on, no restart needed;
+	// failures are logged whatever it is). In settings.json only; this
+	// computer's own (KeepOwn), so a busy computer alone can be turned
+	// chatty.
+	DebugLog bool `json:"debugLog,omitempty"`
 	// NoUpdatePill keeps the header's Update pill away when a newer magpie
 	// is out; UpdateSkip is the one version it was hidden for, and a newer
 	// one brings it back. Either way magpie still downloads the version and

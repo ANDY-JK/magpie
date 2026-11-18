@@ -3520,6 +3520,8 @@ I18N.de = Object.assign(I18N.de || {}, {
     "Config folder": "Konfigurationsordner",
     "Log": "Protokoll",
     "What magpie has logged, to send with a bug report": "Was magpie protokolliert hat, zum Mitschicken bei einem Fehlerbericht",
+    "Log every call": "Jeden Aufruf protokollieren",
+    "Off, only calls that fail are logged. On, each call is logged as it finishes — its model, providers and status — for debugging while something goes wrong; app.log is rotated at 5 MB either way": "Aus: nur fehlgeschlagene Aufrufe werden protokolliert. An: jeder Aufruf wird nach seinem Ende protokolliert — Modell, Anbieter und Status — zum Debuggen; app.log wird entweder Weise bei 5 MB rotiert",
     "Command line": "Befehlszeile",
     "Checking your shells…": "Shells werden geprüft…",
     "Add to PATH": "Zum PATH hinzufügen",

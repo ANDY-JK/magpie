@@ -685,7 +685,7 @@ func (s *Server) images(edit bool) http.HandlerFunc {
 			if im.URL != "" && inline(d.Want) {
 				if b, mt, err := FetchImage(p.Via(r.Context()), vendorClient(p), im.URL); err == nil {
 					im = picture{Mime: mt, Data: b}
-				} else if s.debug {
+				} else if s.debug || settings.Load().DebugLog {
 					log.Printf("images: %s's image at %s is answered by its URL: %v", p.ID, im.URL, err)
 				}
 			}
