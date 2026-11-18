@@ -53,6 +53,13 @@ func screenshotSession(compact bool) string {
 // postResponses posts body to the gateway's /v1/responses as Codex.
 func postResponses(t *testing.T, s *Server, body string) (int, string) {
 	t.Helper()
+	code, out, _ := postResponsesHead(t, s, body)
+	return code, out
+}
+
+// postResponsesHead is postResponses with the reply's headers.
+func postResponsesHead(t *testing.T, s *Server, body string) (int, string, http.Header) {
+	t.Helper()
 	gw := httptest.NewServer(s.Handler())
 	t.Cleanup(gw.Close)
 	req, _ := http.NewRequest("POST", gw.URL+"/v1/responses", strings.NewReader(body))
@@ -64,7 +71,7 @@ func postResponses(t *testing.T, s *Server, body string) (int, string) {
 	}
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
-	return resp.StatusCode, string(b)
+	return resp.StatusCode, string(b), resp.Header
 }
 
 // underCap checks a request sent after the cap was learned: under it, the
@@ -146,6 +153,34 @@ func TestTurnOverByteCapLeavesOutOldImages(t *testing.T) {
 		t.Fatalf("the next turn was asked %d times, not once fitted", len(calls)-2)
 	}
 	underCap(t, calls[2])
+}
+
+// J-01: the fitting that leaves a request's oldest images out is not a
+// silent difference between what the agent sent and what the vendor was
+// asked: the reply says how many images it wasn't given, in
+// X-Magpie-Images-Left-Out — after a refusal's refit (the first turn, its
+// images left out on the ask that answered) and on a turn sent fitted at
+// once (the second, whose images were left out before it was sent). A
+// reply that kept every image says nothing.
+func TestTrimmedImagesAreSaidInTheReply(t *testing.T) {
+	fresh(t)
+	up := &capped{proto: provider.Responses, most: commandCodeMost, status: 400, ctype: "application/json", body: commandCodeCap}
+	cappedOn(t, up)
+	s := New()
+	code, body, head := postResponsesHead(t, s, screenshotSession(false))
+	if code != 200 || !strings.Contains(body, "SUMMARY") {
+		t.Fatalf("the turn failed: %d %.400s", code, body)
+	}
+	if got := head.Get(imagesLeftOutHeader); got != "8" {
+		t.Fatalf("the refit's reply says %q images left out, want 8 (underCap checks the same eight out of the sent body)", got)
+	}
+	code, body, head = postResponsesHead(t, s, screenshotSession(false))
+	if code != 200 || !strings.Contains(body, "SUMMARY") {
+		t.Fatalf("the fitted turn failed: %d %.400s", code, body)
+	}
+	if got := head.Get(imagesLeftOutHeader); got != "8" {
+		t.Fatalf("the fitted reply says %q images left out, want 8", got)
+	}
 }
 
 // When the latest user message alone is over the cap there is nothing to

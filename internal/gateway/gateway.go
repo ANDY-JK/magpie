@@ -5139,6 +5139,7 @@ func (s *Server) forwardOnce(ctx context.Context, p provider.Provider, to provid
 	// the vendor's own first-byte wait, where it set one (F-02): a slow
 	// reasoning channel can be given more than the gateway's default
 	ctx = withHeaderWait(ctx, headerWaitOfProvider(p))
+	was := images(to, body)
 	ctx = s.metered(p.Via(ctx), p, "", "")
 	body = deepseekToolPatterns(p, to, body)
 	body = grokToolPatterns(p, to, body)
@@ -5156,8 +5157,10 @@ func (s *Server) forwardOnce(ctx context.Context, p provider.Provider, to provid
 	// (thinking_back.go)
 	body = s.withThinkingBack(p, to, body)
 	// under the byte cap the provider refused a larger request over,
-	// its oldest images left out (body_cap.go)
+	// its oldest images left out (body_cap.go): what was left out is
+	// said to the agent's client in the reply (J-01)
 	body = s.withinCap(p, to, path, body)
+	ctx = withImagesLeftOut(ctx, was-images(to, body))
 	if to == provider.Responses {
 		// whatever the route, Claude's blocks never reach a Responses API
 		body = withoutClaudeSeals(body)
@@ -5468,6 +5471,13 @@ func (s *Server) forwardOnce(ctx context.Context, p provider.Provider, to provid
 	// what a Codex account's reply says it has used, for its cap (#1295)
 	heardCodexLimits(p, res)
 	noteSignIn(ctx, p.Account, req, res)
+	if n := imagesLeftOutOf(ctx); n > 0 {
+		// the vendor was sent fewer images than the agent's request held,
+		// its byte cap leaving the oldest out (body_cap.go): said to the
+		// agent in the reply's X-Magpie-Images-Left-Out (J-01) by whoever
+		// writes the agent its headers
+		res.Header.Set(imagesLeftOutHeader, strconv.Itoa(n))
+	}
 	return res, nil
 }
 
@@ -6259,6 +6269,10 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 			h.Set(k, v)
 		}
 	}
+	// the images the request's byte cap left out, said to the agent's
+	// client (J-01, body_cap.go): what the vendor wasn't given is what it
+	// can't be asked after
+	sayImagesLeftOut(w, res)
 	if sse {
 		h.Set("Cache-Control", "no-cache")
 		h.Set("X-Accel-Buffering", "no")
@@ -8080,6 +8094,7 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request, p provider.Pr
 	u.add(res2.Usage)
 	u.add(Usage{Served: res2.Model})
 	out := renderUsage(from, res2, request, u)
+	sayImagesLeftOut(w, res)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	w.Write(out)

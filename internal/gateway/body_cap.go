@@ -137,6 +137,43 @@ func (s *Server) withinCap(p provider.Provider, to provider.Protocol, path strin
 	return out
 }
 
+// imagesLeftOutKey carries how many history images this request's body was
+// fitted under its vendor's byte cap by leaving out, through the request's
+// context (J-01): the reply tells the agent's client of it, so a
+// conversation that asks after an image the vendor never saw is a thing to
+// be explained, not a silent difference between what the agent sent and
+// what the model was asked.
+type imagesLeftOutKey struct{}
+
+// withImagesLeftOut tags ctx with n more images left out.
+func withImagesLeftOut(ctx context.Context, n int) context.Context {
+	if n <= 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, imagesLeftOutKey{}, imagesLeftOutOf(ctx)+n)
+}
+
+// imagesLeftOutOf is how many images ctx says were left out, 0 for none.
+func imagesLeftOutOf(ctx context.Context) int {
+	n, _ := ctx.Value(imagesLeftOutKey{}).(int)
+	return n
+}
+
+// imagesLeftOutHeader is the reply's count of the request's history
+// images the vendor was not sent, its byte cap leaving the oldest out:
+// the agent's client is told of the difference (J-01) instead of asking
+// after a picture the model never saw. X-Magpie-Left-Out (the Codex
+// catalog's) said models; this says images.
+const imagesLeftOutHeader = "X-Magpie-Images-Left-Out"
+
+// sayImagesLeftOut writes imagesLeftOutHeader on w from the vendor's
+// reply res, when the request's images were trimmed to fit its cap.
+func sayImagesLeftOut(w http.ResponseWriter, res *http.Response) {
+	if n := res.Header.Get(imagesLeftOutHeader); n != "" {
+		w.Header().Set(imagesLeftOutHeader, n)
+	}
+}
+
 // capFit is withinCap without its log line: body fitted under p's known
 // cap, and how many images were left out for it.
 func (s *Server) capFit(p provider.Provider, to provider.Protocol, path string, body []byte) ([]byte, int) {
@@ -181,9 +218,16 @@ func (s *Server) refitOverCap(ctx context.Context, p provider.Provider, to provi
 		}
 		log.Printf("%s refused a request of %s (HTTP %d: %s); asking again with the %d oldest images left out (%s)", p.Name, mb(sent), res.StatusCode, provider.APIError(b, ""), left, mb(len(fitted)))
 		res.Body.Close()
+		ctx = withImagesLeftOut(ctx, left)
 		// fitted is under capNear already, so forwardOnce sends it as it is
 		if res, err = s.forwardOnce(ctx, p, to, path, fitted, in); err != nil {
 			return res, err
+		}
+		// the refit's own count stands: the refusal's was the send's, and
+		// what the agent's client is told of is the whole difference
+		// between what it sent and what the vendor was given
+		if n := imagesLeftOutOf(ctx); n > 0 {
+			res.Header.Set(imagesLeftOutHeader, strconv.Itoa(n))
 		}
 	}
 	if res.StatusCode >= 400 {
