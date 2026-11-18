@@ -4580,6 +4580,8 @@ I18N.de = Object.assign(I18N.de || {}, {
     "The name the request to the vendor carries for {id}; agents and magpie still list it as {id}. Empty: the vendor's own id": "Der Name, unter dem Anfragen an den Anbieter {id} tragen; Agenten und magpie listen es weiter als {id}. Leer: die eigene ID des Anbieters",
     "Today {n} calls": "Heute {n} Aufrufe",
     "{n} unstable models": "{n} instabile Modelle",
+    "Not tested yet": "Noch nicht geprüft",
+    "No recorded call for this provider's models yet: its stability is unknown": "Für die Modelle dieses Anbieters liegt noch kein aufgezeichneter Aufruf vor; die Stabilität ist unbekannt",
     "{model} is the least steady of this provider's models just now: {pct}% of its calls succeed": "{model} ist im Moment das am wenigsten stabile Modell dieses Anbieters: {pct}% seiner Aufrufe gelingen",
     "Unstable models after the steady ones": "Instabile Modelle nach den stabilen",
     "A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set": "Ein Modell, das zeitweise ausfällt, wird bis es wieder zuverlässig antwortet nach den stabilen seines Plans probiert; aus lässt die Routing-Reihenfolge wie gesetzt",

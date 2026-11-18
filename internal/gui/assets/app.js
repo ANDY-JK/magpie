@@ -6200,10 +6200,18 @@ const keyRows = (p, k, claim) => keyUsageMod ? keyUsageMod.rows(p, k, claim) : [
 // A row's health badge: how many of its models the gateway's stability
 // records hold below the demotion line just now — amber, red when every
 // model with a record is one of them. A provider with records but none
-// below draws nothing, and neither does one never asked (no health).
+// below draws nothing, and one never asked says so: its stability is
+// unknown, which is not the same as good.
 function healthBadge(p) {
   const h = p.health;
-  if (!h?.below) return null;
+  if (!h) {
+    // the state leaves health out when no call of its models was scored:
+    // unknown, which is not the same as good
+    const b = el("span", "badge hc-unknown", t("Not tested yet"));
+    b.title = t("No recorded call for this provider's models yet: its stability is unknown");
+    return b;
+  }
+  if (!h.below) return null;
   const bad = h.recorded > 0 && h.below >= h.recorded;
   const b = el("span", "badge hc-unstable" + (bad ? " bad" : ""), t("{n} unstable models", { n: h.below }));
   b.title = t("{model} is the least steady of this provider's models just now: {pct}% of its calls succeed",

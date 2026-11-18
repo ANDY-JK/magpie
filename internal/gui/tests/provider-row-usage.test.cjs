@@ -5,9 +5,10 @@
 // at most; the health badge ("2 unstable models", amber, red when every
 // model with a record is one of them) comes with the providers read, its
 // hover naming the least steady model and how much of what it was asked
-// it answered. A provider with no calls today, one whose entry holds no
-// calls, and one whose models have no record draw nothing. In every
-// language, on Chromium and WebKit.
+// it answered. A provider with records but none below draws nothing; one
+// never asked draws a grey "Not tested yet", as unknown is not the same as
+// good. A provider with no calls today, or one whose entry holds no calls,
+// draws no today pill. In every language, on Chromium and WebKit.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -55,7 +56,7 @@ function serve(lang) {
     provider("down", { worst: 0.25, worstModel: "model-b", below: 2, recorded: 2 }),
     // steady, with records but none below: no badge, and nothing today
     provider("fine", { worst: 0.9, worstModel: "model-c", below: 0, recorded: 6 }),
-    // never asked, never used: neither
+    // never asked, never used: a grey "not tested" badge, no pill
     provider("quiet", undefined),
     // in the ranking with no calls: no pill
     provider("zero", undefined),
@@ -126,10 +127,18 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert.equal(await red.count(), 1, "down's badge is red");
       assert.equal(await red.textContent(), await say(page, lang, "{n} unstable models", { n: 2 }));
 
-      // records but none below the line: no badge; nothing recorded: no
-      // badge; in the ranking with no calls: no pill
-      assert.equal(await row("fine").locator(".badge.hc-unstable").count(), 0, "a steady provider draws no badge");
-      assert.equal(await row("quiet").locator(".badge.hc-unstable").count(), 0, "a never-asked provider draws no badge");
+      // records but none below the line: no unstable badge; nothing
+      // recorded: a grey "not tested" one, as unknown is not good;
+      // in the ranking with no calls: no pill
+      assert.equal(await row("fine").locator(".badge.hc-unstable").count(), 0, "a steady provider draws no unstable badge");
+      assert.equal(await row("fine").locator(".badge.hc-unknown").count(), 0, "a steady provider is tested");
+      const untested = row("quiet").locator(".badge.hc-unknown");
+      assert.equal(await untested.count(), 1, "a never-asked provider says it was never asked");
+      assert.equal(await untested.getAttribute("class"), "badge hc-unknown", "grey, not a warning");
+      assert.equal(await untested.textContent(), await say(page, lang, "Not tested yet"));
+      assert.equal(await untested.getAttribute("title"), await say(page, lang,
+        "No recorded call for this provider's models yet: its stability is unknown"));
+      assert.equal(await row("quiet").locator(".badge.hc-unstable").count(), 0, "a never-asked provider is not called unstable");
       assert.equal(await row("quiet").locator(".badge.today-calls").count(), 0, "a never-used provider draws no pill");
       assert.equal(await row("zero").locator(".badge.today-calls").count(), 0, "no pill for a day of no calls");
       assert.deepEqual(errors, []);

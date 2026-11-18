@@ -2723,6 +2723,8 @@ body.window .ag-sk-icon { width: 22px; height: 22px; border-radius: 6px; }
 .provider .name .badge.today-calls { background: var(--pill); color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); letter-spacing: .02em; text-transform: none; font-variant-numeric: tabular-nums; }
 .provider .name .badge.hc-unstable { background: var(--amber-soft); color: var(--amber); }
 .provider .name .badge.hc-unstable.bad { background: var(--red-soft); color: var(--red); }
+/* never asked: grey, as nothing is known of it, not a warning */
+.provider .name .badge.hc-unknown { background: color-mix(in srgb, var(--muted) 12%, var(--card)); color: var(--muted); }
 .badge.free { background: var(--green-soft); color: var(--green); }
 /* a model's context, when it is a large one: grey, as it is a fact, not a warning */
 /* which way a model goes (#726): through magpie, or straight to its vendor */

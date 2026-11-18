@@ -4578,6 +4578,8 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "The name the request to the vendor carries for {id}; agents and magpie still list it as {id}. Empty: the vendor's own id": "發給廠商的請求裡 {id} 用的名字；Agent 與 magpie 仍把它列為 {id}。留空即廠商自己的 id",
     "Today {n} calls": "今天 {n} 呼叫",
     "{n} unstable models": "{n} 個模型不穩",
+    "Not tested yet": "尚未測過",
+    "No recorded call for this provider's models yet: its stability is unknown": "這個渠道的模型還沒有被真實請求測過，穩定性未知",
     "{model} is the least steady of this provider's models just now: {pct}% of its calls succeed": "{model} 是該供應商現在最不穩的模型：最近 {pct}% 的呼叫成功",
     "Unstable models after the steady ones": "不穩定的模型排在穩定模型之後",
     "A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set": "時好時壞的模型會被排到同一計畫裡穩定模型之後，直到它重新穩定應答；關閉則路由順序照你設置的原樣",

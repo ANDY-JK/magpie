@@ -4580,6 +4580,8 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "The name the request to the vendor carries for {id}; agents and magpie still list it as {id}. Empty: the vendor's own id": "ベンダーへのリクエストで {id} に使う名前。エージェントと magpie の一覧では {id} のままです。空欄はベンダー自身の id",
     "Today {n} calls": "今日 {n} 回",
     "{n} unstable models": "不安定なモデル {n} 個",
+    "Not tested yet": "未検証",
+    "No recorded call for this provider's models yet: its stability is unknown": "このプロバイダーのモデルにはまだ実リクエストの記録がなく、安定性は不明です",
     "{model} is the least steady of this provider's models just now: {pct}% of its calls succeed": "{model} はこのプロバイダで今いちばん不安定なモデルです：直近の呼び出しの {pct}% が成功しています",
     "Unstable models after the steady ones": "不安定なモデルは安定なモデルの後ろへ",
     "A model whose answers have been intermittent is tried after the steady ones of its plan until it answers well again; off leaves the routing order as set": "途切れがちなモデルは、再び安定して応答するようになるまで、同じプランの安定なモデルの後ろで試されます。オフにするとルーティング順は設定どおりのままです",
