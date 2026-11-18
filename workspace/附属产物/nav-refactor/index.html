@@ -3,158 +3,102 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>magpie 界面原型 · 总览</title>
+<title>magpie 原型 · 按顺序看</title>
 <style>
 :root{
-  --bg:#f4f4f6; --card:#fff; --card-2:#f9f9fb; --pill:#f1f1f4;
-  --line:#e3e3e8; --line-2:#ececf0; --fg:#1c1c21; --fg-2:#4b4b53; --muted:#85858d; --faint:#b9b9c2;
-  --accent:#4f46e5; --accent-soft:#eeedfd; --green:#189a58; --green-soft:#e4f6ec;
-  --amber:#b45309; --amber-soft:#fbf0df; --grey:#6b7280; --grey-soft:#f0f1f4;
+  --bg:#f4f4f6; --card:#fff; --pill:#f1f1f4; --line:#e3e3e8; --line-2:#ececf0;
+  --fg:#1c1c21; --fg-2:#4b4b53; --muted:#85858d; --faint:#b9b9c2;
+  --accent:#4f46e5; --accent-soft:#eeedfd; --accent-fg:#fff; --green:#189a58; --green-soft:#e4f6ec;
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
-  --shadow:0 12px 30px rgba(20,22,30,.10),0 1px 3px rgba(20,22,30,.05),0 0 0 .5px rgba(20,22,30,.06);
+  --shadow:0 10px 26px rgba(20,22,30,.08),0 0 0 .5px rgba(20,22,30,.06);
   --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 0 0 .5px rgba(0,0,0,.07);
 }
 [data-theme="dark"]{
-  --bg:#1a1a1e; --card:#232327; --card-2:#1f1f23; --pill:#2d2d33;
-  --line:#333339; --line-2:#2c2c32; --fg:#ededf1; --fg-2:#b9b9c1; --muted:#8b8b94; --faint:#56565f;
-  --accent:#a5b4fc; --accent-soft:#2b2c47; --green:#6fd99b; --green-soft:#1e3a2b;
-  --amber:#f2b544; --amber-soft:#3f3220; --grey:#9ca3af; --grey-soft:#2a2a30;
-  --shadow:0 12px 30px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.08);
+  --bg:#1a1a1e; --card:#232327; --pill:#2d2d33; --line:#333339; --line-2:#2c2c32;
+  --fg:#ededf1; --fg-2:#b9b9c1; --muted:#8b8b94; --faint:#56565f;
+  --accent:#a5b4fc; --accent-soft:#2b2c47; --accent-fg:#14142a; --green:#6fd99b; --green-soft:#1e3a2b;
+  --shadow:0 10px 26px rgba(0,0,0,.4),0 0 0 .5px rgba(255,255,255,.08);
   --shadow-sm:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.09);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--font);background:var(--bg);color:var(--fg);min-height:100vh;padding:34px 20px 40px;display:flex;flex-direction:column;align-items:center;gap:18px;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-h1{font-size:20px;font-weight:650;letter-spacing:-.01em}
-h2{font-size:13px;font-weight:600;margin-bottom:7px}
-.sub{font-size:11.5px;color:var(--muted);line-height:1.55}
-.wrap{width:1040px;max-width:100%;display:flex;flex-direction:column;gap:16px}
-.top{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+body{font-family:var(--font);background:var(--bg);color:var(--fg);min-height:100vh;display:flex;justify-content:center;padding:40px 20px}
+.wrap{width:760px;max-width:100%;display:flex;flex-direction:column;gap:14px}
+.top{display:flex;align-items:flex-start;gap:12px}
 .top .grow{flex:1}
-.tbtn{height:26px;padding:0 9px;border-radius:7px;font-size:11.5px;color:var(--fg-2);background:var(--card);box-shadow:0 0 0 .5px var(--line)}
+h1{font-size:22px;font-weight:650;letter-spacing:-.01em}
+.lead{font-size:11.5px;color:var(--muted);margin-top:4px}
+.tbtn{height:26px;padding:0 9px;border-radius:7px;font-size:11px;color:var(--fg-2);background:var(--card);box-shadow:0 0 0 .5px var(--line)}
 .tbtn:hover{color:var(--fg)}
-.pill{display:inline-flex;align-items:center;height:19px;padding:0 7px;border-radius:6px;font-size:9.5px;font-weight:600;white-space:nowrap}
-.pill.ok{background:var(--green-soft);color:var(--green)}
-.pill.now{background:var(--accent-soft);color:var(--accent)}
-.pill.prop{background:var(--amber-soft);color:var(--amber)}
-.pill.old{background:var(--grey-soft);color:var(--grey)}
+a{color:inherit;text-decoration:none}
 
-.hero{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
-@media (max-width:900px){.hero{grid-template-columns:1fr 1fr}}
-.entry{display:flex;flex-direction:column;gap:5px;background:var(--card);border-radius:11px;padding:11px 12px;box-shadow:var(--shadow-sm);border-top:3px solid var(--accent)}
-.entry.ok{border-top-color:var(--green)}
-.entry .n{font-size:9.5px;color:var(--muted);font-weight:600}
-.entry b{font-size:12.5px}
-.entry .d{font-size:10.5px;color:var(--muted);line-height:1.45}
-.entry .pill{align-self:flex-start}
-.entry:hover{box-shadow:var(--shadow)}
+.complete{display:flex;align-items:center;gap:12px;background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);border-radius:12px;padding:13px 15px}
+.complete b{font-size:13px;color:var(--accent)}
+.complete span{font-size:10.5px;color:var(--accent);opacity:.8}
+.complete .go{margin-left:auto;font-size:12px;color:var(--accent);font-weight:600;white-space:nowrap}
+.complete:hover{background:color-mix(in srgb,var(--accent-soft) 75%,var(--card))}
 
-.timeline{display:flex;align-items:stretch;gap:0;background:var(--card);border-radius:11px;padding:10px 12px;box-shadow:var(--shadow-sm);overflow-x:auto}
-.step{flex:1;min-width:110px;padding:6px 8px;border-left:1px solid var(--line-2);display:flex;flex-direction:column;gap:3px}
-.step:first-child{border-left:0}
-.step .v{font-size:9px;color:var(--faint);font-weight:600}
-.step b{font-size:10.5px}
-.step .s{font-size:9px}
-.step a:hover b{color:var(--accent)}
-.step.old{opacity:.62}
-.step.prop .v{color:var(--amber)}
-.step.ok .v{color:var(--green)}
-
-table{width:100%;border-collapse:collapse;background:var(--card);border-radius:11px;overflow:hidden;box-shadow:var(--shadow-sm);font-size:11px}
-th,td{text-align:left;padding:7px 9px;border-top:.5px solid var(--line-2);vertical-align:top}
-th{font-size:9.5px;color:var(--muted);font-weight:600;border-top:0}
-td:first-child{font-weight:500;white-space:nowrap}
-td a{color:var(--accent)}
-td a:hover{text-decoration:underline}
-td .f{font-size:9.5px;color:var(--muted)}
-.mono{font-family:ui-monospace,Consolas,monospace;font-size:10px;color:var(--muted)}
-.note{background:var(--accent-soft);color:var(--accent);border-radius:9px;padding:9px 11px;font-size:11px;line-height:1.55}
-.foot{font-size:10px;color:var(--muted);text-align:center}
+.steps{display:flex;flex-direction:column;gap:8px}
+.step{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow-sm)}
+.step:hover{box-shadow:var(--shadow)}
+.num{flex:none;width:26px;height:26px;border-radius:50%;background:var(--pill);color:var(--fg-2);font-size:12px;font-weight:650;display:inline-flex;align-items:center;justify-content:center}
+.step main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.step b{font-size:13px}
+.step .d{font-size:10.5px;color:var(--muted);line-height:1.4}
+.go{flex:none;font-size:11.5px;color:var(--accent);font-weight:600;white-space:nowrap}
+.step:hover .go{text-decoration:underline}
+.pill{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;font-size:9.5px;font-weight:600;background:var(--green-soft);color:var(--green);margin-left:6px;vertical-align:1px}
+.links{flex:none;display:flex;gap:10px;font-size:11.5px;color:var(--accent);font-weight:600}
+.links a:hover{text-decoration:underline}
+.foot{font-size:10px;color:var(--muted);text-align:center;line-height:1.5;margin-top:2px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top">
     <div class="grow">
-      <h1>magpie 界面原型 · 总览</h1>
-      <p class="sub">唯一入口。定稿、当前分开；历史已清理。最后整理 2026-11-18。</p>
+      <h1>magpie 原型 · 按顺序看</h1>
+      <p class="lead">① 骨架 → ② 层级 → ③ 页面 → ④ 浮层 → ⑤ 对照。点每行打开。</p>
     </div>
     <button class="tbtn" id="themeBtn">明 / 暗</button>
   </div>
 
-  <div>
-    <h2>完整入口（先看这个）</h2>
-    <a class="entry ok" href="complete.html" style="grid-column:1/-1">
-      <span class="n">完整</span>
-      <b>一个页面看全部：应用 + 浮层 + 骨架 + 层级</b>
-      <span class="d">顶部四个标签切换；不用再自己找文件</span>
-      <span class="pill ok">完整</span>
+  <a class="complete" href="complete.html">
+    <div>
+      <b>完整入口：一个页面试完 ①–④</b><br>
+      <span>顶部四个标签，按编号切换；不想分文件看就用这个</span>
+    </div>
+    <span class="go">打开完整原型 →</span>
+  </a>
+
+  <div class="steps">
+    <a class="step" href="skeleton-components.html">
+      <span class="num">1</span>
+      <main><b>骨架与通用组件</b><span class="d">外壳、4 个导航组件、11 个内容组件；宽窄与明暗</span></main>
+      <span class="go">打开 →</span>
     </a>
-  </div>
-
-  <div>
-    <h2>只看这 4 个（当前）</h2>
-    <div class="hero">
-      <a class="entry ok" href="skeleton-components.html">
-        <span class="n">① 骨架</span>
-        <b>骨架与通用组件</b>
-        <span class="d">外壳、4 个导航组件、11 个内容组件</span>
-        <span class="pill ok">当前</span>
-      </a>
-      <a class="entry" href="all-pages.html">
-        <span class="n">② 页面</span>
-        <b>全部页面（32 个视图）</b>
-        <span class="d">11 个页面 + 24 个页内视图，带区域标注</span>
-        <span class="pill now">当前</span>
-      </a>
-      <a class="entry" href="overlays.html">
-        <span class="n">③ 浮层</span>
-        <b>弹窗与浮层（30 个）</b>
-        <span class="d">供应商行展开、添加 sheet、确认、选择器、托盘</span>
-        <span class="pill now">当前</span>
-      </a>
-      <a class="entry ok" href="framework-layers.html">
-        <span class="n">④ 层级</span>
-        <b>四层导航框架</b>
-        <span class="d">一级分区 / 二级页面 / 三级标签 / 顶部功能</span>
-        <span class="pill ok">定稿</span>
-      </a>
+    <a class="step" href="framework-layers.html">
+      <span class="num">2</span>
+      <main><b>四层导航框架<span class="pill">定稿</span></b><span class="d">一级分区 / 二级页面 / 三级标签 / 四级工具栏</span></main>
+      <span class="go">打开 →</span>
+    </a>
+    <a class="step" href="all-pages.html">
+      <span class="num">3</span>
+      <main><b>全部页面（32 个视图）</b><span class="d">11 个页面 + 24 个页内视图；带区域标注和组件索引</span></main>
+      <span class="go">打开 →</span>
+    </a>
+    <a class="step" href="overlays.html">
+      <span class="num">4</span>
+      <main><b>弹窗与浮层（30 个）</b><span class="d">添加 sheet、右键菜单、确认、选择器、托盘、手机</span></main>
+      <span class="go">打开 →</span>
+    </a>
+    <div class="step">
+      <span class="num">5</span>
+      <main><b>对照与审计</b><span class="d">和现行版逐项对比；缺口、布局方案与文件台账</span></main>
+      <span class="links"><a href="COMPARE.md">对照</a><a href="AUDIT.md">审计</a><a href="MANIFEST.md">台账</a></span>
     </div>
   </div>
 
-  <div>
-    <h2>现在的内容</h2>
-    <div class="timeline">
-      <div class="step ok"><span class="v">定稿</span><a href="framework-layers.html"><b>四层框架</b></a><span class="s">层级定义</span></div>
-      <div class="step"><span class="v">当前</span><a href="skeleton-components.html"><b>骨架 = 组件</b></a><span class="s">外壳 + 组件库</span></div>
-      <div class="step"><span class="v">当前</span><a href="all-pages.html"><b>32 个视图</b></a><span class="s">页面 + 区域标注</span></div>
-      <div class="step"><span class="v">当前</span><a href="overlays.html"><b>30 个浮层</b></a><span class="s">弹窗 + 全界面清单</span></div>
-    </div>
-  </div>
-
-  <div>
-    <h2>文件清单</h2>
-    <table>
-      <thead><tr><th>文件</th><th>状态</th><th>是什么</th><th>规模 / 说明</th></tr></thead>
-      <tbody>
-        <tr><td><a href="complete.html">complete.html</a></td><td><span class="pill ok">完整</span></td><td>一个入口看全部</td><td>应用 + 浮层 + 骨架 + 层级<br><span class="f">顶部四标签</span></td></tr>
-        <tr><td><a href="skeleton-components.html">skeleton-components.html</a></td><td><span class="pill ok">当前</span></td><td>骨架与通用组件</td><td>外壳 + 4 导航组件 + 11 内容组件<br><span class="f">骨架宽/窄、明暗</span></td></tr>
-        <tr><td><a href="all-pages.html">all-pages.html</a></td><td><span class="pill now">当前</span></td><td>全部页面与页内视图</td><td>32 个视图 + 每页元素表 + 32 行总索引<br><span class="f">顶部可开「标注」</span></td></tr>
-        <tr><td><a href="overlays.html">overlays.html</a></td><td><span class="pill now">当前</span></td><td>弹窗与浮层</td><td>30 个 + 33 行全界面清单<br><span class="f">含托盘、手机、外部流程说明</span></td></tr>
-        <tr><td><a href="framework-layers.html">framework-layers.html</a></td><td><span class="pill ok">定稿</span></td><td>四层导航框架</td><td>一级 5 分区 / 二级页面 / 三级标签 / 四级工具栏<br><span class="f">外壳已定，不再改</span></td></tr>
-        <tr><td><a href="COMPARE.md">COMPARE.md</a></td><td><span class="pill old">对照</span></td><td>与现行版逐个对照</td><td>30 个界面：外观 / 行为 / 状态</td></tr>
-        <tr><td><a href="AUDIT.md">AUDIT.md</a></td><td><span class="pill old">审计</span></td><td>检查与遗漏清单</td><td>缺口优先级 + 布局方案 A–E</td></tr>
-        <tr><td><a href="README.md">README.md</a></td><td><span class="pill old">说明</span></td><td>文字台账（非入口）</td><td>组件、层级、标注、清单的详细说明</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <div class="note">
-    改哪里：改页面 → <b>all-pages</b>；改弹窗 → <b>overlays</b>；改通用组件 → <b>skeleton-components</b>；改层级 → <b>framework-layers</b>（定稿，先别动）；历史/提案文件已清理，git 历史可查。
-  </div>
-
-  <p class="foot">截图只保留 8 张：complete、index-light、page-providers、prov-inline、overlays-light、skeleton-wide、layers-narrow、state-empty。</p>
+  <p class="foot">文件只剩 6 个 HTML + 8 张截图；旧版本已清理，git 历史可查。</p>
 </div>
 
 <script>
