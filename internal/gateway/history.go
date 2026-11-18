@@ -56,9 +56,15 @@ const testSandbox = "MAGPIE_TEST_SANDBOX"
 // agent, davsync). No test outside this package reads the history back.
 func keepsRoutes() bool { return keepRoutes && os.Getenv(testSandbox) == "" }
 
+// history separates the lock a reader needs from the IO a writer does.
+// history.mu still guards the counted/tally caches and every read of the day
+// files; the write path takes historyWrite instead, so a save's
+// MkdirAll/open/write/close and a prune's gzip never hold up History,
+// DayTallies or HistoryRoute (#F-14). historyWrite also serializes the
+// writers, keeping a day's lines in append order and gzip's read/modify of a
+// day whole.
 var history struct {
 	mu     sync.Mutex
-	pruned time.Time
 	counts map[string]counted // a day's file → its requests, as of its size
 	// the live page's tallies of today (DayTallies): each file's bytes
 	// folded in so far, up to the end of its last whole line, so a look
@@ -66,6 +72,14 @@ var history struct {
 	talliedDay string
 	talliedOff map[string]int64
 	tallies    map[string]*Tally
+}
+
+// historyWrite serializes the writers only: a slow disk or a day's gzip
+// blocks other saves, never a reader of the history. pruned is the last
+// prune's time, read and written only under this lock.
+var historyWrite struct {
+	mu     sync.Mutex
+	pruned time.Time
 }
 
 type counted struct {
@@ -87,15 +101,21 @@ const dayForm = "2006-01-02"
 var historyClock = time.Now
 
 // saveRoute adds a done route to its day. Errors are swallowed: keeping
-// the history must never break a call.
+// the history must never break a call. The line is written through keptLine,
+// which drops the candidate fields the history's readers never use (F-15);
+// an older, full-keyed line still reads back the same. Only the append and
+// the prune are serialized, on historyWrite: the reader's history.mu is not
+// taken here, so a slow disk or a day's gzip can't hold up History,
+// DayTallies or HistoryRoute. The line is marshalled before the lock, on the
+// caller's goroutine.
 func saveRoute(r Route) {
 	r.Seq = 0
-	b, err := json.Marshal(r)
+	b, err := keptLine(r)
 	if err != nil {
 		return
 	}
-	history.mu.Lock()
-	defer history.mu.Unlock()
+	historyWrite.mu.Lock()
+	defer historyWrite.mu.Unlock()
 	dir := HistoryDir()
 	if os.MkdirAll(dir, 0o755) != nil {
 		return
@@ -106,8 +126,8 @@ func saveRoute(r Route) {
 	}
 	f.Write(append(b, '\n'))
 	f.Close()
-	if now := historyClock(); now.Sub(history.pruned) > time.Hour {
-		history.pruned = now
+	if now := historyClock(); now.Sub(historyWrite.pruned) > time.Hour {
+		historyWrite.pruned = now
 		pruneHistory(dir, now)
 	}
 }
@@ -166,73 +186,159 @@ func pruneHistory(dir string, now time.Time) {
 // couldn't be read, and after a route cut short the first of them would join
 // it. A last route whole but for its newline is kept. The .gz is read a route
 // at a time, never held whole unzipped; it is replaced whole, never seen half
-// written, and the file goes once its routes are in. A .gz that can't be read
-// from disk is left as it is, and the file with it, for a later prune.
+// written, and the file goes once its routes are in. The .gz is copied or
+// rewritten and the file's new routes appended as a stream, file to
+// gzip.Writer to a temp file, so neither a day's file nor its compressed
+// result is ever held whole in memory (#F-14). A .gz that can't be read from
+// disk is left as it is, and the file with it, for a later prune.
 func gzipFile(path string) {
-	b, err := os.ReadFile(path)
+	gzPath := path + ".gz"
+
+	// The .gz already there, if any: whether it reads whole (routes may go
+	// after it) and which of the file's routes it already has. Opening it
+	// first means the dedup set is built only when there is a .gz to dedup
+	// against: on a day's first gzip there is none, and the file is the whole
+	// day (a busy one 350 MB), so no set of its lines is held. A .gz that
+	// can't be read is left for a later prune.
+	haveOld := false
+	if old, err := os.Open(gzPath); err == nil {
+		haveOld = true
+		old.Close()
+	} else if !os.IsNotExist(err) {
+		return
+	}
+
+	in := map[string]bool{} // the file's routes, each true once the .gz is seen to have it
+	fileHasLine := false
+	file, err := os.Open(path)
 	if err != nil {
 		return
 	}
-	old, err := os.ReadFile(path + ".gz")
-	if err != nil && !os.IsNotExist(err) {
-		return
-	}
-	// the file's routes, each true once the .gz is seen to have it: a set
-	// built from the file, a few routes, not from the whole day
-	in := map[string]bool{}
+	forEachLine(file, func(l []byte) {
+		if len(l) > 0 {
+			fileHasLine = true
+			if haveOld {
+				in[string(l)] = false
+			}
+		}
+	})
+	file.Close()
 	whole := true // the .gz, if there is one, can have routes go after it
-	if len(old) > 0 {
-		for l := range bytes.Lines(b) {
-			in[string(bytes.TrimSpace(l))] = false
+	if haveOld {
+		old, err := os.Open(gzPath)
+		if err != nil {
+			return
 		}
 		whole = gzRoutes(old, func(l []byte) {
 			if _, ok := in[string(l)]; ok {
 				in[string(l)] = true
 			}
 		})
+		old.Close()
 	}
-	buf := new(bytes.Buffer)
-	if whole {
-		buf = bytes.NewBuffer(old)
-	}
-	z := gzip.NewWriter(buf)
-	nl := []byte{'\n'}
-	add := func(l []byte) {
-		z.Write(l)
-		z.Write(nl)
-	}
-	if !whole {
-		gzRoutes(old, add) // written anew, its whole routes first
-	}
+	// added is whether a file route isn't in the .gz (or, with no .gz,
+	// whether the file has a route). Only then is a new .gz written. A route
+	// in the .gz cut short is not a whole route and so can't satisfy a file
+	// line.
 	added := false
-	for l := range bytes.Lines(b) {
-		if l = bytes.TrimSpace(l); len(l) > 0 && !in[string(l)] {
-			add(l)
-			added = true
+	if !haveOld {
+		added = fileHasLine
+	} else {
+		for _, ok := range in {
+			if !ok {
+				added = true
+				break
+			}
 		}
 	}
-	if added {
-		tmp := path + ".gz.tmp"
-		if z.Close() != nil || os.WriteFile(tmp, buf.Bytes(), 0o600) != nil || steady.Rename(tmp, path+".gz") != nil {
-			os.Remove(tmp)
+	if !added {
+		os.Remove(path) // its routes are in the .gz already
+		return
+	}
+
+	// Stream the merge into a temp file: whole .gz bytes copied as a first
+	// member, or its whole routes rewritten when it was cut short, then the
+	// file's new routes appended as one more gzip member (read back as one
+	// stream). Each path's handle is opened per pass and closed before the
+	// rename and the remove, since Windows won't replace or delete a file
+	// another handle still holds open (#F-14).
+	tmp := gzPath + ".tmp"
+	out, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return
+	}
+	fail := func() { out.Close(); os.Remove(tmp) }
+	if whole && haveOld {
+		old, err := os.Open(gzPath)
+		if err != nil {
+			fail()
+			return
+		}
+		_, err = io.Copy(out, old)
+		old.Close()
+		if err != nil {
+			fail()
 			return
 		}
 	}
+	z := gzip.NewWriter(out)
+	nl := []byte{'\n'}
+	add := func(l []byte) { z.Write(l); z.Write(nl) }
+	if !whole && haveOld {
+		old, err := os.Open(gzPath)
+		if err != nil {
+			fail()
+			return
+		}
+		gzRoutes(old, add) // written anew, its whole routes first
+		old.Close()
+	}
+	file, err = os.Open(path)
+	if err != nil {
+		fail()
+		return
+	}
+	forEachLine(file, func(l []byte) {
+		if len(l) > 0 && !in[string(l)] {
+			add(l)
+		}
+	})
+	file.Close()
+	if z.Close() != nil || out.Close() != nil || steady.Rename(tmp, gzPath) != nil {
+		fail()
+		return
+	}
 	os.Remove(path)
+}
+
+// forEachLine calls f with each line of an open file, trimmed, from its
+// current position. A last route whole but for its newline is a line too.
+func forEachLine(f *os.File, fn func([]byte)) {
+	br := bufio.NewReader(f)
+	for {
+		line, err := br.ReadBytes('\n')
+		if len(line) > 0 {
+			fn(bytes.TrimSpace(line))
+		}
+		if err != nil {
+			return
+		}
+	}
 }
 
 // gzRoutes calls f with each route of a day's .gz in turn, a last route
 // whole but for its newline among them and one cut short left out. It says
 // whether the .gz read to its end, its last route ending in a newline: what
 // a gzip member added after it needs to be read.
-func gzRoutes(gz []byte, f func([]byte)) bool {
-	z, err := gzip.NewReader(bytes.NewReader(gz))
+func gzRoutes(r io.Reader, f func([]byte)) bool {
+	z, err := gzip.NewReader(r)
 	if err != nil {
 		return false
 	}
-	r := bufio.NewReader(z)
+	defer z.Close()
+	br := bufio.NewReader(z)
 	for {
-		line, err := r.ReadBytes('\n')
+		line, err := br.ReadBytes('\n')
 		l := bytes.TrimSpace(line)
 		if err != nil {
 			if len(l) > 0 && json.Valid(l) {

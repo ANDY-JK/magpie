@@ -857,9 +857,15 @@ func (t *trace) update(r *Route, f func(r *Route)) {
 		}
 		t.turns.end(r, turnFinal(r), time.Now())
 		if keepsRoutes() {
+			// The route is Done: its Order and Left are final. They are never
+			// changed in place — a later update replaces the whole slice
+			// (append on a clipped order, Clone/DeleteFunc on left) — so a
+			// clipped header is a stable snapshot, and the large candidate
+			// arrays aren't copied under t.mu (F-15). Tries and Usage do take
+			// in-place writes (tries[i].Fail, appends), so they are copied.
 			c := *r
-			c.Order = append([]Weighed{}, r.Order...) // [] for none: the GUI reads it as a list
-			c.Left = append([]Weighed(nil), r.Left...)
+			c.Order = slices.Clip(r.Order)
+			c.Left = slices.Clip(r.Left)
 			c.Tries = append([]Try{}, r.Tries...)
 			c.Usage = append([]RouteUsage(nil), r.Usage...)
 			go saveRoute(c)
