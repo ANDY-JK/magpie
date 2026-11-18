@@ -411,9 +411,12 @@ func dropReserves(cands []candidate, i int, id string) []candidate {
 }
 
 // ready is whether c's request would go at once: a slot free in its lane,
-// and room in its minute (rpm.go), the model's own bound over the key or
-// account's.
+// room in its minute (rpm.go), the model's own bound over the key or
+// account's, and room in its provider's day (daycalls.go).
 func (s *Server) ready(c candidate) bool {
+	if limit := c.p.DayCallLimit(); limit > 0 && !s.days.free(c.p.ID, limit, dayNow()) {
+		return false
+	}
 	return s.lanes.free(c.who(), c.p.LaneLimit()) && s.rpms.free(c.who(), c.p.ModelRPMLimit(c.model))
 }
 
@@ -421,6 +424,9 @@ func (s *Server) ready(c candidate) bool {
 // queue: full, or waited out.
 func laneMessage(c candidate, err error, queued int64) string {
 	if e := (*errRPM)(nil); errors.As(err, &e) {
+		return fmt.Sprintf("%s: %s; try again then", c.label(), e.Error())
+	}
+	if e := (*errDayCalls)(nil); errors.As(err, &e) {
 		return fmt.Sprintf("%s: %s; try again then", c.label(), e.Error())
 	}
 	lim := c.p.LaneLimit()

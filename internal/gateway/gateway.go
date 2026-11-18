@@ -560,6 +560,9 @@ type Server struct {
 	// minute, and those about to go (rpm.go)
 	rpms          rpms
 	requestLimits requestLimits
+	// how many requests each provider has taken today, kept across restarts
+	// (daycalls.go)
+	days dayCalls
 	// what a restart would cut short (busy.go)
 	busyCounters
 	// when Antigravity last turned away the system prompt it refuses
@@ -3529,8 +3532,22 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			}
 			queuedAlive()
 			queued = (inLane + inMinute).Milliseconds()
+				// a provider's DayCalls bounds the requests it takes in a
+				// calendar day, all keys and accounts together (daycalls.go);
+				// over it this try counts nothing, and the agent is told
+				// until when (the 429 below). Its slot goes back first, so
+				// another key or account of it, or another provider, may go.
+				if err == nil {
+					if limit := c.p.DayCallLimit(); limit > 0 {
+						if ok, left := s.days.take(c.p.ID, limit, dayNow()); !ok {
+							release()
+							err = &errDayCalls{limit: limit, after: left}
+						}
+					}
+				}
 			var tooMany *errRPM
-			if errors.Is(err, errQueueFull) || errors.Is(err, errQueueWait) || errors.As(err, &tooMany) {
+			var dayFull *errDayCalls
+			if errors.Is(err, errQueueFull) || errors.Is(err, errQueueWait) || errors.As(err, &tooMany) || errors.As(err, &dayFull) {
 				laneErr = err
 			}
 			if err == nil {
@@ -3578,6 +3595,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				after := "1"
 				if e := (*errRPM)(nil); errors.As(laneErr, &e) {
 					after = e.retryAfter() // when the minute has room
+				if e := (*errDayCalls)(nil); errors.As(laneErr, &e) {
+					after = e.retryAfter() // when the day turns
+				}
 				}
 				w.Header().Set("Retry-After", after)
 			}
