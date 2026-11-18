@@ -27,6 +27,11 @@ func capsHome(t *testing.T) {
 		testenv.Program(t, filepath.Join(bin, "security"), "#!/bin/sh\nexit 44\n")
 		t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	}
+	// The catalog is loaded once per process (catalog.loadGen); without
+	// forgetting it, what another test's home first read stands for this
+	// one's too, and the cache written below is never seen. Each capsHome
+	// is the process's only reader of the cache it writes.
+	catalog.Reset()
 	os.MkdirAll(filepath.Dir(catalog.CachePath()), 0o755)
 	data := `{"relay":{"models":{"sol":{"id":"sol","name":"Sol"}}}}`
 	if err := os.WriteFile(catalog.CachePath(), []byte(data), 0o644); err != nil {
