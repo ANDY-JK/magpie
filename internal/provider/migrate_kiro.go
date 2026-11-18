@@ -152,24 +152,22 @@ func kiroOut(home, user, plan string) (map[string]any, error) {
 
 // setKiroKey sets (or, "", clears) the key saved on the Kiro provider.
 func setKiroKey(k string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	for i := range f.Providers {
-		if f.Providers[i].ID == "kiro" {
-			if f.Providers[i].Key == k {
-				return nil
+	return mutate(func(f *file) (bool, error) {
+		for i := range f.Providers {
+			if f.Providers[i].ID == "kiro" {
+				if f.Providers[i].Key == k {
+					return false, nil
+				}
+				f.Providers[i].Key = k
+				return true, nil
 			}
-			f.Providers[i].Key = k
-			return store(f)
 		}
-	}
-	if k == "" {
-		return nil
-	}
-	f.Providers = append(f.Providers, Provider{ID: "kiro", Key: k})
-	return store(f)
+		if k == "" {
+			return false, nil
+		}
+		f.Providers = append(f.Providers, Provider{ID: "kiro", Key: k})
+		return true, nil
+	})
 }
 
 // kiroForgetHome drops what was cached of home's sign-in, rewritten.

@@ -27,34 +27,36 @@ func Stored() ([]Provider, error) {
 // one without an access key or balance token keeps those (KeepSecrets). It
 // returns how many were new and how many replaced one here.
 func Restore(ps []Provider) (added, replaced int, err error) {
-	f, err := read()
-	if err != nil {
-		return 0, 0, err
-	}
-	for _, p := range ps {
-		p.IconURL = ""
-		if p.ID == "" || p.ID != Slug(p.ID) || p.ID == "magpie" {
-			continue
-		}
-		i := -1
-		for j := range f.Providers {
-			if f.Providers[j].ID == p.ID {
-				i = j
-				break
+	err = mutate(func(f *file) (bool, error) {
+		for _, p := range ps {
+			p.IconURL = ""
+			if p.ID == "" || p.ID != Slug(p.ID) || p.ID == "magpie" {
+				continue
 			}
+			i := -1
+			for j := range f.Providers {
+				if f.Providers[j].ID == p.ID {
+					i = j
+					break
+				}
+			}
+			if i < 0 {
+				f.Providers = append(f.Providers, p)
+				added++
+				continue
+			}
+			f.Providers[i] = KeepSecrets(p, f.Providers[i], p.Key == "" && len(p.Keys) == 0)
+			replaced++
 		}
-		if i < 0 {
-			f.Providers = append(f.Providers, p)
-			added++
-			continue
+		if added+replaced == 0 {
+			return false, nil
 		}
-		f.Providers[i] = KeepSecrets(p, f.Providers[i], p.Key == "" && len(p.Keys) == 0)
-		replaced++
+		return true, nil
+	})
+	if err != nil {
+		return added, replaced, err
 	}
-	if added+replaced == 0 {
-		return 0, 0, nil
-	}
-	return added, replaced, store(f)
+	return added, replaced, nil
 }
 
 // StoredGroups is the groups as saved: the user's own, and the found ones
@@ -70,22 +72,20 @@ func RestoreGroups(gs []Group) error {
 	if len(gs) == 0 {
 		return nil
 	}
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	for _, g := range gs {
-		if g.ID == "" || g.ID != GroupSlug(g.ID) {
-			continue
+	return mutate(func(f *file) (bool, error) {
+		for _, g := range gs {
+			if g.ID == "" || g.ID != GroupSlug(g.ID) {
+				continue
+			}
+			g.Auto = false
+			if i := slices.IndexFunc(f.Groups, func(x Group) bool { return x.ID == g.ID }); i >= 0 {
+				f.Groups[i] = g
+			} else {
+				f.Groups = append(f.Groups, g)
+			}
 		}
-		g.Auto = false
-		if i := slices.IndexFunc(f.Groups, func(x Group) bool { return x.ID == g.ID }); i >= 0 {
-			f.Groups[i] = g
-		} else {
-			f.Groups = append(f.Groups, g)
-		}
-	}
-	return store(f)
+		return true, nil
+	})
 }
 
 // Mirror makes the providers and groups exactly these, as sync brings them
@@ -96,31 +96,29 @@ func RestoreGroups(gs []Group) error {
 // one person signs in to a personal account at home and a work account at
 // the office, and sync set each computer to the other's every day.
 func Mirror(ps []Provider, gs []Group) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	here := map[string]Provider{}
-	for _, p := range f.Providers {
-		here[p.ID] = p
-	}
-	out := []Provider{}
-	for _, p := range ps {
-		p.IconURL = ""
-		if p.ID == "" || p.ID != Slug(p.ID) || p.ID == "magpie" {
-			continue
+	return mutate(func(f *file) (bool, error) {
+		here := map[string]Provider{}
+		for _, p := range f.Providers {
+			here[p.ID] = p
 		}
-		if h, ok := here[p.ID]; ok {
-			p = KeepSecrets(p, h, p.Key == "" && len(p.Keys) == 0)
-			p.KeepLogin, p.KeepLoginAs, p.SwitchOnly = h.KeepLogin, h.KeepLoginAs, h.SwitchOnly
-		} else {
-			p.KeepLoginAs = "" // an account signed in on the other computer
+		out := []Provider{}
+		for _, p := range ps {
+			p.IconURL = ""
+			if p.ID == "" || p.ID != Slug(p.ID) || p.ID == "magpie" {
+				continue
+			}
+			if h, ok := here[p.ID]; ok {
+				p = KeepSecrets(p, h, p.Key == "" && len(p.Keys) == 0)
+				p.KeepLogin, p.KeepLoginAs, p.SwitchOnly = h.KeepLogin, h.KeepLoginAs, h.SwitchOnly
+			} else {
+				p.KeepLoginAs = "" // an account signed in on the other computer
+			}
+			out = append(out, p)
 		}
-		out = append(out, p)
-	}
-	f.Providers = out
-	f.Groups = slices.DeleteFunc(slices.Clone(gs), func(g Group) bool { return g.ID == "" || g.ID != GroupSlug(g.ID) })
-	return store(f)
+		f.Providers = out
+		f.Groups = slices.DeleteFunc(slices.Clone(gs), func(g Group) bool { return g.ID == "" || g.ID != GroupSlug(g.ID) })
+		return true, nil
+	})
 }
 
 // Carried is the plugins a backup or a sync carries: those added from npm

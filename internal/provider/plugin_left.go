@@ -76,27 +76,25 @@ func setAside(pkg string, ids []string) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	keep := make([]Provider, 0, len(f.Providers))
-	moved := false
-	for _, p := range f.Providers {
-		if slices.Contains(ids, p.ID) && OnlyPicks(p) {
-			// one set aside before under the same id gives way to this
-			f.PluginLeft = slices.DeleteFunc(f.PluginLeft, func(l LeftRecord) bool { return l.Provider.ID == p.ID })
-			f.PluginLeft = append(f.PluginLeft, LeftRecord{Package: pkg, Provider: p})
-			moved = true
-			continue
+	return mutate(func(f *file) (bool, error) {
+		keep := make([]Provider, 0, len(f.Providers))
+		moved := false
+		for _, p := range f.Providers {
+			if slices.Contains(ids, p.ID) && OnlyPicks(p) {
+				// one set aside before under the same id gives way to this
+				f.PluginLeft = slices.DeleteFunc(f.PluginLeft, func(l LeftRecord) bool { return l.Provider.ID == p.ID })
+				f.PluginLeft = append(f.PluginLeft, LeftRecord{Package: pkg, Provider: p})
+				moved = true
+				continue
+			}
+			keep = append(keep, p)
 		}
-		keep = append(keep, p)
-	}
-	if !moved {
-		return nil
-	}
-	f.Providers = keep
-	return store(f)
+		if !moved {
+			return false, nil
+		}
+		f.Providers = keep
+		return true, nil
+	})
 }
 
 // takeBackLeft puts the records set aside for the plugin spec back among the
@@ -104,28 +102,26 @@ func setAside(pkg string, ids []string) error {
 // gave the id to a provider since) stays aside.
 func takeBackLeft(spec string) error {
 	pkg := plugin.PackageName(spec)
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	if !slices.ContainsFunc(f.PluginLeft, func(l LeftRecord) bool { return l.Package == pkg }) {
-		return nil
-	}
-	left := f.PluginLeft[:0]
-	changed := false
-	for _, l := range f.PluginLeft {
-		if l.Package == pkg && !slices.ContainsFunc(f.Providers, func(p Provider) bool { return p.ID == l.Provider.ID }) {
-			f.Providers = append(f.Providers, l.Provider)
-			changed = true
-			continue
+	return mutate(func(f *file) (bool, error) {
+		if !slices.ContainsFunc(f.PluginLeft, func(l LeftRecord) bool { return l.Package == pkg }) {
+			return false, nil
 		}
-		left = append(left, l)
-	}
-	if !changed {
-		return nil
-	}
-	f.PluginLeft = left
-	return store(f)
+		left := f.PluginLeft[:0]
+		changed := false
+		for _, l := range f.PluginLeft {
+			if l.Package == pkg && !slices.ContainsFunc(f.Providers, func(p Provider) bool { return p.ID == l.Provider.ID }) {
+				f.Providers = append(f.Providers, l.Provider)
+				changed = true
+				continue
+			}
+			left = append(left, l)
+		}
+		if !changed {
+			return false, nil
+		}
+		f.PluginLeft = left
+		return true, nil
+	})
 }
 
 // AddPlugin installs the plugin spec, as plugin.Add does, and puts back

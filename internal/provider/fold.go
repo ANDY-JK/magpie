@@ -242,119 +242,127 @@ func foldWhere(candidates func([]Provider) [][]int) (int, error) {
 	if b, err := os.ReadFile(Path()); err == nil && !validProviders(b) {
 		return 0, &unreadableError{Path(), errors.New("it doesn't parse")}
 	}
-	f, err := read()
+	var (
+		ps    []Provider
+		folds [][]int
+		gone  map[string]string
+		s     settings.Settings
+		ref   func(string) string
+	)
+	err := mutate(func(f *file) (bool, error) {
+		if len(f.Providers) < 2 {
+			return false, nil
+		}
+		ps = ordered(slices.Clone(f.Providers), f.Order)
+		stepfunMu.Lock()
+		stepfun := loadStepFun()
+		stepfunMu.Unlock()
+		s = settings.Load()
+		refs := foldRefs(*f, &s)
+
+		// each set of copies alike, by its shape, in the order of ps
+		for _, set := range candidates(ps) {
+			byShape := map[string][]int{}
+			var shapes []string
+			for _, i := range set {
+				p := ps[i]
+				if !foldable(p, stepfun) {
+					continue
+				}
+				sh := foldShape(p, modelPrefs(&s, p.ID)+"\x00"+strings.Join(refs[p.ID], "\x02"))
+				if sh == "" {
+					continue
+				}
+				if _, ok := byShape[sh]; !ok {
+					shapes = append(shapes, sh)
+				}
+				byShape[sh] = append(byShape[sh], i)
+			}
+			for _, sh := range shapes {
+				if len(byShape[sh]) > 1 {
+					folds = append(folds, byShape[sh])
+				}
+			}
+		}
+		if len(folds) == 0 {
+			return false, nil
+		}
+
+		now := time.Now()
+		gone = map[string]string{} // a folded provider's id → the one it went into
+		into := map[string]Provider{}
+		for _, set := range folds {
+			p, ids := foldSet(ps, set)
+			into[p.ID] = p
+			for _, id := range ids {
+				gone[id] = p.ID
+			}
+		}
+		// providers.json's list as it was, the folded ones out and each that
+		// took them in where it was
+		kept := f.Providers[:0:0]
+		for _, p := range f.Providers {
+			if _, ok := gone[p.ID]; ok {
+				continue
+			}
+			if q, ok := into[p.ID]; ok {
+				p = q
+			}
+			kept = append(kept, p)
+		}
+		f.Providers = kept
+		// a name another provider has already stays the copy's own
+		names := map[string]int{}
+		for _, p := range f.Providers {
+			names[strings.ToLower(p.Name)]++
+		}
+		for j, p := range f.Providers {
+			if _, ok := into[p.ID]; ok && names[strings.ToLower(p.Name)] > 1 && p.KeyName != "" {
+				if i := slices.IndexFunc(ps, func(q Provider) bool { return q.ID == p.ID }); i >= 0 && ps[i].Name != p.Name {
+					f.Providers[j].Name = ps[i].Name
+				}
+			}
+		}
+		// an id one of them gave away before is the one's that has it now
+		for id := range gone {
+			giveID(f.Providers, slices.IndexFunc(f.Providers, func(p Provider) bool { return p.ID == gone[id] }), id, now)
+		}
+		to := func(id string) string {
+			if t, ok := gone[id]; ok {
+				return t
+			}
+			return id
+		}
+		ref = func(m string) string { return foldedRef(m, to) }
+		f.Order = compact(mapEach(f.Order, to))
+		for j := range f.Providers {
+			f.Providers[j].Fallback = compact(mapEach(f.Providers[j].Fallback, ref))
+		}
+		for j := range f.Groups {
+			g := &f.Groups[j]
+			g.Members = compact(mapEach(g.Members, ref))
+			for k := range g.Rules {
+				g.Rules[k].MapUses(ref)
+			}
+			g.Fast = compact(mapEach(g.Fast, ref))
+			g.Placed = compact(mapEach(g.Placed, ref))
+			g.Off = compact(mapEach(g.Off, ref))
+			g.Weights = renamedWeights(g.Weights, ref)
+			g.Classifier = ref(g.Classifier)
+			g.Pick = ref(g.Pick)
+		}
+		return true, nil
+	})
 	if err != nil {
-		return 0, err
-	}
-	if len(f.Providers) < 2 {
-		return 0, nil
-	}
-	ps := ordered(slices.Clone(f.Providers), f.Order)
-	stepfunMu.Lock()
-	stepfun := loadStepFun()
-	stepfunMu.Unlock()
-	s := settings.Load()
-	refs := foldRefs(f, &s)
-
-	// each set of copies alike, by its shape, in the order of ps
-	var folds [][]int
-	for _, set := range candidates(ps) {
-		byShape := map[string][]int{}
-		var shapes []string
-		for _, i := range set {
-			p := ps[i]
-			if !foldable(p, stepfun) {
-				continue
-			}
-			sh := foldShape(p, modelPrefs(&s, p.ID)+"\x00"+strings.Join(refs[p.ID], "\x02"))
-			if sh == "" {
-				continue
-			}
-			if _, ok := byShape[sh]; !ok {
-				shapes = append(shapes, sh)
-			}
-			byShape[sh] = append(byShape[sh], i)
-		}
-		for _, sh := range shapes {
-			if len(byShape[sh]) > 1 {
-				folds = append(folds, byShape[sh])
-			}
-		}
-	}
-	if len(folds) == 0 {
-		return 0, nil
-	}
-
-	now := time.Now()
-	gone := map[string]string{} // a folded provider's id → the one it went into
-	into := map[string]Provider{}
-	for _, set := range folds {
-		p, ids := foldSet(ps, set)
-		into[p.ID] = p
-		for _, id := range ids {
-			gone[id] = p.ID
-		}
-	}
-	// providers.json's list as it was, the folded ones out and each that
-	// took them in where it was
-	kept := f.Providers[:0:0]
-	for _, p := range f.Providers {
-		if _, ok := gone[p.ID]; ok {
-			continue
-		}
-		if q, ok := into[p.ID]; ok {
-			p = q
-		}
-		kept = append(kept, p)
-	}
-	f.Providers = kept
-	// a name another provider has already stays the copy's own
-	names := map[string]int{}
-	for _, p := range f.Providers {
-		names[strings.ToLower(p.Name)]++
-	}
-	for j, p := range f.Providers {
-		if _, ok := into[p.ID]; ok && names[strings.ToLower(p.Name)] > 1 && p.KeyName != "" {
-			if i := slices.IndexFunc(ps, func(q Provider) bool { return q.ID == p.ID }); i >= 0 && ps[i].Name != p.Name {
-				f.Providers[j].Name = ps[i].Name
-			}
-		}
-	}
-	// an id one of them gave away before is the one's that has it now
-	for id := range gone {
-		giveID(f.Providers, slices.IndexFunc(f.Providers, func(p Provider) bool { return p.ID == gone[id] }), id, now)
-	}
-	to := func(id string) string {
-		if t, ok := gone[id]; ok {
-			return t
-		}
-		return id
-	}
-	ref := func(m string) string { return foldedRef(m, to) }
-	f.Order = compact(mapEach(f.Order, to))
-	for j := range f.Providers {
-		f.Providers[j].Fallback = compact(mapEach(f.Providers[j].Fallback, ref))
-	}
-	for j := range f.Groups {
-		g := &f.Groups[j]
-		g.Members = compact(mapEach(g.Members, ref))
-		for k := range g.Rules {
-			g.Rules[k].MapUses(ref)
-		}
-		g.Fast = compact(mapEach(g.Fast, ref))
-		g.Placed = compact(mapEach(g.Placed, ref))
-		g.Off = compact(mapEach(g.Off, ref))
-		g.Weights = renamedWeights(g.Weights, ref)
-		g.Classifier = ref(g.Classifier)
-		g.Pick = ref(g.Pick)
-	}
-	if err := store(f); err != nil {
 		return 0, err
 	}
 	for id := range gone {
 		// the list last fetched for it is the one it went into's
 		_ = os.Remove(catalog.LivePath(id))
 		_ = os.Remove(catalog.LivePath(decisionsID(id)))
+	}
+	if len(gone) == 0 {
+		return 0, nil
 	}
 	foldSettings(&s, gone, ref)
 	foldHistories(folds, ps)

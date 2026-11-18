@@ -785,6 +785,49 @@ func store(f file) error {
 	return nil
 }
 
+// fileMu makes the read, change and write of providers.json one step. read
+// and store alone don't take it: a look (load, storedFile, All) reads the
+// file without it, and store's rename hands a reader the old generation or
+// the new one, never a file cut short. But two goroutines that each read,
+// change and write the whole file would otherwise each write the version it
+// read, and the second would drop the first's change — a Save beside a
+// scheduled list refresh taking models by rule, or two capability runs.
+var fileMu sync.Mutex
+
+// mutateTestHook, when a test sets it, is called by mutate with fileMu held,
+// after reading providers.json and before fn changes it. The guard test holds
+// a reader there to show that, without fileMu, a second reader comes in with
+// the same stale file and one of the two writes is lost. It is nil outside a
+// test.
+var mutateTestHook func()
+
+// mutate reads providers.json, hands it to fn under fileMu, and writes it
+// back once fn says it changed: the one way a change to the file is made, so
+// that read, change and write are one step. fn must not call a public
+// mutator itself (it would take fileMu again and deadlock), and must not wait
+// on a vendor or a keychain: only the file's read-modify-write is under the
+// lock. A read that only looks at the file doesn't take it, so nothing a
+// reader needs is held here.
+func mutate(fn func(*file) (bool, error)) error {
+	fileMu.Lock()
+	defer fileMu.Unlock()
+	f, err := read()
+	if err != nil {
+		return err
+	}
+	if mutateTestHook != nil {
+		mutateTestHook()
+	}
+	changed, err := fn(&f)
+	if err != nil {
+		return err
+	}
+	if changed {
+		return store(f)
+	}
+	return nil
+}
+
 // sealFellBackMu guards sealFellBackLast, when a plain generation was last
 // written because the seal failed: the fallback is said once a minute, and
 // a seal that works again resets it, so a DPAPI that healed stops being
@@ -1143,41 +1186,39 @@ func Save(p Provider) error {
 			return fmt.Errorf("%s needs an API key", p.Name)
 		}
 	}
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == p.ID })
-	var was *Provider
-	if i >= 0 {
-		was = &f.Providers[i]
-	}
-	p.PickedFrom = listedWith(p, was)
-	p.Delisted = delistedWith(p, was)
-	p.DelistedAt = delistedAtWith(p, was)
-	p.Caps = capsWith(p, was)
-	if was != nil {
-		if p.Was == nil {
-			p.Was = was.Was
+	if err := mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == p.ID })
+		var was *Provider
+		if i >= 0 {
+			was = &f.Providers[i]
 		}
-		if p.Gave == nil {
-			p.Gave = was.Gave
+		p.PickedFrom = listedWith(p, was)
+		p.Delisted = delistedWith(p, was)
+		p.DelistedAt = delistedAtWith(p, was)
+		p.Caps = capsWith(p, was)
+		if was != nil {
+			if p.Was == nil {
+				p.Was = was.Was
+			}
+			if p.Gave == nil {
+				p.Gave = was.Gave
+			}
+			if sameStored(*was, p) {
+				// Save pressed on an editor left as it was: providers.json
+				// would be written byte for byte as it is, and its write
+				// handed the catalog to every agent again (agent.SyncCatalog),
+				// seconds of CPU with many agents set up (#1962, witt-bit)
+				return false, nil
+			}
+			f.Providers[i] = p
+		} else {
+			// a new provider under an id another had: what was recorded under
+			// it until now stays that one's
+			giveID(f.Providers, -1, p.ID, time.Now())
+			f.Providers = append(f.Providers, p)
 		}
-		if sameStored(*was, p) {
-			// Save pressed on an editor left as it was: providers.json
-			// would be written byte for byte as it is, and its write
-			// handed the catalog to every agent again (agent.SyncCatalog),
-			// seconds of CPU with many agents set up (#1962, witt-bit)
-			return nil
-		}
-		f.Providers[i] = p
-	} else {
-		// a new provider under an id another had: what was recorded under
-		// it until now stays that one's
-		giveID(f.Providers, -1, p.ID, time.Now())
-		f.Providers = append(f.Providers, p)
-	}
-	if err := store(f); err != nil {
+		return true, nil
+	}); err != nil {
 		return err
 	}
 	if p.ID == "claude" {
@@ -1494,89 +1535,82 @@ func tuckedAccount(id string) bool {
 // magpie" too (on), or lists it there again (off). Tucked, it is quiet as
 // well: no reminder line either (#116).
 func TuckAccount(id string, on bool) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	for i := range f.Providers {
-		if f.Providers[i].ID == id && f.Providers[i].Hidden {
-			f.Providers[i].Tucked = on
-			if on {
-				f.Providers[i].Quiet = true
+	return mutate(func(f *file) (bool, error) {
+		for i := range f.Providers {
+			if f.Providers[i].ID == id && f.Providers[i].Hidden {
+				f.Providers[i].Tucked = on
+				if on {
+					f.Providers[i].Quiet = true
+				}
+				return true, nil
 			}
-			return store(f)
 		}
-	}
-	return nil
+		return false, nil
+	})
 }
 
 // QuietAccount stops reminding the user of an account they removed: its
 // "Add it back" line goes, and it is offered only from the Add sheet.
 func QuietAccount(id string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	for i := range f.Providers {
-		if f.Providers[i].ID == id && f.Providers[i].Hidden {
-			f.Providers[i].Quiet = true
-			return store(f)
+	return mutate(func(f *file) (bool, error) {
+		for i := range f.Providers {
+			if f.Providers[i].ID == id && f.Providers[i].Hidden {
+				f.Providers[i].Quiet = true
+				return true, nil
+			}
 		}
-	}
-	return nil
+		return false, nil
+	})
 }
 
 // ShowAccount brings back the signed-in account of an agent the user had
 // removed from magpie.
 func ShowAccount(id string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	for i := range f.Providers {
-		if f.Providers[i].ID == id && f.Providers[i].Hidden {
-			f.Providers[i].Hidden, f.Providers[i].Quiet, f.Providers[i].Tucked = false, false, false
-			return store(f)
+	return mutate(func(f *file) (bool, error) {
+		for i := range f.Providers {
+			if f.Providers[i].ID == id && f.Providers[i].Hidden {
+				f.Providers[i].Hidden, f.Providers[i].Quiet, f.Providers[i].Tucked = false, false, false
+				return true, nil
+			}
 		}
-	}
-	return nil
+		return false, nil
+	})
 }
 
 // Delete removes a provider. An account, a built-in's or a plugin's, is
 // only hidden from magpie (its accounts and model picks kept, shown again
 // from Hidden or by signing in); signing out is each account's Remove.
 func Delete(id string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	if _, ok := find(Accounts(), id); ok {
-		for i := range f.Providers {
-			if f.Providers[i].ID == id {
-				f.Providers[i].Hidden = true
-				return store(f)
+	_, isAccount := find(Accounts(), id)
+	if err := mutate(func(f *file) (bool, error) {
+		if isAccount {
+			for i := range f.Providers {
+				if f.Providers[i].ID == id {
+					f.Providers[i].Hidden = true
+					return true, nil
+				}
 			}
+			f.Providers = append(f.Providers, Provider{ID: id, Hidden: true})
+			return true, nil
 		}
-		f.Providers = append(f.Providers, Provider{ID: id, Hidden: true})
-		return store(f)
-	}
-	keep := f.Providers[:0]
-	found := false
-	for _, p := range f.Providers {
-		if p.ID == id {
-			found = true
-			// its calls stay its own, not a provider's added later under
-			// its id (cybercaius on Discord)
-			f.Deleted = append(f.Deleted, Deleted{ID: p.ID, Name: p.Name, Icon: p.Icon, At: time.Now(), Was: slices.Clone(p.Was), Gave: slices.Clone(p.Gave)})
-			continue
+		keep := f.Providers[:0]
+		found := false
+		for _, p := range f.Providers {
+			if p.ID == id {
+				found = true
+				// its calls stay its own, not a provider's added later under
+				// its id (cybercaius on Discord)
+				f.Deleted = append(f.Deleted, Deleted{ID: p.ID, Name: p.Name, Icon: p.Icon, At: time.Now(), Was: slices.Clone(p.Was), Gave: slices.Clone(p.Gave)})
+				continue
+			}
+			keep = append(keep, p)
 		}
-		keep = append(keep, p)
-	}
-	if !found {
-		return fmt.Errorf("no provider %q", id)
-	}
-	f.Providers = keep
-	if err := store(f); err != nil {
+		if !found {
+			return false, fmt.Errorf("no provider %q", id)
+		}
+		f.Providers = keep
+		return true, nil
+	}); err != nil {
 		return err
 	}
 	// its StepFun sign-in goes with it, not to a provider added later
@@ -2288,6 +2322,29 @@ func Mask(s string) string {
 		return strings.Repeat("•", len(s))
 	}
 	return s[:4] + "…" + s[len(s)-4:]
+}
+
+// RedactError replaces this provider's own keys, as kept, with their masked
+// form in a vendor's error text. A vendor that echoes the key it refused
+// would otherwise put it in the client's reply, app.log, the trace and the
+// usage ledger in clear. Only this provider's keys are replaced, never
+// another channel's, and a value shorter than 8 characters is left alone so
+// an ordinary short word is not taken for a secret. A key the vendor
+// re-encoded (URL-encoded, base64) is not found by this plain replacement.
+func (p Provider) RedactError(s string) string {
+	keys := []string{p.Key, p.SecretAccessKey, p.BalanceToken}
+	for _, k := range p.Keys {
+		keys = append(keys, k.Key)
+	}
+	// longest first, so a key that is another's prefix isn't masked first
+	slices.SortFunc(keys, func(a, b string) int { return len(b) - len(a) })
+	for _, k := range keys {
+		if len(k) < 8 || !strings.Contains(s, k) {
+			continue
+		}
+		s = strings.ReplaceAll(s, k, Mask(k))
+	}
+	return s
 }
 
 // Ready reports whether the provider can be used: it has a key, needs

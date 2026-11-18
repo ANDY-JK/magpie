@@ -584,39 +584,37 @@ func AutoGroupsOn() bool { return !load().NoAutoGroups }
 // taken out, as DeleteGroup keeps it: the user's group would lose it
 // unsaid.
 func SetAutoGroups(on bool) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	if f.NoAutoGroups == !on {
-		return nil
-	}
-	if !on {
-		all := groupsIn(providerEntries())
-		found := func(ref string) bool {
-			gid, ok := strings.CutPrefix(ref, GroupPrefix)
-			return ok && slices.ContainsFunc(all, func(o Group) bool { return o.ID == gid && o.Auto && !o.Hidden })
+	return mutate(func(f *file) (bool, error) {
+		if f.NoAutoGroups == !on {
+			return false, nil
 		}
-		var held []string
-		for _, g := range all {
-			if g.Auto || g.Hidden {
-				continue
+		if !on {
+			all := groupsIn(providerEntries())
+			found := func(ref string) bool {
+				gid, ok := strings.CutPrefix(ref, GroupPrefix)
+				return ok && slices.ContainsFunc(all, func(o Group) bool { return o.ID == gid && o.Auto && !o.Hidden })
 			}
-			for _, m := range g.Members {
-				if found(m) {
-					held = append(held, fmt.Sprintf("%s is in %s", strings.TrimPrefix(m, GroupPrefix), g.Name))
+			var held []string
+			for _, g := range all {
+				if g.Auto || g.Hidden {
+					continue
+				}
+				for _, m := range g.Members {
+					if found(m) {
+						held = append(held, fmt.Sprintf("%s is in %s", strings.TrimPrefix(m, GroupPrefix), g.Name))
+					}
+				}
+				if found(g.Classifier) {
+					held = append(held, fmt.Sprintf("%s is %s's classifier", strings.TrimPrefix(g.Classifier, GroupPrefix), g.Name))
 				}
 			}
-			if found(g.Classifier) {
-				held = append(held, fmt.Sprintf("%s is %s's classifier", strings.TrimPrefix(g.Classifier, GroupPrefix), g.Name))
+			if len(held) > 0 {
+				return false, fmt.Errorf("%s: take it out, or change it to make it yours, first", strings.Join(held, ", "))
 			}
 		}
-		if len(held) > 0 {
-			return fmt.Errorf("%s: take it out, or change it to make it yours, first", strings.Join(held, ", "))
-		}
-	}
-	f.NoAutoGroups = !on
-	return store(f)
+		f.NoAutoGroups = !on
+		return true, nil
+	})
 }
 
 // AutoGroupID is the id of the group magpie finds for a model, however a
@@ -728,22 +726,20 @@ func AutoGroupSkip() []string { return slices.Clone(load().AutoGroupSkip) }
 // are the user's. A request still naming a found group skipping took away
 // goes to its model from one provider (AutoStandIn).
 func SetAutoGroupSkip(ids []string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	var skip []string
-	for _, id := range ids {
-		id = strings.ToLower(strings.TrimSpace(id))
-		if id != "" && !slices.Contains(skip, id) {
-			skip = append(skip, id)
+	return mutate(func(f *file) (bool, error) {
+		var skip []string
+		for _, id := range ids {
+			id = strings.ToLower(strings.TrimSpace(id))
+			if id != "" && !slices.Contains(skip, id) {
+				skip = append(skip, id)
+			}
 		}
-	}
-	if slices.Equal(skip, f.AutoGroupSkip) {
-		return nil
-	}
-	f.AutoGroupSkip = skip
-	return store(f)
+		if slices.Equal(skip, f.AutoGroupSkip) {
+			return false, nil
+		}
+		f.AutoGroupSkip = skip
+		return true, nil
+	})
 }
 
 // foundFrom is entries with idle's models it lacks, each provider's in
@@ -1442,135 +1438,135 @@ func SaveGroup(g Group) error {
 	if len(g.Members) == 0 && len(g.Match) == 0 {
 		return errors.New("a group needs a model in it, or a pattern its models match")
 	}
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	entries := providerEntries()
-	// checked with what its patterns match now, so that a rule, a pick, a
-	// fast or an off member may name one of those
-	named := len(g.Members)
-	g.Members = append(g.Members, matchesIn(entries, g)...)
-	if err := cleanFast(entries, &g); err != nil {
-		return err
-	}
-	for i, m := range g.Members {
-		if model, effort := memberEffortIn(entries, m); effort != "" && IsGroupRef(model) {
-			return fmt.Errorf("%s is a group: its models reason as it says, so it takes no effort of its own (:%s)", model, effort)
+	return mutate(func(f *file) (bool, error) {
+		entries := providerEntries()
+		// checked with what its patterns match now, so that a rule, a pick, a
+		// fast or an off member may name one of those
+		named := len(g.Members)
+		g.Members = append(g.Members, matchesIn(entries, g)...)
+		if err := cleanFast(entries, &g); err != nil {
+			return false, err
 		}
-		g.Members[i] = cleanMember(entries, m)
-	}
-	own := cleanList(g.Members[:named])
-	g.Members = append(slices.Clone(own), slices.DeleteFunc(cleanList(g.Members[named:]), func(m string) bool { return slices.Contains(own, m) })...)
-	// the order the user put them in, a pattern's members among them: as
-	// the caller sends it (the Routing page's editor), or as it was. The
-	// models named go in the order the caller names them, so one added
-	// to a group as read (models+=, the TUI) goes after those named
-	before := g.Placed
-	if len(before) == 0 {
+		for i, m := range g.Members {
+			if model, effort := memberEffortIn(entries, m); effort != "" && IsGroupRef(model) {
+				return false, fmt.Errorf("%s is a group: its models reason as it says, so it takes no effort of its own (:%s)", model, effort)
+			}
+			g.Members[i] = cleanMember(entries, m)
+		}
+		own := cleanList(g.Members[:named])
+		g.Members = append(slices.Clone(own), slices.DeleteFunc(cleanList(g.Members[named:]), func(m string) bool { return slices.Contains(own, m) })...)
+		// the order the user put them in, a pattern's members among them: as
+		// the caller sends it (the Routing page's editor), or as it was. The
+		// models named go in the order the caller names them, so one added
+		// to a group as read (models+=, the TUI) goes after those named
+		before := g.Placed
+		if len(before) == 0 {
+			if i := slices.IndexFunc(f.Groups, func(x Group) bool { return x.ID == g.ID }); i >= 0 {
+				before = f.Groups[i].Placed
+			}
+		}
+		key := func(m string) string {
+			id, _ := memberFastIn(entries, strings.TrimSpace(m))
+			return cleanMember(entries, id)
+		}
+		if g.Placed = placedOver(g.Members, mapEach(before, key), mapEach(members, key)); g.Placed != nil {
+			own = slices.DeleteFunc(slices.Clone(g.Placed), func(m string) bool { return !slices.Contains(own, m) })
+		}
+		var off []string
+		for _, m := range cleanList(g.Off) {
+			if m = cleanMember(entries, m); slices.Contains(g.Members, m) && !slices.Contains(off, m) {
+				off = append(off, m)
+			}
+		}
+		g.Off = off
+		if err := cleanWeights(entries, &g); err != nil {
+			return false, err
+		}
+		var was []string
 		if i := slices.IndexFunc(f.Groups, func(x Group) bool { return x.ID == g.ID }); i >= 0 {
-			before = f.Groups[i].Placed
+			was = f.Groups[i].Accounts
 		}
-	}
-	key := func(m string) string {
-		id, _ := memberFastIn(entries, strings.TrimSpace(m))
-		return cleanMember(entries, id)
-	}
-	if g.Placed = placedOver(g.Members, mapEach(before, key), mapEach(members, key)); g.Placed != nil {
-		own = slices.DeleteFunc(slices.Clone(g.Placed), func(m string) bool { return !slices.Contains(own, m) })
-	}
-	var off []string
-	for _, m := range cleanList(g.Off) {
-		if m = cleanMember(entries, m); slices.Contains(g.Members, m) && !slices.Contains(off, m) {
-			off = append(off, m)
+		accounts, err := cleanGroupAccounts(g.Accounts, was)
+		if err != nil {
+			return false, err
 		}
-	}
-	g.Off = off
-	if err := cleanWeights(entries, &g); err != nil {
-		return err
-	}
-	var was []string
-	if i := slices.IndexFunc(f.Groups, func(x Group) bool { return x.ID == g.ID }); i >= 0 {
-		was = f.Groups[i].Accounts
-	}
-	if g.Accounts, err = cleanGroupAccounts(g.Accounts, was); err != nil {
-		return err
-	}
-	if g.Routing != Manual && len(g.Members) > 0 && len(g.Off) == len(g.Members) {
-		return fmt.Errorf("every model in %s is switched off: switch one on, or it has nothing to send to", g.Name)
-	}
-	for i := range g.Rules {
-		g.Rules[i].MapUses(func(u string) string { return cleanMember(entries, strings.TrimSpace(u)) })
-	}
-	if err := groupsInGroup(g, groupsIn(entries)); err != nil {
-		return err
-	}
-	// decision models make a group of their own, asked at /v1/systemone,
-	// never one with models that hold conversations (decide_group.go)
-	if err := cleanDecisionGroup(&g, groupsIn(entries)); err != nil {
-		return err
-	}
-	if !keptRouting(g.Routing, true) {
-		g.Routing = ""
-	}
-	if !slices.Contains(Affinities, g.Affinity) {
-		g.Affinity = ""
-	}
-	if g.Pick = strings.TrimPrefix(strings.TrimSpace(g.Pick), "magpie/"); g.Pick != "" {
-		g.Pick = cleanMember(entries, g.Pick)
-	}
-	if !slices.Contains(g.Members, g.Pick) {
-		g.Pick = "" // taken out of the group: its first, when manual
-	}
-	if g.Routing == Manual && g.Pick == "" && len(g.Members) > 0 {
-		g.Pick = g.Members[0]
-	}
-	rules, err := cleanRules(g.Rules, g.Members)
-	if err != nil {
-		return err
-	}
-	g.Rules = rules
-	if g.Levels, err = CleanLevels(g.Levels); err != nil {
-		return err
-	}
-	g.Classifier = strings.TrimPrefix(strings.TrimSpace(g.Classifier), "magpie/")
-	g.Effort = strings.ToLower(strings.TrimSpace(g.Effort))
-	intents := slices.ContainsFunc(g.Rules, func(r Rule) bool { return r.Intent != "" })
-	switch {
-	case g.Effort != "" && g.Effort != EffortAuto:
-		return fmt.Errorf("a group's effort is %q or left to the agent, not %q", EffortAuto, g.Effort)
-	case g.Classifier == GroupPrefix+g.ID:
-		return fmt.Errorf("%s can't be its own classifier: asking it would ask it again", g.Name)
-	case intents && g.Classifier == "":
-		return errors.New("a rule with an intent needs the group's classifier: the model that tells which intent a message is")
-	case g.Effort == EffortAuto && g.Classifier == "":
-		return errors.New("effort picked per turn needs the group's classifier: the model that rates how hard a turn is")
-	case !intents && g.Effort == "":
-		g.Classifier = "" // nothing to ask it
-	}
-	if gid, ok := strings.CutPrefix(g.Classifier, GroupPrefix); ok {
-		if c, ok := groupOf(groupsIn(providerEntries()), gid); !ok {
-			return fmt.Errorf("magpie has no group %q to classify with", gid)
-		} else if c.Disabled {
-			return fmt.Errorf("%s is switched off: switch it on to classify with it", c.Name)
+		g.Accounts = accounts
+		if g.Routing != Manual && len(g.Members) > 0 && len(g.Off) == len(g.Members) {
+			return false, fmt.Errorf("every model in %s is switched off: switch one on, or it has nothing to send to", g.Name)
 		}
-	} else if g.Classifier != "" {
-		if _, _, ok := Resolve(g.Classifier); !ok {
-			return fmt.Errorf("magpie knows no model %q to classify with", g.Classifier)
+		for i := range g.Rules {
+			g.Rules[i].MapUses(func(u string) string { return cleanMember(entries, strings.TrimSpace(u)) })
 		}
-	}
-	g.Auto, g.Hidden = false, false
-	g.Members = own // what the patterns match is found again as it is read
-	g.Disabled = false
-	for i := range f.Groups {
-		if f.Groups[i].ID == g.ID {
-			g.Disabled = f.Groups[i].Disabled && !f.Groups[i].Hidden
-			f.Groups[i] = g
-			return store(f)
+		if err := groupsInGroup(g, groupsIn(entries)); err != nil {
+			return false, err
 		}
-	}
-	f.Groups = append(f.Groups, g)
-	return store(f)
+		// decision models make a group of their own, asked at /v1/systemone,
+		// never one with models that hold conversations (decide_group.go)
+		if err := cleanDecisionGroup(&g, groupsIn(entries)); err != nil {
+			return false, err
+		}
+		if !keptRouting(g.Routing, true) {
+			g.Routing = ""
+		}
+		if !slices.Contains(Affinities, g.Affinity) {
+			g.Affinity = ""
+		}
+		if g.Pick = strings.TrimPrefix(strings.TrimSpace(g.Pick), "magpie/"); g.Pick != "" {
+			g.Pick = cleanMember(entries, g.Pick)
+		}
+		if !slices.Contains(g.Members, g.Pick) {
+			g.Pick = "" // taken out of the group: its first, when manual
+		}
+		if g.Routing == Manual && g.Pick == "" && len(g.Members) > 0 {
+			g.Pick = g.Members[0]
+		}
+		rules, err := cleanRules(g.Rules, g.Members)
+		if err != nil {
+			return false, err
+		}
+		g.Rules = rules
+		if g.Levels, err = CleanLevels(g.Levels); err != nil {
+			return false, err
+		}
+		g.Classifier = strings.TrimPrefix(strings.TrimSpace(g.Classifier), "magpie/")
+		g.Effort = strings.ToLower(strings.TrimSpace(g.Effort))
+		intents := slices.ContainsFunc(g.Rules, func(r Rule) bool { return r.Intent != "" })
+		switch {
+		case g.Effort != "" && g.Effort != EffortAuto:
+			return false, fmt.Errorf("a group's effort is %q or left to the agent, not %q", EffortAuto, g.Effort)
+		case g.Classifier == GroupPrefix+g.ID:
+			return false, fmt.Errorf("%s can't be its own classifier: asking it would ask it again", g.Name)
+		case intents && g.Classifier == "":
+			return false, errors.New("a rule with an intent needs the group's classifier: the model that tells which intent a message is")
+		case g.Effort == EffortAuto && g.Classifier == "":
+			return false, errors.New("effort picked per turn needs the group's classifier: the model that rates how hard a turn is")
+		case !intents && g.Effort == "":
+			g.Classifier = "" // nothing to ask it
+		}
+		if gid, ok := strings.CutPrefix(g.Classifier, GroupPrefix); ok {
+			if c, ok := groupOf(groupsIn(providerEntries()), gid); !ok {
+				return false, fmt.Errorf("magpie has no group %q to classify with", gid)
+			} else if c.Disabled {
+				return false, fmt.Errorf("%s is switched off: switch it on to classify with it", c.Name)
+			}
+		} else if g.Classifier != "" {
+			if _, _, ok := Resolve(g.Classifier); !ok {
+				return false, fmt.Errorf("magpie knows no model %q to classify with", g.Classifier)
+			}
+		}
+		g.Auto, g.Hidden = false, false
+		g.Members = own // what the patterns match is found again as it is read
+		g.Disabled = false
+		for i := range f.Groups {
+			if f.Groups[i].ID == g.ID {
+				g.Disabled = f.Groups[i].Disabled && !f.Groups[i].Hidden
+				f.Groups[i] = g
+				return true, nil
+			}
+		}
+		f.Groups = append(f.Groups, g)
+		return true, nil
+	})
 }
 
 // cleanGroupAccounts is a group's account list as kept: each entry
@@ -1723,38 +1719,36 @@ func memberGroupsIn(entries []Entry) map[string][]string {
 // to come back with ShowGroup. A group another has in it, or classifies
 // with, stays until it is taken out of that one.
 func DeleteGroup(id string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	if in := GroupsWith(id); len(in) > 0 {
-		var names []string
-		for _, g := range in {
-			names = append(names, g.Name)
+	return mutate(func(f *file) (bool, error) {
+		if in := GroupsWith(id); len(in) > 0 {
+			var names []string
+			for _, g := range in {
+				names = append(names, g.Name)
+			}
+			return false, fmt.Errorf("%s is in %s: take it out first", id, strings.Join(names, ", "))
 		}
-		return fmt.Errorf("%s is in %s: take it out first", id, strings.Join(names, ", "))
-	}
-	for _, g := range groupsIn(providerEntries()) {
-		if !g.Hidden && g.Classifier == GroupPrefix+id {
-			return fmt.Errorf("%s is %s's classifier: choose another first", id, g.Name)
+		for _, g := range groupsIn(providerEntries()) {
+			if !g.Hidden && g.Classifier == GroupPrefix+id {
+				return false, fmt.Errorf("%s is %s's classifier: choose another first", id, g.Name)
+			}
 		}
-	}
-	found := false
-	f.Groups = slices.DeleteFunc(f.Groups, func(g Group) bool {
-		if g.ID == id {
+		found := false
+		f.Groups = slices.DeleteFunc(f.Groups, func(g Group) bool {
+			if g.ID == id {
+				found = true
+				return true
+			}
+			return false
+		})
+		if slices.ContainsFunc(foundGroups(providerEntries()), func(g Group) bool { return g.ID == id }) {
+			f.Groups = append(f.Groups, Group{ID: id, Hidden: true})
 			found = true
-			return true
 		}
-		return false
+		if !found {
+			return false, fmt.Errorf("no group %q", id)
+		}
+		return true, nil
 	})
-	if slices.ContainsFunc(foundGroups(providerEntries()), func(g Group) bool { return g.ID == id }) {
-		f.Groups = append(f.Groups, Group{ID: id, Hidden: true})
-		found = true
-	}
-	if !found {
-		return fmt.Errorf("no group %q", id)
-	}
-	return store(f)
 }
 
 // DeleteGroups removes several groups at once, as DeleteGroup does each
@@ -1811,29 +1805,27 @@ func DeleteGroups(ids []string) error {
 // switched off; and one that classifies for another stays on, or that
 // group's rules would have no one to ask.
 func SwitchGroup(id string, on bool) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	i := slices.IndexFunc(f.Groups, func(g Group) bool { return g.ID == id && !g.Hidden })
-	if i < 0 {
-		if g, ok := groupOf(groupsIn(providerEntries()), id); ok && g.Auto {
-			return fmt.Errorf("%s was found by magpie: remove it, or change it to make it yours, to switch it off", g.Name)
+	return mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Groups, func(g Group) bool { return g.ID == id && !g.Hidden })
+		if i < 0 {
+			if g, ok := groupOf(groupsIn(providerEntries()), id); ok && g.Auto {
+				return false, fmt.Errorf("%s was found by magpie: remove it, or change it to make it yours, to switch it off", g.Name)
+			}
+			return false, fmt.Errorf("magpie has no group %q", id)
 		}
-		return fmt.Errorf("magpie has no group %q", id)
-	}
-	if f.Groups[i].Disabled == !on {
-		return nil
-	}
-	if !on {
-		for _, o := range f.Groups {
-			if !o.Hidden && !o.Disabled && o.ID != id && o.Classifier == GroupPrefix+id {
-				return fmt.Errorf("%s classifies %s's requests: pick another classifier there first", f.Groups[i].Name, o.Name)
+		if f.Groups[i].Disabled == !on {
+			return false, nil
+		}
+		if !on {
+			for _, o := range f.Groups {
+				if !o.Hidden && !o.Disabled && o.ID != id && o.Classifier == GroupPrefix+id {
+					return false, fmt.Errorf("%s classifies %s's requests: pick another classifier there first", f.Groups[i].Name, o.Name)
+				}
 			}
 		}
-	}
-	f.Groups[i].Disabled = !on
-	return store(f)
+		f.Groups[i].Disabled = !on
+		return true, nil
+	})
 }
 
 // PickGroup sends every request to a Manual group of the user's to its
@@ -1841,26 +1833,24 @@ func SwitchGroup(id string, on bool) error {
 // from wherever the user switches it: the tray panel (#2489) too. Nothing
 // else of the group changes, and only a Manual group can be switched so.
 func PickGroup(id, pick string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	i := slices.IndexFunc(f.Groups, func(g Group) bool { return g.ID == id && !g.Hidden })
-	if i < 0 {
-		return fmt.Errorf("magpie has no group %q", id)
-	}
-	g := &f.Groups[i]
-	if g.Routing != Manual {
-		return fmt.Errorf("%s doesn't route by hand: its card picks a model only in Manual routing", g.Name)
-	}
-	if !slices.Contains(g.Members, pick) {
-		return fmt.Errorf("%s is not in %s", pick, g.Name)
-	}
-	if g.Pick == pick {
-		return nil
-	}
-	g.Pick = pick
-	return store(f)
+	return mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Groups, func(g Group) bool { return g.ID == id && !g.Hidden })
+		if i < 0 {
+			return false, fmt.Errorf("magpie has no group %q", id)
+		}
+		g := &f.Groups[i]
+		if g.Routing != Manual {
+			return false, fmt.Errorf("%s doesn't route by hand: its card picks a model only in Manual routing", g.Name)
+		}
+		if !slices.Contains(g.Members, pick) {
+			return false, fmt.Errorf("%s is not in %s", pick, g.Name)
+		}
+		if g.Pick == pick {
+			return false, nil
+		}
+		g.Pick = pick
+		return true, nil
+	})
 }
 
 // DisabledGroup is the group of the user's a model id names ("group/<id>",
@@ -1894,12 +1884,10 @@ func RemovedGroups() []string {
 
 // ShowGroup brings back a group magpie found that the user had removed.
 func ShowGroup(id string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	f.Groups = slices.DeleteFunc(f.Groups, func(g Group) bool { return g.ID == id && g.Hidden })
-	return store(f)
+	return mutate(func(f *file) (bool, error) {
+		f.Groups = slices.DeleteFunc(f.Groups, func(g Group) bool { return g.ID == id && g.Hidden })
+		return true, nil
+	})
 }
 
 // RenameGroup gives a group another id, the one agents pick it by
@@ -1915,70 +1903,68 @@ func RenameGroup(from, to string) error {
 	if to == from {
 		return nil
 	}
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	all := groupsIn(providerEntries())
-	g, ok := groupOf(all, from)
-	if !ok {
-		return fmt.Errorf("no group %q", from)
-	}
-	if slices.ContainsFunc(all, func(o Group) bool { return o.ID == to }) ||
-		slices.ContainsFunc(f.Groups, func(o Group) bool { return o.ID == to }) {
-		return fmt.Errorf("there is a group %q already", to)
-	}
-	found := slices.ContainsFunc(foundGroups(providerEntries()), func(o Group) bool { return o.ID == from })
-	g.ID, g.Auto, g.Hidden = to, false, false
-	f.Groups = slices.DeleteFunc(f.Groups, func(o Group) bool { return o.ID == from })
-	if found {
-		f.Groups = append(f.Groups, Group{ID: from, Hidden: true})
-	}
-	f.Groups = append(f.Groups, g)
-	// renamed, it keeps its place in the order the user put the groups in
-	if i := slices.Index(f.GroupOrder, from); i >= 0 {
-		f.GroupOrder = slices.Clone(f.GroupOrder)
-		f.GroupOrder[i] = to
-	}
 	old, now := GroupPrefix+from, GroupPrefix+to
-	for i := range f.Groups {
-		for j, m := range f.Groups[i].Members {
-			if m == old {
-				f.Groups[i].Members[j] = now
-			}
+	if err := mutate(func(f *file) (bool, error) {
+		all := groupsIn(providerEntries())
+		g, ok := groupOf(all, from)
+		if !ok {
+			return false, fmt.Errorf("no group %q", from)
 		}
-		for j, m := range f.Groups[i].Placed {
-			if m == old {
-				f.Groups[i].Placed[j] = now
-			}
+		if slices.ContainsFunc(all, func(o Group) bool { return o.ID == to }) ||
+			slices.ContainsFunc(f.Groups, func(o Group) bool { return o.ID == to }) {
+			return false, fmt.Errorf("there is a group %q already", to)
 		}
-		for j := range f.Groups[i].Rules {
-			f.Groups[i].Rules[j].MapUses(func(u string) string {
-				if u == old {
+		found := slices.ContainsFunc(foundGroups(providerEntries()), func(o Group) bool { return o.ID == from })
+		g.ID, g.Auto, g.Hidden = to, false, false
+		f.Groups = slices.DeleteFunc(f.Groups, func(o Group) bool { return o.ID == from })
+		if found {
+			f.Groups = append(f.Groups, Group{ID: from, Hidden: true})
+		}
+		f.Groups = append(f.Groups, g)
+		// renamed, it keeps its place in the order the user put the groups in
+		if i := slices.Index(f.GroupOrder, from); i >= 0 {
+			f.GroupOrder = slices.Clone(f.GroupOrder)
+			f.GroupOrder[i] = to
+		}
+		for i := range f.Groups {
+			for j, m := range f.Groups[i].Members {
+				if m == old {
+					f.Groups[i].Members[j] = now
+				}
+			}
+			for j, m := range f.Groups[i].Placed {
+				if m == old {
+					f.Groups[i].Placed[j] = now
+				}
+			}
+			for j := range f.Groups[i].Rules {
+				f.Groups[i].Rules[j].MapUses(func(u string) string {
+					if u == old {
+						return now
+					}
+					return u
+				})
+			}
+			if f.Groups[i].Pick == old {
+				f.Groups[i].Pick = now
+			}
+			for j, m := range f.Groups[i].Off {
+				if m == old {
+					f.Groups[i].Off[j] = now
+				}
+			}
+			f.Groups[i].Weights = renamedWeights(f.Groups[i].Weights, func(m string) string {
+				if m == old {
 					return now
 				}
-				return u
+				return m
 			})
-		}
-		if f.Groups[i].Pick == old {
-			f.Groups[i].Pick = now
-		}
-		for j, m := range f.Groups[i].Off {
-			if m == old {
-				f.Groups[i].Off[j] = now
+			if f.Groups[i].Classifier == old {
+				f.Groups[i].Classifier = now
 			}
 		}
-		f.Groups[i].Weights = renamedWeights(f.Groups[i].Weights, func(m string) string {
-			if m == old {
-				return now
-			}
-			return m
-		})
-		if f.Groups[i].Classifier == old {
-			f.Groups[i].Classifier = now
-		}
-	}
-	if err := store(f); err != nil {
+		return true, nil
+	}); err != nil {
 		return err
 	}
 	return renameGroupPicks(old, now)

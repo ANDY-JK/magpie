@@ -34,69 +34,68 @@ func Rename(from, to string) error {
 	if to == from {
 		return nil
 	}
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	i := slices.IndexFunc(f.Providers, func(p Provider) bool { return p.ID == from })
-	// one of the user's own saved on a subscription's id before that was one
-	// (a "WorkBuddy" key before v0.1.261) can be moved off it; the
-	// subscription itself can't
-	custom := i >= 0 && hasEndpoint(f.Providers[i])
 	_, signedIn := find(Accounts(), from)
 	sub := subscriptionID(from)
-	if (signedIn || sub) && !custom {
-		return fmt.Errorf("%s is a subscription: its id is its agent's", from)
-	}
-	switch {
-	case to == "magpie":
-		return errors.New(`"magpie" is what agents call the gateway itself; pick another id`)
-	case to == strings.TrimSuffix(GroupPrefix, "/"):
-		return errors.New(`"group" starts the ids of routing groups; pick another id`)
-	case to == autoID:
-		return errAutoID
-	case subscriptionID(to):
-		return fmt.Errorf("%q is the id of the %s subscription; pick another", to, to)
-	}
-	if i < 0 {
-		return fmt.Errorf("no provider %q", from)
-	}
-	if slices.ContainsFunc(f.Providers, func(p Provider) bool { return p.ID == to }) {
-		return fmt.Errorf("there is a provider %q already", to)
-	}
-	// an id another provider once had is this one's now; the calls
-	// recorded under it until now stay that one's
-	giveID(f.Providers, i, to, time.Now())
-	p := &f.Providers[i]
-	p.Was = slices.DeleteFunc(p.Was, func(w string) bool { return w == to })
-	p.ID = to
-	// the subscription's id is the subscription's: an old ref to it isn't
-	// taken for this one
-	if !sub && !slices.Contains(p.Was, from) {
-		p.Was = append(p.Was, from)
-	}
-	mapModelRefs(&f, func(m string) string { return renamedRef(m, from, to) })
-	for j, id := range f.Order {
-		if id == from {
-			f.Order[j] = to
+	err := mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Providers, func(p Provider) bool { return p.ID == from })
+		// one of the user's own saved on a subscription's id before that was one
+		// (a "WorkBuddy" key before v0.1.261) can be moved off it; the
+		// subscription itself can't
+		custom := i >= 0 && hasEndpoint(f.Providers[i])
+		if (signedIn || sub) && !custom {
+			return false, fmt.Errorf("%s is a subscription: its id is its agent's", from)
 		}
-	}
-	// kept out of found groups under its new id too
-	for j, id := range f.AutoGroupSkip {
-		if id == from {
-			f.AutoGroupSkip[j] = to
+		switch {
+		case to == "magpie":
+			return false, errors.New(`"magpie" is what agents call the gateway itself; pick another id`)
+		case to == strings.TrimSuffix(GroupPrefix, "/"):
+			return false, errors.New(`"group" starts the ids of routing groups; pick another id`)
+		case to == autoID:
+			return false, errAutoID
+		case subscriptionID(to):
+			return false, fmt.Errorf("%q is the id of the %s subscription; pick another", to, to)
 		}
-	}
-	// a deleted provider merged into it stays merged (MergeDeleted)
-	for j := range f.Deleted {
-		if f.Deleted[j].Into == from {
-			f.Deleted[j].Into = to
+		if i < 0 {
+			return false, fmt.Errorf("no provider %q", from)
 		}
-	}
-	// the vendor's list last fetched goes with it
-	os.Rename(catalog.LivePath(from), catalog.LivePath(to))
-	os.Rename(catalog.LivePath(decisionsID(from)), catalog.LivePath(decisionsID(to)))
-	if err := store(f); err != nil {
+		if slices.ContainsFunc(f.Providers, func(p Provider) bool { return p.ID == to }) {
+			return false, fmt.Errorf("there is a provider %q already", to)
+		}
+		// an id another provider once had is this one's now; the calls
+		// recorded under it until now stay that one's
+		giveID(f.Providers, i, to, time.Now())
+		p := &f.Providers[i]
+		p.Was = slices.DeleteFunc(p.Was, func(w string) bool { return w == to })
+		p.ID = to
+		// the subscription's id is the subscription's: an old ref to it isn't
+		// taken for this one
+		if !sub && !slices.Contains(p.Was, from) {
+			p.Was = append(p.Was, from)
+		}
+		mapModelRefs(f, func(m string) string { return renamedRef(m, from, to) })
+		for j, id := range f.Order {
+			if id == from {
+				f.Order[j] = to
+			}
+		}
+		// kept out of found groups under its new id too
+		for j, id := range f.AutoGroupSkip {
+			if id == from {
+				f.AutoGroupSkip[j] = to
+			}
+		}
+		// a deleted provider merged into it stays merged (MergeDeleted)
+		for j := range f.Deleted {
+			if f.Deleted[j].Into == from {
+				f.Deleted[j].Into = to
+			}
+		}
+		// the vendor's list last fetched goes with it
+		os.Rename(catalog.LivePath(from), catalog.LivePath(to))
+		os.Rename(catalog.LivePath(decisionsID(from)), catalog.LivePath(decisionsID(to)))
+		return true, nil
+	})
+	if err != nil {
 		return err
 	}
 	// so is its StepFun sign-in, kept by provider id
@@ -571,40 +570,36 @@ func deletedAt(f *file, id string) (int, error) {
 // added later under the deleted one's id is not merged.
 func MergeDeleted(id, into string) error {
 	into = strings.ToLower(strings.TrimSpace(into))
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	i, err := deletedAt(&f, id)
-	if err != nil {
-		return err
-	}
-	d := &f.Deleted[i]
-	if into == "" {
-		d.Into, d.MergedAt = "", time.Time{}
-		return store(f)
-	}
-	if !slices.ContainsFunc(All(), func(p Provider) bool { return p.ID == into }) {
-		return fmt.Errorf("no provider %q to merge into", into)
-	}
-	d.Into, d.MergedAt = into, time.Now()
-	return store(f)
+	return mutate(func(f *file) (bool, error) {
+		i, err := deletedAt(f, id)
+		if err != nil {
+			return false, err
+		}
+		d := &f.Deleted[i]
+		if into == "" {
+			d.Into, d.MergedAt = "", time.Time{}
+			return true, nil
+		}
+		if !slices.ContainsFunc(All(), func(p Provider) bool { return p.ID == into }) {
+			return false, fmt.Errorf("no provider %q to merge into", into)
+		}
+		d.Into, d.MergedAt = into, time.Now()
+		return true, nil
+	})
 }
 
 // NameDeleted names the deleted provider the Usage page lists under id
 // as the user wants it shown there; "" shows it by its own name again.
 func NameDeleted(id, name string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	i, err := deletedAt(&f, id)
-	if err != nil {
-		return err
-	}
-	f.Deleted[i].Label = strings.TrimSpace(name)
-	if f.Deleted[i].Label == f.Deleted[i].Name {
-		f.Deleted[i].Label = ""
-	}
-	return store(f)
+	return mutate(func(f *file) (bool, error) {
+		i, err := deletedAt(f, id)
+		if err != nil {
+			return false, err
+		}
+		f.Deleted[i].Label = strings.TrimSpace(name)
+		if f.Deleted[i].Label == f.Deleted[i].Name {
+			f.Deleted[i].Label = ""
+		}
+		return true, nil
+	})
 }

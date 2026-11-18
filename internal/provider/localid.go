@@ -314,54 +314,52 @@ var ModelMoved func(from, to string) error
 // there only once the user has set something on it (withPicks): with
 // none kept (account), only the other providers' refs to it move.
 func moveModelRefs(pid, from, to string, account bool) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == pid })
-	if i < 0 && !account {
-		return fmt.Errorf("no provider %q", pid)
-	}
-	moved := func(ids []string) []string {
-		if !slices.Contains(ids, from) {
-			return ids
+	return mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == pid })
+		if i < 0 && !account {
+			return false, fmt.Errorf("no provider %q", pid)
 		}
-		out := make([]string, 0, len(ids))
-		for _, m := range ids {
-			if m == from {
-				m = to
+		moved := func(ids []string) []string {
+			if !slices.Contains(ids, from) {
+				return ids
 			}
-			if !slices.Contains(out, m) {
-				out = append(out, m)
+			out := make([]string, 0, len(ids))
+			for _, m := range ids {
+				if m == from {
+					m = to
+				}
+				if !slices.Contains(out, m) {
+					out = append(out, m)
+				}
+			}
+			return out
+		}
+		if i >= 0 {
+			q := &f.Providers[i]
+			q.Models, q.PickedFrom, q.Delisted = moved(q.Models), moved(q.PickedFrom), moved(q.Delisted)
+			for k, ms := range q.AccountModels {
+				q.AccountModels[k] = moved(ms)
+			}
+			if n, ok := q.Contexts[from]; ok {
+				if _, has := q.Contexts[to]; !has {
+					q.Contexts[to] = n
+				}
+				delete(q.Contexts, from)
 			}
 		}
-		return out
-	}
-	if i >= 0 {
-		q := &f.Providers[i]
-		q.Models, q.PickedFrom, q.Delisted = moved(q.Models), moved(q.PickedFrom), moved(q.Delisted)
-		for k, ms := range q.AccountModels {
-			q.AccountModels[k] = moved(ms)
-		}
-		if n, ok := q.Contexts[from]; ok {
-			if _, has := q.Contexts[to]; !has {
-				q.Contexts[to] = n
+		ref := func(m string) string {
+			pre, rest := "", m
+			if r, ok := strings.CutPrefix(m, "magpie/"); ok {
+				pre, rest = "magpie/", r
 			}
-			delete(q.Contexts, from)
+			if rest == pid+"/"+from {
+				return pre + pid + "/" + to
+			}
+			return m
 		}
-	}
-	ref := func(m string) string {
-		pre, rest := "", m
-		if r, ok := strings.CutPrefix(m, "magpie/"); ok {
-			pre, rest = "magpie/", r
-		}
-		if rest == pid+"/"+from {
-			return pre + pid + "/" + to
-		}
-		return m
-	}
-	mapModelRefs(&f, ref)
-	return store(f)
+		mapModelRefs(f, ref)
+		return true, nil
+	})
 }
 
 // moveModelLists gives the pickers' lists of the settings (hidden, picked

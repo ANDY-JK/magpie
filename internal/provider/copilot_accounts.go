@@ -150,31 +150,29 @@ func moveAccountSettings(id string, moves map[string]string) error {
 	if len(moves) == 0 {
 		return nil
 	}
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	moved := false
-	for i := range f.Providers {
-		p := &f.Providers[i]
-		if p.ID != id {
-			continue
+	return mutate(func(f *file) (bool, error) {
+		moved := false
+		for i := range f.Providers {
+			p := &f.Providers[i]
+			if p.ID != id {
+				continue
+			}
+			for was, now := range moves {
+				from, to := accountKey(was), accountKey(now)
+				moved = moveKey(p.AccountProxies, from, to) || moved
+				moved = moveKey(p.AccountModels, from, to) || moved
+				moved = moveKey(p.AccountCaps, from, to) || moved
+				moved = moveKey(p.AccountWindowCaps, from, to) || moved
+				moved = moveKey(p.AccountConcurrency, from, to) || moved
+				moved = moveKey(p.AccountWeights, from, to) || moved
+				moved = moveKey(p.AccountNames, from, to) || moved
+			}
 		}
-		for was, now := range moves {
-			from, to := accountKey(was), accountKey(now)
-			moved = moveKey(p.AccountProxies, from, to) || moved
-			moved = moveKey(p.AccountModels, from, to) || moved
-			moved = moveKey(p.AccountCaps, from, to) || moved
-			moved = moveKey(p.AccountWindowCaps, from, to) || moved
-			moved = moveKey(p.AccountConcurrency, from, to) || moved
-			moved = moveKey(p.AccountWeights, from, to) || moved
-			moved = moveKey(p.AccountNames, from, to) || moved
+		if !moved {
+			return false, nil
 		}
-	}
-	if !moved {
-		return nil
-	}
-	return store(f)
+		return true, nil
+	})
 }
 
 func moveKey[V any](m map[string]V, from, to string) bool {

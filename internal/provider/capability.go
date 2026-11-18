@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
+	"slices"
 )
 
 // A model's test can say what it can do besides answer (TestModelsWith):
@@ -351,13 +353,29 @@ func SetCaps(id string, caps map[string]ModelCaps) error {
 	if err != nil {
 		return err
 	}
-	merged := make(map[string]ModelCaps, len(p.Caps)+len(got))
-	for mid, c := range p.Caps {
-		merged[mid] = c
-	}
-	for mid, c := range got {
-		merged[mid] = c
-	}
-	p.Caps = merged
-	return Save(*p)
+	return mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == p.ID })
+		var q *Provider
+		if i >= 0 {
+			q = &f.Providers[i]
+		} else {
+			// a signed-in account with nothing kept of it yet: the record
+			// Save would make for it, with the letters the run settled
+			f.Providers = append(f.Providers, Provider{ID: p.ID})
+			q = &f.Providers[len(f.Providers)-1]
+		}
+		merged := make(map[string]ModelCaps, len(q.Caps)+len(got))
+		for mid, c := range q.Caps {
+			merged[mid] = c
+		}
+		for mid, c := range got {
+			merged[mid] = c
+		}
+		next := capsWith(Provider{Caps: merged, Models: q.Models, Delisted: q.Delisted}, q)
+		if maps.Equal(q.Caps, next) {
+			return false, nil
+		}
+		q.Caps = next
+		return true, nil
+	})
 }

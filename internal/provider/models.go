@@ -352,43 +352,46 @@ func liveIDs(id string) map[string]bool {
 // not forgotten, and those of its Delisted now has go back among the picks
 // (relistPicks): a list that shrank for a while gives back what it took.
 func dropGonePicks(id string, before, now map[string]bool) ([]string, error) {
-	f, err := read()
+	var dropped []string
+	err := mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == id })
+		if i < 0 {
+			return false, nil
+		}
+		q := &f.Providers[i]
+		var kept []string
+		for _, m := range q.Models {
+			if before[m] && !now[m] {
+				dropped = append(dropped, m)
+			} else {
+				kept = append(kept, m)
+			}
+		}
+		back := relistPicks(q, now)
+		if len(dropped) == 0 && !back {
+			return false, nil
+		}
+		if len(dropped) > 0 {
+			q.Models = kept
+			for _, m := range dropped {
+				if !slices.Contains(q.Delisted, m) {
+					q.Delisted = append(q.Delisted, m)
+				}
+			}
+		}
+		switch {
+		case len(q.Models) > 0 || len(q.Delisted) == 0:
+			q.DelistedAt = time.Time{}
+		case len(dropped) > 0 && q.DelistedAt.IsZero():
+			// the last pick left now: the wait for one starts
+			q.DelistedAt = time.Now()
+		}
+		return true, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == id })
-	if i < 0 {
-		return nil, nil
-	}
-	q := &f.Providers[i]
-	var kept, dropped []string
-	for _, m := range q.Models {
-		if before[m] && !now[m] {
-			dropped = append(dropped, m)
-		} else {
-			kept = append(kept, m)
-		}
-	}
-	back := relistPicks(q, now)
-	if len(dropped) == 0 && !back {
-		return nil, nil
-	}
-	if len(dropped) > 0 {
-		q.Models = kept
-		for _, m := range dropped {
-			if !slices.Contains(q.Delisted, m) {
-				q.Delisted = append(q.Delisted, m)
-			}
-		}
-	}
-	switch {
-	case len(q.Models) > 0 || len(q.Delisted) == 0:
-		q.DelistedAt = time.Time{}
-	case len(dropped) > 0 && q.DelistedAt.IsZero():
-		// the last pick left now: the wait for one starts
-		q.DelistedAt = time.Now()
-	}
-	return dropped, store(f)
+	return dropped, nil
 }
 
 // relistPicks puts back among q's picks those of its Delisted the list now
@@ -1262,29 +1265,28 @@ func (p Provider) fixV1(base, at string) string {
 		return base
 	}
 	fixed := base + "/v1"
-	f, err := read()
-	if err != nil {
+	found := false
+	err := mutate(func(f *file) (bool, error) {
+		for i := range f.Providers {
+			q := &f.Providers[i]
+			if q.ID != p.ID {
+				continue
+			}
+			found = true
+			changed := false
+			for _, u := range []*string{&q.Chat, &q.Responses} {
+				if strings.TrimRight(strings.TrimSpace(*u), "/") == base {
+					*u, changed = fixed, true
+				}
+			}
+			return changed, nil
+		}
+		return false, nil
+	})
+	if err != nil || !found {
 		return base
 	}
-	for i := range f.Providers {
-		q := &f.Providers[i]
-		if q.ID != p.ID {
-			continue
-		}
-		changed := false
-		for _, u := range []*string{&q.Chat, &q.Responses} {
-			if strings.TrimRight(strings.TrimSpace(*u), "/") == base {
-				*u, changed = fixed, true
-			}
-		}
-		if changed {
-			if err := store(f); err != nil {
-				return base
-			}
-		}
-		return fixed
-	}
-	return base
+	return fixed
 }
 
 // fetchPerKey asks with each key in turn, at the endpoint it is made for: a

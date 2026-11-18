@@ -158,27 +158,25 @@ func LearnZhipuCoding(p Provider, from string) {
 	}
 	learnMu.Lock()
 	defer learnMu.Unlock()
-	f, err := read()
-	if err != nil {
-		return
-	}
-	for i := range f.Providers {
-		q := &f.Providers[i]
-		if q.ID != p.ID {
-			continue
-		}
-		if q.Account != nil || len(q.Keys) > 0 || q.Key != p.Key || strings.TrimRight(q.Chat, "/") != strings.TrimRight(from, "/") {
-			return
-		}
-		q.Chat = coding
-		if pr := Preset(q.Preset); pr != nil && q.Responses == "" {
-			for _, r := range pr.Regions {
-				if r.ID == "coding" && r.Chat == coding {
-					q.Responses = r.Responses
+	_ = mutate(func(f *file) (bool, error) {
+		for i := range f.Providers {
+			q := &f.Providers[i]
+			if q.ID != p.ID {
+				continue
+			}
+			if q.Account != nil || len(q.Keys) > 0 || q.Key != p.Key || strings.TrimRight(q.Chat, "/") != strings.TrimRight(from, "/") {
+				return false, nil
+			}
+			q.Chat = coding
+			if pr := Preset(q.Preset); pr != nil && q.Responses == "" {
+				for _, r := range pr.Regions {
+					if r.ID == "coding" && r.Chat == coding {
+						q.Responses = r.Responses
+					}
 				}
 			}
+			return true, nil
 		}
-		_ = store(f)
-		return
-	}
+		return false, nil
+	})
 }

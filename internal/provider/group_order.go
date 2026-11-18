@@ -35,29 +35,27 @@ func orderedGroups(gs []Group, order []string) []Group {
 // as they are now, and the whole order is kept, so a group made or found
 // later goes after them all.
 func SetGroupOrder(ids []string) error {
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	all := groupsIn(providerEntries())
-	seen := map[string]bool{}
-	for _, id := range ids {
-		if seen[id] {
-			return fmt.Errorf("%s is in the order twice", id)
+	return mutate(func(f *file) (bool, error) {
+		all := groupsIn(providerEntries())
+		seen := map[string]bool{}
+		for _, id := range ids {
+			if seen[id] {
+				return false, fmt.Errorf("%s is in the order twice", id)
+			}
+			seen[id] = true
+			if !slices.ContainsFunc(all, func(g Group) bool { return g.ID == id }) {
+				return false, fmt.Errorf("no group %q", id)
+			}
 		}
-		seen[id] = true
-		if !slices.ContainsFunc(all, func(g Group) bool { return g.ID == id }) {
-			return fmt.Errorf("no group %q", id)
+		order := slices.Clone(ids)
+		for _, g := range all {
+			if !seen[g.ID] {
+				order = append(order, g.ID)
+			}
 		}
-	}
-	order := slices.Clone(ids)
-	for _, g := range all {
-		if !seen[g.ID] {
-			order = append(order, g.ID)
-		}
-	}
-	f.GroupOrder = order
-	return store(f)
+		f.GroupOrder = order
+		return true, nil
+	})
 }
 
 // StoredGroupOrder is the order the user put the groups in, as saved; as
@@ -75,21 +73,19 @@ func MirrorGroupOrder(order []string) error {
 	if len(order) == 0 {
 		return nil
 	}
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	out := []string{}
-	seen := map[string]bool{}
-	for _, id := range slices.Concat(order, f.GroupOrder) {
-		if id != "" && !seen[id] {
-			seen[id] = true
-			out = append(out, id)
+	return mutate(func(f *file) (bool, error) {
+		out := []string{}
+		seen := map[string]bool{}
+		for _, id := range slices.Concat(order, f.GroupOrder) {
+			if id != "" && !seen[id] {
+				seen[id] = true
+				out = append(out, id)
+			}
 		}
-	}
-	if slices.Equal(out, f.GroupOrder) {
-		return nil
-	}
-	f.GroupOrder = out
-	return store(f)
+		if slices.Equal(out, f.GroupOrder) {
+			return false, nil
+		}
+		f.GroupOrder = out
+		return true, nil
+	})
 }

@@ -80,20 +80,18 @@ var learnMu sync.Mutex
 func LearnAuthHeader(id, only string) {
 	learnMu.Lock()
 	defer learnMu.Unlock()
-	f, err := read()
-	if err != nil {
-		return
-	}
-	for i := range f.Providers {
-		if f.Providers[i].ID == id {
-			if f.Providers[i].AuthHeader != AuthBoth {
-				return
+	_ = mutate(func(f *file) (bool, error) {
+		for i := range f.Providers {
+			if f.Providers[i].ID == id {
+				if f.Providers[i].AuthHeader != AuthBoth {
+					return false, nil
+				}
+				f.Providers[i].AuthHeader = only
+				return true, nil
 			}
-			f.Providers[i].AuthHeader = only
-			_ = store(f)
-			return
 		}
-	}
+		return false, nil
+	})
 }
 
 // listAuth is ctx for asking p's model list at its Anthropic base: its key

@@ -159,37 +159,35 @@ func keepSignInProxy(id, user, proxy string) error {
 			alone = false
 		}
 	}
-	f, err := read()
-	if err != nil {
-		return err
-	}
-	i := slices.IndexFunc(f.Providers, func(p Provider) bool { return p.ID == id })
-	if i < 0 {
-		f.Providers = append(f.Providers, Provider{ID: id})
-		i = len(f.Providers) - 1
-	}
-	p := &f.Providers[i]
-	own := maps.Clone(p.AccountProxies)
-	if own == nil {
-		own = map[string]string{}
-	}
-	switch {
-	case alone:
-		p.Proxy = proxy
-		delete(own, accountKey(user))
-	case user == "":
-		return errors.New("the account it signed in to isn't known")
-	case proxy == p.Proxy:
-		delete(own, accountKey(user))
-	case proxy == "":
-		// an account's own can't say "the global one": "" follows the
-		// subscription's
-		return errors.New("an account can't follow the global proxy while its subscription has a proxy of its own")
-	default:
-		own[accountKey(user)] = proxy
-	}
-	p.AccountProxies = normalAccountProxies(own)
-	return store(f)
+	return mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Providers, func(p Provider) bool { return p.ID == id })
+		if i < 0 {
+			f.Providers = append(f.Providers, Provider{ID: id})
+			i = len(f.Providers) - 1
+		}
+		p := &f.Providers[i]
+		own := maps.Clone(p.AccountProxies)
+		if own == nil {
+			own = map[string]string{}
+		}
+		switch {
+		case alone:
+			p.Proxy = proxy
+			delete(own, accountKey(user))
+		case user == "":
+			return false, errors.New("the account it signed in to isn't known")
+		case proxy == p.Proxy:
+			delete(own, accountKey(user))
+		case proxy == "":
+			// an account's own can't say "the global one": "" follows the
+			// subscription's
+			return false, errors.New("an account can't follow the global proxy while its subscription has a proxy of its own")
+		default:
+			own[accountKey(user)] = proxy
+		}
+		p.AccountProxies = normalAccountProxies(own)
+		return true, nil
+	})
 }
 
 // checkAccountProxies refuses an account's proxy Settings would refuse.

@@ -226,25 +226,23 @@ func takeMatching(id string, isNew func(string) bool) ([]string, error) {
 	if len(taken) == 0 {
 		return nil, nil
 	}
-	f, err := read()
-	if err != nil {
-		return nil, err
-	}
-	i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == id })
-	if i < 0 {
-		return nil, nil
-	}
-	q := &f.Providers[i]
-	// new ones first, as the vendor's list and withNewlyListed have them
-	q.Models = append(slices.Clone(taken), served...)
-	q.NoModels, q.BestInFamily = false, false
-	// picked from the list as it is now: one it lists later and no rule
-	// matches stays out, unless the picks hold every model
-	q.PickedFrom = nil
-	for _, m := range avail {
-		q.PickedFrom = append(q.PickedFrom, m.ID)
-	}
-	if err := store(f); err != nil {
+	if err := mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == id })
+		if i < 0 {
+			return false, nil
+		}
+		q := &f.Providers[i]
+		// new ones first, as the vendor's list and withNewlyListed have them
+		q.Models = append(slices.Clone(taken), served...)
+		q.NoModels, q.BestInFamily = false, false
+		// picked from the list as it is now: one it lists later and no rule
+		// matches stays out, unless the picks hold every model
+		q.PickedFrom = nil
+		for _, m := range avail {
+			q.PickedFrom = append(q.PickedFrom, m.ID)
+		}
+		return true, nil
+	}); err != nil {
 		return nil, err
 	}
 	return taken, nil
