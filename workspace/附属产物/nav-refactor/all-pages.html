@@ -212,6 +212,22 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
 .spec-hint{font-size:10px;color:var(--muted);line-height:1.5;max-width:900px;text-align:center}
 .foldrow{display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:10.5px;color:var(--muted)}
 .foldrow .note{font-size:9.5px;color:var(--faint)}
+.formrow{display:flex;align-items:center;gap:8px}
+.formrow label{width:56px;font-size:10px;color:var(--muted);flex:none}
+.formrow .ov-search{flex:1}
+.keycap{background:var(--bg);border-radius:8px;padding:10px;text-align:center;font:13px ui-monospace,Consolas,monospace;color:var(--fg-2);box-shadow:inset 0 0 0 .5px var(--line)}
+.ov-list{display:flex;flex-direction:column;gap:1px}
+.mi.on{background:var(--accent-soft);color:var(--accent);font-weight:500}
+.grow{flex:1}
+.textbtn{font-size:10px;color:var(--muted);padding:0 6px;height:20px;border-radius:5px}
+.textbtn:hover{background:var(--pill);color:var(--fg)}
+.empty-list{border:1px dashed var(--line);border-radius:10px;padding:24px;text-align:center;font-size:11px;color:var(--faint)}
+.skel-list{display:flex;flex-direction:column;gap:6px;padding:4px}
+.skel-list i{height:12px;border-radius:6px;background:var(--pill);display:block}
+.skel-list i:nth-child(2){width:82%}
+.skel-list i:nth-child(3){width:66%}
+.skel-list i:nth-child(4){width:74%}
+.sheet-inline{background:var(--card);border-radius:10px;box-shadow:var(--shadow-sm);padding:10px 12px;margin-top:8px;display:flex;flex-direction:column;gap:6px}
 .ov{position:absolute;inset:0;z-index:30;background:rgba(20,22,30,.18);display:flex;align-items:center;justify-content:center}
 .ov-sheet{width:min(430px,92%);background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;display:flex;flex-direction:column;gap:7px}
 .ov-h{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
@@ -240,6 +256,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
   </div>
   <span class="sep"></span>
   <button class="tbtn" id="navBtn">窄窗：两行</button>
+  <button class="tbtn" id="stateBtn">状态：正常</button>
   <button class="tbtn" id="specBtn">标注：关</button>
   <button class="tbtn" id="themeBtn">明 / 暗</button>
   <span class="sep"></span>
@@ -287,7 +304,7 @@ const SECTIONS = [
   {id:'extend', name:'扩展', pages:['library','plugins']},
 ];
 const PAGES = {
-  agents:{name:'智能体',icon:'agents',kind:'agents',buttons:['刷新']},
+  agents:{name:'智能体',icon:'agents',kind:'agents',buttons:['刷新','＋ 添加']},
   sessions:{name:'会话',icon:'sessions',kind:'sessions',search:'搜索会话',buttons:['选择']},
   providers:{name:'供应商',icon:'providers',kind:'providers',search:'查找供应商',buttons:['隐藏账号','＋ 添加']},
   routing:{name:'路由',icon:'routing',kind:'routing',buttons:['今天','请求 / 会话','用途 ⌄','刷新']},
@@ -410,13 +427,22 @@ const COMPONENTS = [
 const state = {
   frame:'narrow', section:'model', page:'providers', theme:'light',
   tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
-  spec:false, sel:null, libSel:0, mdSel:0, compact:false, ov:null, menuAt:null, sw:{},
+  spec:false, sel:null, libSel:0, mdSel:0, compact:false, sheet:false, ov:null, menuAt:null, sw:{}, listState:'normal',
 };
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
 if(qs.get('nav')==='one') state.compact = true;
-if(qs.get('ov')==='add') state.ov = 'add';
-if(qs.get('ov')==='menu'){ state.ov = 'menu'; state.menuAt = {x:120,y:150}; }
+if(['empty','loading'].includes(qs.get('state'))) state.listState = qs.get('state');
+const ovq = qs.get('ov');
+if(ovq==='add') state.sheet = true;
+else if(ovq==='menu'){ state.ov = {kind:'menu'}; state.menuAt = {x:120,y:150}; }
+else if(ovq==='confirm') state.ov = {kind:'confirm', title:'删除供应商？', body:'删除后无法恢复，使用它的请求会失败。', ok:'删除'};
+else if(ovq==='rename') state.ov = {kind:'rename', title:'重命名 / 移动会话'};
+else if(ovq==='lang') state.ov = {kind:'pick', title:'语言', items:['简体中文','繁體中文','English','日本語','Deutsch'], selected:'简体中文'};
+else if(ovq==='shortcut') state.ov = {kind:'shortcut', title:'快速面板快捷键', key:'⌃ ⌘ Space'};
+else if(ovq==='request') state.ov = {kind:'request', title:'请求详情'};
+else if(ovq==='update') state.ov = {kind:'update', title:'发现新版本 0.1.2401'};
+else if(ovq==='quit') state.ov = {kind:'quit', title:'退出 magpie？'};
 if(qs.get('p') && PAGES[qs.get('p')]) state.page = qs.get('p');
 if(qs.get('spec')==='1') state.spec = true;
 if(PAGES[state.page]){ const s=SECTIONS.find(x=>x.pages.includes(state.page)); if(s) state.section=s.id; }
@@ -575,8 +601,9 @@ function settingRow(name, sub, control){
 function settingsGeneral(){
   return [`<div class="list">
     ${settingRow('外观','跟随系统','<div class="segline"><button class="segbtn on">跟随</button><button class="segbtn">浅色</button><button class="segbtn">深色</button></div>')}
-    ${settingRow('语言','','<button class="btn">简体中文 ⌄</button>')}
+    ${settingRow('语言','','<button class="btn" data-act="lang">简体中文 ⌄</button>')}
     ${settingRow('文字大小','','<div class="segline"><button class="segbtn">小</button><button class="segbtn on">中</button><button class="segbtn">大</button></div>')}
+    ${settingRow('快速面板快捷键','','<button class="btn" data-act="shortcut">⌃ ⌘ Space</button>')}
     ${settingRow('减少动态效果','','<span class="switch"></span>')}
   </div>`];
 }
@@ -838,7 +865,7 @@ function mdSessions(){
   return [mdSplit(items, x=>{
     const i = SESSION_INFO[x.n] || ['—','—','—','—'];
     return det(x.n, [['Agent',i[0]],['会话数',i[1]],['最近',i[2]],['文件夹',i[3]]],
-      '<button class="btn">打开</button><button class="btn">重命名</button><button class="btn">移动</button>');
+      '<button class="btn">打开</button><button class="btn" data-act="rename">重命名</button><button class="btn" data-act="rename">移动</button>');
   })];
 }
 function mdProviders(){
@@ -846,7 +873,7 @@ function mdProviders(){
   return [mdSplit(items, x=>{
     const i = PROVIDER_INFO[x.n] || ['—','—','—','—'];
     return det(x.n, [['账号',i[0]],['模型',i[1]],['今日',i[2]],['健康度',i[3]]],
-      '<button class="btn">编辑</button><button class="btn">隐藏账号</button><button class="btn danger">删除</button>');
+      '<button class="btn">编辑</button><button class="btn">隐藏账号</button><button class="btn danger" data-act="delProvider">删除</button>');
   })];
 }
 function mdDoctor(){
@@ -887,7 +914,7 @@ function mdRequests(){
   return [mdSplit(items, x=>{
     const i = REQUEST_INFO[x.n] || ['—','—','—'];
     return det(x.n, [['耗时',i[0]],['令牌',i[1]],['状态',i[2]],['时间','今天 14:20']],
-      '<button class="btn">在路由页打开</button><button class="btn">复制</button>');
+      '<button class="btn" data-act="request">详情</button><button class="btn">复制</button>');
   })];
 }
 function mdUsageSessions(){
@@ -906,7 +933,16 @@ function mdRank(){
       '<button class="btn">看请求</button>');
   })];
 }
+function listStateOn(){
+  if(state.listState==='normal') return false;
+  if(['agents','sessions','providers','doctor','masking','library','plugins'].includes(state.page)) return true;
+  if(state.page==='usage' && ['请求','会话','榜单'].includes(state.tabs.usage)) return true;
+  return false;
+}
+function emptyState(){ return `<div class="empty-list">暂无内容</div>`; }
+function skeletonState(){ return `<div class="skel-list"><i></i><i></i><i></i><i></i></div>`; }
 function bodyBlocks(page, kind){
+  if(listStateOn()) return [state.listState==='empty' ? emptyState() : skeletonState()];
   const p = PAGES[page];
   const tab = p && p.tabs ? (state.tabs[page] || p.tabs[0]) : null;
   const f = tab && TAB_BODIES[page] && TAB_BODIES[page][tab];
@@ -923,6 +959,7 @@ function bodyBlocks(page, kind){
   return [listRows(kind)];
 }
 function bodyNamesFor(page, tab){
+  if(listStateOn()) return [state.listState==='empty' ? '空状态' : '骨架屏'];
   const p = PAGES[page];
   const n = tab && TAB_BODY_NAMES[page] && TAB_BODY_NAMES[page][tab];
   return n || BODY_NAMES[p.kind] || ['内容'];
@@ -981,11 +1018,11 @@ function topbar(brand){
   return `<header class="top">
     <div class="lights"><i></i><i></i><i></i></div>
     ${brand?`<div class="brand">${logo()}<span>magpie</span></div>`:`<div class="crumb">${PAGES[state.page].name}</div>`}
-    <div class="actions"><button class="btn">更新</button><button class="iconbtn${state.page==='settings'?' on':''}" data-page="settings">${ic('gear')}</button></div>
+    <div class="actions"><button class="btn" data-act="update">更新</button><button class="iconbtn${state.page==='settings'?' on':''}" data-page="settings">${ic('gear')}</button></div>
   </header>`;
 }
 function footerbar(){
-  return `<footer style="flex:none;height:27px;display:flex;align-items:center;gap:6px;padding:0 10px;border-top:.5px solid var(--line-2);font-size:10px;color:var(--muted)"><span class="dot"></span>网关运行中 · 4 个会话已连接</footer>`;
+  return `<footer style="flex:none;height:27px;display:flex;align-items:center;gap:6px;padding:0 10px;border-top:.5px solid var(--line-2);font-size:10px;color:var(--muted)"><span class="dot"></span>网关运行中 · 4 个会话已连接<span class="grow"></span><button class="textbtn" data-act="quit">退出</button></footer>`;
 }
 function regionsFor(page, p){
   const arr = [];
@@ -996,10 +1033,19 @@ function regionsFor(page, p){
   bodyBlocks(page, p.kind).forEach((html,i)=>arr.push([names[i]||'内容', html]));
   return arr;
 }
+function addSheetInline(){
+  return `<div class="sheet-inline">
+    <div class="ov-h"><span>添加供应商</span><span class="grow"></span><button class="ov-close" data-closesheet>×</button></div>
+    <div class="ov-search">搜索厂商…</div>
+    <div class="ov-tiles">${['Codex','Claude','Gemini','Qwen','Kimi','自定义…'].map(x=>`<button class="ov-tile">${x}</button>`).join('')}</div>
+    <div class="rowbtns"><button class="btn" data-closesheet>取消</button><button class="btn">导入…</button></div>
+  </div>`;
+}
 function mainView(){
   const p = PAGES[state.page];
   const regions = regionsFor(state.page, p);
-  return `<main class="view">${regions.map((r,i)=>reg(i+1, r[0], r[1])).join('')}</main>`;
+  const sheet = state.sheet && state.page==='providers' ? addSheetInline() : '';
+  return `<main class="view">${regions.map((r,i)=>reg(i+1, r[0], r[1])).join('')}${sheet}</main>`;
 }
 function compactNav(){
   let out = '';
@@ -1012,23 +1058,49 @@ function compactNav(){
   out += `<button class="tab${state.page==='settings'?' on':''}" data-page="settings">设置</button>`;
   return `<nav class="tabstrip">${out}</nav>`;
 }
+function modalHtml(title, body, actions){
+  return `<div class="ov"><div class="ov-sheet">
+    <div class="ov-h"><span>${title}</span><span class="grow"></span><button class="ov-close" data-ovclose>×</button></div>
+    ${body}
+    <div class="rowbtns">${actions}</div>
+  </div></div>`;
+}
 function overlayHtml(){
-  if(!state.ov) return '';
-  if(state.ov==='add'){
-    return `<div class="ov"><div class="ov-sheet">
-      <div class="ov-h"><span>添加供应商</span><span class="grow"></span><button class="ov-close" data-ovclose>×</button></div>
-      <div class="ov-search">搜索厂商…</div>
-      <div class="ov-tiles">${['Codex','Claude','Gemini','Qwen','Kimi','自定义…'].map(x=>`<button class="ov-tile">${x}</button>`).join('')}</div>
-      <div class="rowbtns"><button class="btn" data-ovclose>取消</button><button class="btn">导入…</button></div>
-    </div></div>`;
-  }
-  if(state.ov==='menu'){
+  const o = state.ov;
+  if(!o) return '';
+  if(o.kind==='menu'){
     const p = state.menuAt || {x:40,y:40};
     return `<div class="ov"><div class="ov-menu" style="left:min(${p.x}px, calc(100% - 160px));top:min(${p.y}px, calc(100% - 210px))">
       <button class="mi" data-ovclose>移至顶部</button><button class="mi" data-ovclose>上移</button><button class="mi" data-ovclose>下移</button><button class="mi" data-ovclose>移至底部</button>
       <div class="msep"></div><button class="mi" data-ovclose>编辑</button><button class="mi danger" data-ovclose>删除</button>
     </div></div>`;
   }
+  if(o.kind==='confirm') return modalHtml(o.title || '确认', `<p class="hint">${o.body||''}</p>`,
+    `<button class="btn" data-ovclose>取消</button><button class="btn danger" data-ovclose>${o.ok||'确定'}</button>`);
+  if(o.kind==='edit') return modalHtml(o.title || '编辑',
+    (o.fields||[]).map(([k,v])=>`<div class="formrow"><label>${k}</label><div class="ov-search">${v}</div></div>`).join(''),
+    '<button class="btn" data-ovclose>取消</button><button class="btn primary" data-ovclose>保存</button>');
+  if(o.kind==='pick') return modalHtml(o.title || '选择',
+    `<div class="ov-list">${(o.items||[]).map(x=>`<button class="mi${x===o.selected?' on':''}" data-ovclose>${x}</button>`).join('')}</div>`,
+    '<button class="btn" data-ovclose>取消</button>');
+  if(o.kind==='shortcut') return modalHtml(o.title || '快捷键',
+    `<div class="keycap">${o.key||'⌃ ⌘ Space'}</div><p class="hint">按下组合键；Esc 取消，Backspace 清除。</p>`,
+    '<button class="btn" data-ovclose>清除</button><button class="btn primary" data-ovclose>保存</button>');
+  if(o.kind==='rename') return modalHtml(o.title || '重命名 / 移动会话',
+    `<div class="formrow"><label>标题</label><div class="ov-search">项目一 · 代码评审</div></div><div class="formrow"><label>文件夹</label><div class="ov-search">~/work/project-one</div></div>`,
+    '<button class="btn" data-ovclose>取消</button><button class="btn primary" data-ovclose>保存</button>');
+  if(o.kind==='addAgent') return modalHtml(o.title || '添加智能体',
+    `<div class="ov-tiles">${['Codex','Claude Code','Gemini CLI','自定义…'].map(x=>`<button class="ov-tile">${x}</button>`).join('')}</div><div class="formrow"><label>命令</label><div class="ov-search">codex</div></div><div class="formrow"><label>模型</label><div class="ov-search">跟随默认</div></div>`,
+    '<button class="btn" data-ovclose>取消</button><button class="btn primary" data-ovclose>添加</button>');
+  if(o.kind==='request') return modalHtml(o.title || '请求详情',
+    `<div class="det-row"><span>模型</span><b>codex/gpt-5.6-sol</b></div><div class="det-row"><span>耗时</span><b>1.2s</b></div><div class="det-row"><span>令牌</span><b>2.4K</b></div><div class="det-row"><span>状态</span><b>成功</b></div>`,
+    '<button class="btn" data-ovclose>关闭</button><button class="btn">在路由页打开</button>');
+  if(o.kind==='update') return modalHtml(o.title || '发现新版本',
+    `<p class="hint">更新会重启 magpie，正在运行的请求会先完成。</p>`,
+    '<button class="btn" data-ovclose>稍后</button><button class="btn primary" data-ovclose>更新</button>');
+  if(o.kind==='quit') return modalHtml(o.title || '退出 magpie？',
+    `<p class="hint">还有 4 个会话连着网关，退出会中断它们。</p>`,
+    '<button class="btn" data-ovclose>取消</button><button class="btn danger" data-ovclose>退出</button>');
   return '';
 }
 function renderStage(){
@@ -1041,6 +1113,8 @@ function renderStage(){
   document.querySelectorAll('#frameSeg button[data-f]').forEach(b=>b.classList.toggle('on', b.dataset.f===state.frame));
   document.getElementById('specBtn').textContent = '标注：' + (state.spec ? '开' : '关');
   document.getElementById('navBtn').textContent = '窄窗：' + (state.compact ? '一行' : '两行');
+  document.getElementById('stateBtn').textContent = '状态：' + ({normal:'正常',empty:'空',loading:'加载'}[state.listState]);
+  if(state.sheet){ const sh=document.querySelector('.sheet-inline'); if(sh) sh.scrollIntoView({block:'nearest'}); }
   if(state.frame==='narrow' && state.compact){ const nav=document.querySelector('.win.narrow .tabstrip'); const on=nav && nav.querySelector('.tab.on'); if(on) nav.scrollLeft = Math.max(0, on.offsetLeft - 60); }
   const regions = regionsFor(state.page, PAGES[state.page]).map(r=>r[0]);
   const selTxt = state.sel ? ('已选：' + where + ' · 区域 ' + state.sel.n + ' · ' + state.sel.name) : ('当前页：' + where);
@@ -1059,11 +1133,23 @@ function renderStage(){
 stage.addEventListener('click', e=>{
   const sw = e.target.closest('[data-sw]');
   if(sw){ const n = sw.dataset.sw; state.sw[n] = !sw.classList.contains('on'); renderStage(); return; }
-  const act = e.target.closest('[data-act="add"]');
-  if(act){ state.ov = 'add'; renderStage(); return; }
+  const act = e.target.closest('[data-act]');
+  if(act){
+    const a = act.dataset.act;
+    if(a==='add'){ if(state.page==='agents') state.ov={kind:'addAgent'}; else { state.sheet = true; state.ov = null; } }
+    else if(a==='delProvider') state.ov={kind:'confirm', title:'删除供应商？', body:'删除后无法恢复，使用它的请求会失败。', ok:'删除'};
+    else if(a==='rename') state.ov={kind:'rename', title:'重命名 / 移动会话'};
+    else if(a==='lang') state.ov={kind:'pick', title:'语言', items:['简体中文','繁體中文','English','日本語','Deutsch'], selected:'简体中文'};
+    else if(a==='shortcut') state.ov={kind:'shortcut', title:'快速面板快捷键', key:'⌃ ⌘ Space'};
+    else if(a==='request') state.ov={kind:'request', title:'请求详情'};
+    else if(a==='update') state.ov={kind:'update', title:'发现新版本 0.1.2401'};
+    else if(a==='quit') state.ov={kind:'quit', title:'退出 magpie？'};
+    renderStage(); return;
+  }
+  if(e.target.closest('[data-closesheet]')){ state.sheet = false; renderStage(); return; }
+  if(e.target.closest('[data-ovclose]')){ state.ov = null; renderStage(); return; }
   const ov = e.target.closest('.ov');
   if(ov){
-    if(e.target.closest('[data-ovclose]')){ state.ov = null; renderStage(); return; }
     if(!e.target.closest('.ov-sheet') && !e.target.closest('.ov-menu')){ state.ov = null; renderStage(); return; }
     return;
   }
@@ -1095,11 +1181,11 @@ stage.addEventListener('contextmenu', e=>{
   if(!row || state.page!=='providers') return;
   e.preventDefault();
   const wr = row.closest('.win').getBoundingClientRect();
-  state.ov = 'menu'; state.menuAt = {x:e.clientX-wr.left, y:e.clientY-wr.top};
+  state.ov = {kind:'menu'}; state.menuAt = {x:e.clientX-wr.left, y:e.clientY-wr.top};
   renderStage();
 });
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape' && state.ov){ state.ov = null; renderStage(); }
+  if(e.key==='Escape' && (state.ov || state.sheet)){ state.ov = null; state.sheet = false; renderStage(); }
 });
 function renderAllIndex(){
   const rows = [];
@@ -1132,6 +1218,7 @@ document.getElementById('frameSeg').addEventListener('click', e=>{
   state.frame = b.dataset.f; renderStage();
 });
 document.getElementById('navBtn').addEventListener('click', ()=>{ state.compact = !state.compact; renderStage(); });
+document.getElementById('stateBtn').addEventListener('click', ()=>{ state.listState = state.listState==='normal' ? 'empty' : (state.listState==='empty' ? 'loading' : 'normal'); renderStage(); });
 document.getElementById('specBtn').addEventListener('click', ()=>{
   state.spec = !state.spec; state.sel = null; renderStage();
 });
