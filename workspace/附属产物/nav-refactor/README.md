@@ -12,7 +12,7 @@
 
 - 一级：5 个分区（对话 / 模型 / 分析 / 隐私 / 扩展）
 - 二级：分区里的页面（2–3 个）
-- 三级：页面自己的标签（用量 5、资源库 6、插件 3、设置 9）
+- 三级：页面自己的标签（用量 5、资源库 7、插件 3、设置 9）
 - 四级：顶部工具栏（每页一个）
 - 设置不在分区里，走侧栏脚 / 顶栏齿轮
 
@@ -49,8 +49,6 @@
 - **描述方式**：页面 · 区域号 · 区域名，例如「供应商 · 2 · 列表 的行距改小」→ 改 C01 列表行（`.item`）的 padding
 - 外壳（标题栏 / 一级分区 / 二级页面 / 底栏）见 `skeleton-components.html`，不重复列
 
-截图：`spec-providers-narrow.png`、`spec-usage-narrow.png`、`spec-settings-wide.png`、`spec-plugins-narrow.png`、`spec-routing-narrow.png`、`no-spec-providers-narrow.png`。
-
 ## 全部页面 + 页内视图（都统一组件）
 
 `all-pages.html` 现在有 **11 个页面，展开为 32 个视图**（8 个单页 + 24 个页内视图）。点页内标签会真正换内容，不是只换高亮：
@@ -70,8 +68,6 @@
 
 普通按钮点后有底部提示，危险按钮先弹确认；列表 ↑/↓、标签条 ←/→ 可键盘移动。
 
-截图：`page-*.png`（11 个页面）、`tab-<页面>-<序号>.png`（24 个视图）。
-
 列表型：智能体、会话、供应商、诊断、掩码、资源库
 卡片型：路由、网关
 数据型：用量、指标
@@ -81,7 +77,7 @@
 
 ## 弹窗与浮层（30 个）
 
-`overlays.html` 把窗口之外的界面补齐了。特别说明：**点供应商行是原地展开编辑器，不是 modal**；添加供应商才是底部 sheet。
+`overlays.html` 把窗口之外的界面补齐了。特别说明：**点供应商行是原地展开编辑器，不是 modal**；添加供应商是列表下方的 sheet。
 
 - 供应商：行展开、添加 sheet、右键菜单、导入配置、添加账号/登录
 - 通用：密钥编辑、确认删除、模型选择器、更新提示
@@ -90,21 +86,23 @@
 
 页面底部有一张逐项清单（33 行），每项标了“已画 / 外部 / 组件覆盖”；OAuth 登录页、系统文件选择、浏览器授权属于系统/外部页面，不画。
 
-截图：`overlays-light.png`、`overlays-dark.png`。
+截图：`overlays-light.png`。
 
 ## 截图
 
-`skeleton-wide.png`、`skeleton-narrow.png`、`skeleton-wide-dark.png`
+只保留 8 张：`complete.png`、`index-light.png`、`page-providers.png`、`prov-inline.png`、`overlays-light.png`、`skeleton-wide.png`、`layers-narrow.png`、`state-empty.png`。其余已清理，运行原型为准。
 
 ## 相关文件
 
-- `all-pages.html`：用这些组件拼出的 32 个视图（11 个页面 + 24 个页内视图）
+- `complete.html`：完整入口（应用 + 浮层 + 骨架 + 层级）
+- `index.html`：总览
+- `all-pages.html`：32 个视图（11 个页面 + 24 个页内视图）
 - `overlays.html`：30 个弹窗/浮层 + 全界面清单
-- `AUDIT.md`：检查与遗漏清单 + 布局方案 A–E
-- `COMPARE.md`：与现行版逐个对照（30 个界面，外观/行为/状态）
-- `framework-layers.html`：四层导航框架图（外壳定义）
-- `grouping-options.html`：导航分组方案
-- `layout-detail.html`：真实页内标签的细节版
+- `skeleton-components.html`：骨架与通用组件
+- `framework-layers.html`：四层导航框架（定稿）
+- `AUDIT.md`：检查与遗漏清单
+- `COMPARE.md`：与现行版逐个对照
+- `MANIFEST.md`：文件台账
 
 ## 边界
 

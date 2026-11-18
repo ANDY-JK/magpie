@@ -1,6 +1,6 @@
 # 原型文件清单（唯一来源）
 
-最后整理：2026-11-16。只从 `index.html` 进入；本文件是给人和 agent 看的台账。
+最后整理：2026-11-18。只从 `index.html` 进入；本文件是给人和 agent 看的台账。
 
 ## 当前（会继续改）
 
@@ -20,27 +20,12 @@
 |---|---|---|
 | `framework-layers.html` | 四层导航框架 | 一级 5 分区 / 二级页面 / 三级标签 / 四级工具栏；外壳已定 |
 
-## 提案（等确认）
+## 截图
 
-| 文件 | 是什么 | 说明 |
-|---|---|---|
-| `grouping-options.html` | 导航分组 A/B/C | 3 套方案，尚未选 |
-
-## 历史（只读，不再改）
-
-| 文件 | 是什么 | 被谁取代 |
-|---|---|---|
-| `layout-detail.html` | 六页细节版 | `all-pages.html` |
-| `layout-frameworks.html` | 宽窄两套骨架 | `framework-layers.html` |
-| `prototype.html` | 三方案（英文） | `framework-layers.html` |
-
-## 截图前缀
-
-- 当前：`skeleton-*`、`page-*`、`tab-*`、`spec-*`、`no-spec-*`、`overlays-*`
-- 历史：`detail-*`、`frame-*`、`group-*`、`nav-*`
+只保留 8 张：`complete.png`、`index-light.png`、`page-providers.png`、`prov-inline.png`、`overlays-light.png`、`skeleton-wide.png`、`layers-narrow.png`、`state-empty.png`。其余已清理，运行原型为准。
 
 ## 规则
 
 1. 新增原型先在 `index.html` 和本文件登记，再开工。
-2. 被取代的文件不删，移到“历史”，加“历史版本”角标。
+2. 被取代的文件已清理，git 历史可查；新增先登记。
 3. 描述改动统一用：`页面 · 区域号 · 区域名`，组件名见 `all-pages.html` 的 C01–C16 索引。
