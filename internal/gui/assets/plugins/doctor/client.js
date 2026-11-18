@@ -7,7 +7,10 @@
 // again every 45 seconds while it is in sight. A second list says which keys
 // and accounts are signed out, paused or off, so every one's state is here.
 // A page the Doctor plugin adds to the window (kernel.js), its words in
-// i18n.js beside this file. Nothing here changes a provider by itself.
+// i18n.js beside this file. Nothing here changes a provider by itself. A
+// third list shows the real model lists the desktop apps on this computer
+// keep, read from their own configs (doctor_models.go), with the IDs to
+// copy and the parsing steps for an app no catalog here knows.
 magpie.plugin("doctor", (ctx) => {
   let page = null, reading = null;
   ctx.slots.add("page", {
@@ -30,6 +33,9 @@ magpie.plugin("doctor", (ctx) => {
   <div class="list" id="drFails"></div>
   <p class="hint dr-none" id="drNoFails" hidden></p>
   <p class="hint dr-note" id="drNote"></p>
+  <div class="row-head" id="drModelsHeadRow" hidden><span class="label" id="drModelsHead"></span><span class="grow"></span><button class="text action" id="drCopySteps" type="button" hidden></button></div>
+  <div class="list" id="drModels"></div>
+  <p class="hint dr-none" id="drNoModels" hidden></p>
   <div class="plugin-slot" data-slot="doctor" hidden></div>`,
     mount(main) {
       page = main;
@@ -43,6 +49,9 @@ magpie.plugin("doctor", (ctx) => {
       main.querySelector("#drNoRests").textContent = t("Nothing is resting now.");
       main.querySelector("#drNoFails").textContent = t("Nothing failed lately.");
       main.querySelector("#drNote").textContent = t("Resting is magpie passing a key or account over until its time. Try now asks it again at once; refused again, it rests again.");
+      main.querySelector("#drModelsHead").textContent = t("Real model lists");
+      main.querySelector("#drCopySteps").textContent = t("Copy the parsing steps");
+      main.querySelector("#drNoModels").textContent = t("No local model list was found.");
       main.querySelector("#drReload").onclick = () => load();
     },
     open() { load(); },
@@ -264,6 +273,59 @@ magpie.plugin("doctor", (ctx) => {
     }
   }
 
+  // The real model lists the desktop apps on this computer keep, read from
+  // their own config files (read-only): a provider whose plugin lists only
+  // part of them can be checked against the app's list here, its IDs
+  // copied into its editor. For a widget no catalog here knows, the
+  // parsing steps are copied for its agent to follow
+  // (.agents/skills/local-model-catalog in magpie's own checkout).
+  const DR_STEPS = [
+    "按 local-model-catalog 技能解析本机真实模型列表：",
+    "1. 找到该控件桌面端的数据目录（install.json / auth.json / current-owner.json），别只看默认路径；",
+    "2. 只读解密登录态，不输出 Cookie、token 或密钥；",
+    "3. 在它的配置里找 provider.<Name>.models，键 ≠ API id（glm-5 可能只是 model-text 的别名）；",
+    "4. 排除 mock/OCR/向量/重排/内部任务入口，按 API id 去重；",
+    "5. 把清单存进插件自己的 models.json，源缺失或损坏时保留最近一次有效清单；",
+    "6. 用 magpie provider models <id> all 启用，并经网关发一个 max_tokens:1 的请求验证。",
+  ].join("\n");
+
+  function drawModels(catalogs, providers) {
+    const head = page.querySelector("#drModelsHeadRow");
+    const list = page.querySelector("#drModels");
+    const none = page.querySelector("#drNoModels");
+    const steps = page.querySelector("#drCopySteps");
+    list.replaceChildren();
+    const rows = (catalogs || []).filter((c) => c.source);
+    head.hidden = steps.hidden = none.hidden = !rows.length;
+    if (!rows.length) return;
+    for (const c of rows) {
+      const row = el("div", "row dr-model");
+      const who = el("div", "who");
+      const ids = (c.models || []).map((m) => m.id);
+      const shown = ids.slice(0, 6).join(", ") + (ids.length > 6 ? " …" : "");
+      who.append(el("div", "name", c.app), el("div", "sub", `${c.provider} · ${t("{n} models", { n: c.count || ids.length })} · ${c.source}`));
+      if (shown) who.append(el("div", "hint dr-ids", shown));
+      const acts = el("div", "dr-acts");
+      const copyIds = el("button", "text action", t("Copy model IDs"));
+      copyIds.onclick = () => copy(ids.join("\n"), t("Model IDs"), copyIds);
+      acts.append(copyIds);
+      if ((providers || []).some((x) => x.id === c.provider)) {
+        const open = el("button", "text action dr-open", t("Open provider"));
+        open.onclick = () => openProvider(c.provider);
+        acts.append(open);
+      }
+      row.append(who, acts);
+      if (c.error) {
+        const why = el("div", "dr-why", c.error);
+        why.title = c.error;
+        row.append(why);
+      }
+      list.append(row);
+    }
+    steps.hidden = false;
+    steps.onclick = () => copy(DR_STEPS, t("Parsing steps"), steps);
+  }
+
   async function load(quiet) {
     if (!page) return reading;
     if (reading) return reading;
@@ -271,8 +333,13 @@ magpie.plugin("doctor", (ctx) => {
       const say = page.querySelector("#drRead");
       if (!quiet) say.textContent = t("Reading…");
       try {
-        const [pv, led] = await Promise.all([api("providers"), api("usage/requests?failed=1&limit=200")]);
+        const [pv, led, cats] = await Promise.all([
+          api("providers"),
+          api("usage/requests?failed=1&limit=200"),
+          api("doctor/model-catalogs").catch(() => ({ catalogs: [] })),
+        ]);
         draw(pv.providers || [], led.rows || []);
+        drawModels(cats.catalogs || [], pv.providers || []);
         say.textContent = t("Read {time}", { time: new Date().toLocaleTimeString(intlLang()) });
       } catch (e) {
         say.textContent = e.message || String(e);

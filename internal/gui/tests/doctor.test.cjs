@@ -29,6 +29,12 @@ const relay = {
   ],
   balanceToken: { takes: false, set: false }, proxy: "",
 };
+const CATS = [
+  { app: "DuMate", provider: "relay", source: "C:/Users/me/AppData/Roaming/qianfan-desktop-app/qianfan_desk_xdg/acct/config/opencode/opencode.json", count: 3,
+    models: [{ id: "model-text" }, { id: "deepseek-v41-flash" }, { id: "qwen2.5-vl-32b-instruct" }] },
+  { app: "TeleAgent", provider: "teleagent", source: "C:/Users/me/.config/TeleAgent/users/v1_public_x/TeleAgent.jsonc", count: 5,
+    models: [{ id: "chat-pro" }, { id: "chat-flagship" }, { id: "chat-flash" }, { id: "chat-lite" }, { id: "chat-nano" }] },
+];
 const acct = {
   id: "acct", name: "Account", icon: "generic", chat: "", responses: "", anthropic: "", catalog: "",
   models: [], agents: [], fallback: [], headers: {}, key: { set: false }, keyList: [],
@@ -79,6 +85,7 @@ function server(lang, state) {
       return json({ providers: picture(state), presets: [], excluded: [], gateway: { running: true } });
     }
     if (url.pathname === "/api/usage/requests") return json({ rows: ROWS, total: ROWS.length, offset: 0 });
+    if (url.pathname === "/api/doctor/model-catalogs") return json({ catalogs: CATS });
     if (url.pathname === "/api/gateway/unrest") {
       const body = req.postDataJSON();
       state.unrest.push({ ...body, at: Date.now() });
@@ -111,6 +118,7 @@ const L = {
     signin: "Sign in again, then try it again here", top: "Top up the account, then try it again here",
     proxy: "proxy not reachable", signedout: "Signed out", paused: "Paused", off: "turned off",
     keysub: "Key Main", acctsub: "account me@example.com",
+    modelsHead: "Real model lists", copyIds: "Copy model IDs", copySteps: "Copy the parsing steps", dumateCount: "3 models",
   },
   zh: {
     title: "医生", sub: "谁在休息、为什么，以及最近哪些请求失败", rest: "正在休息", fail: "最近的失败",
@@ -122,6 +130,7 @@ const L = {
     signin: "重新登录后再来试", top: "充值后再来试",
     proxy: "代理连不上", signedout: "已退出登录", paused: "已暂停", off: "已停用",
     keysub: "密钥 Main", acctsub: "账号 me@example.com",
+    modelsHead: "真实模型清单", copyIds: "复制模型 ID", copySteps: "复制解析步骤", dumateCount: "3 个模型",
   },
 };
 const KEYS = ["Read again", "Resting now", "Failed lately", "Nothing is resting now.", "Nothing failed lately.",
@@ -213,6 +222,21 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert((await fails.nth(0).locator(".sub").textContent()).includes(w.keysub), await fails.nth(0).locator(".sub").textContent());
       assert.equal((await fails.nth(1).locator(".name").textContent()).trim(), "Account");
       assert((await fails.nth(1).locator(".sub").textContent()).includes(w.acctsub), await fails.nth(1).locator(".sub").textContent());
+      // the real model lists the local apps keep, read-only: the IDs to
+      // copy, the provider to open when magpie has it, and the steps for a
+      // widget no catalog here knows
+      await page.waitForFunction(() => !document.querySelector("#drModelsHeadRow")?.hidden);
+      assert.equal((await page.locator("#drModelsHead").textContent()).trim(), w.modelsHead);
+      const cats = page.locator("#drModels .dr-model");
+      assert.equal(await cats.count(), 2);
+      assert.equal((await cats.nth(0).locator(".name").textContent()).trim(), "DuMate");
+      const sub0 = await cats.nth(0).locator(".sub").textContent();
+      assert(sub0.includes("relay · " + w.dumateCount + " ·") && sub0.includes("opencode.json"), sub0);
+      assert.equal(await cats.nth(0).getByRole("button", { name: w.copyIds }).count(), 1);
+      assert.equal(await cats.nth(0).getByRole("button", { name: w.open }).count(), 1, "the provider magpie has opens");
+      assert.equal((await cats.nth(1).locator(".name").textContent()).trim(), "TeleAgent");
+      assert.equal(await cats.nth(1).getByRole("button", { name: w.open }).count(), 0, "no provider, no open");
+      assert.equal((await page.locator("#drCopySteps").textContent()).trim(), w.copySteps);
       // Try now ends the rest, as the provider's button does
       await rests.nth(0).locator(".dr-try").click();
       for (let i = 0; i < 60 && !state.unrest.length; i++) await page.waitForTimeout(50);
@@ -237,13 +261,12 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // Wait on the read's own timestamp, not a fixed number of polls: a
       // loaded runner with the whole suite in WebKit can outlast 60×50ms.
       assert.equal(await page.evaluate(() => window.__ticks.length), 1, "one interval, at 45 seconds");
-      const before = (await page.locator("#drRead").textContent()).trim();
+      const reads0 = state.reads;
       await page.evaluate(() => window.__ticks[0]());
-      await page.waitForFunction((old) => {
-        const now = document.querySelector("#drRead")?.textContent.trim();
-        return now && now !== old && !now.includes("Reading…");
-      }, before, { timeout: 15000 });
-      assert(state.reads > 0, "the 45-second read reads the providers again");
+      // the read is waited on by its effect (state.reads), not by the clock
+      // string: two reads inside one second draw the same time
+      for (let i = 0; i < 100 && state.reads <= reads0; i++) await page.waitForTimeout(50);
+      assert(state.reads > reads0, "the 45-second read reads the providers again");
       assert.notEqual((await page.locator("#drRead").textContent()).trim(), "", "quietly: it still says when");
       // Open provider goes to it
       await page.locator("#drFails .dr-fail").first().locator(".dr-open").click();

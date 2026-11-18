@@ -29,5 +29,12 @@ magpie.strings({
     "Top up the account, then try it again here": "充值后再来试",
     "Sign in again, then try it again here": "重新登录后再来试",
     "Replace the key, then try it again here": "换个密钥再来试",
+    "Real model lists": "真实模型清单",
+    "Copy the parsing steps": "复制解析步骤",
+    "No local model list was found.": "没找到本机的真实模型清单。",
+    "{n} models": "{n} 个模型",
+    "Copy model IDs": "复制模型 ID",
+    "Model IDs": "模型 ID",
+    "Parsing steps": "解析步骤",
   },
 });

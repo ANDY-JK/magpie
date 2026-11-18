@@ -29,5 +29,12 @@ magpie.strings({
     "Top up the account, then try it again here": "チャージしてから再度お試しください",
     "Sign in again, then try it again here": "サインインし直してから再度お試しください",
     "Replace the key, then try it again here": "キーを交換してから再度お試しください",
+    "Real model lists": "実モデル一覧",
+    "Copy the parsing steps": "解析手順をコピー",
+    "No local model list was found.": "ローカルのモデル一覧が見つかりません。",
+    "{n} models": "{n} 個のモデル",
+    "Copy model IDs": "モデルIDをコピー",
+    "Model IDs": "モデルID",
+    "Parsing steps": "解析手順",
   },
 });

@@ -29,5 +29,12 @@ magpie.strings({
     "Top up the account, then try it again here": "儲值後再來試",
     "Sign in again, then try it again here": "重新登入後再來試",
     "Replace the key, then try it again here": "換個金鑰再來試",
+    "Real model lists": "真實模型清單",
+    "Copy the parsing steps": "複製解析步驟",
+    "No local model list was found.": "找不到本機的真實模型清單。",
+    "{n} models": "{n} 個模型",
+    "Copy model IDs": "複製模型 ID",
+    "Model IDs": "模型 ID",
+    "Parsing steps": "解析步驟",
   },
 });

@@ -29,5 +29,12 @@ magpie.strings({
     "Top up the account, then try it again here": "Guthaben aufladen und danach erneut versuchen",
     "Sign in again, then try it again here": "Erneut anmelden und danach erneut versuchen",
     "Replace the key, then try it again here": "Schlüssel ersetzen und danach erneut versuchen",
+    "Real model lists": "Echte Modellisten",
+    "Copy the parsing steps": "Analyseschritte kopieren",
+    "No local model list was found.": "Keine lokale Modelliste gefunden.",
+    "{n} models": "{n} Modelle",
+    "Copy model IDs": "Modell-IDs kopieren",
+    "Model IDs": "Modell-IDs",
+    "Parsing steps": "Analyseschritte",
   },
 });
