@@ -229,6 +229,15 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
 .phone-secs{height:44px;display:flex;align-items:center;justify-content:space-around;border-top:.5px solid var(--line-2)}
 .psec{font-size:10px;color:var(--muted);padding:4px 6px;border-radius:6px}
 .psec.on{color:var(--fg);background:var(--card);box-shadow:var(--seg-edge);font-weight:500}
+.prow{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;background:var(--card);border-top:.5px solid var(--line-2);text-align:left}
+.prow:first-child{border-top:0}
+.prow.open{background:var(--card-2)}
+.prow .who{display:flex;flex-direction:column;min-width:0;flex:1}
+.prow .nm,.prow .sub{display:block}
+.prow .chev{color:var(--faint);font-size:10px}
+.prow-edit{padding:6px 12px 10px 42px;background:var(--card-2);border-top:.5px solid var(--line-2);display:flex;flex-direction:column;gap:4px}
+.prow-edit .item{border-top:0;padding:4px 0}
+.subhead{font-size:9.5px;font-weight:600;color:var(--muted);margin:3px 0 0}
 .phonewin .lib-split{grid-template-columns:1fr}
 .phonewin .cols{grid-template-columns:1fr}
 .phonewin .stats{grid-template-columns:1fr 1fr}
@@ -386,7 +395,7 @@ const SPEC_INFO = {
   },
   providers:{
     '工具栏':['搜索框、普通按钮、主按钮','toolbarHtml · .toolbar'],
-    '列表':['列表 + 详情面板','mdProviders · .lib-split'],
+    '列表':['列表 + 展开编辑器','providersInline · .prow/.prow-edit'],
     '已关闭':['折叠行','foldRow · .foldrow'],
   },
   routing:{
@@ -457,13 +466,14 @@ const COMPONENTS = [
 const state = {
   frame:'narrow', section:'model', page:'providers', theme:'light',
   tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
-  spec:false, sel:null, libSel:0, mdSel:0, compact:false, sheet:false, ov:null, menuAt:null, sw:{}, listState:'normal', editDirty:false, form:'window', panelTab:'额度',
+  spec:false, sel:null, libSel:0, mdSel:0, compact:false, sheet:false, ov:null, menuAt:null, sw:{}, listState:'normal', editDirty:false, form:'window', panelTab:'额度', providerOpen:null,
 };
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
 if(qs.get('nav')==='one') state.compact = true;
 if(['empty','loading','error'].includes(qs.get('state'))) state.listState = qs.get('state');
 if(['panel','phone'].includes(qs.get('form'))) state.form = qs.get('form');
+if(qs.get('open')) state.providerOpen = qs.get('open');
 const ovq = qs.get('ov');
 if(ovq==='add') state.sheet = true;
 else if(ovq==='menu'){ state.ov = {kind:'menu'}; state.menuAt = {x:120,y:150}; }
@@ -908,6 +918,31 @@ function mdSessions(){
       '<button class="btn">打开</button><button class="btn" data-act="rename">重命名</button><button class="btn" data-act="rename">移动</button>');
   })];
 }
+function providerEditor(x){
+  return `<div class="prow-edit">
+    <div class="subhead">账号</div>
+    <div class="item"><span class="dot"></span><div class="who"><div class="nm">alex@example.com</div><div class="sub">ChatGPT Pro · 62% 已用</div></div><button class="btn">⋯</button></div>
+    <div class="item"><span class="dot"></span><div class="who"><div class="nm">team@example.com</div><div class="sub">ChatGPT Plus · 31% 已用</div></div><button class="btn">⋯</button></div>
+    <div class="rowbtns"><button class="btn">＋ 添加账号</button><button class="btn">登录新账号</button></div>
+    <div class="subhead">密钥与高级</div>
+    <div class="item"><div class="who"><div class="nm">API 密钥</div></div><span class="meta">2 个</span></div>
+    <div class="rowbtns"><button class="btn danger" data-act="delProvider">删除供应商</button></div>
+  </div>`;
+}
+function providersInline(){
+  const h = (n)=> (PROVIDER_INFO[n]||['','','',''])[3];
+  return [`<div class="list">${ROWS.providers.map(([n,s,m,c])=>{
+    const on = state.sw[n] !== undefined ? state.sw[n] : true;
+    const open = state.providerOpen===n;
+    return `<button class="prow${open?' open':''}" data-provider="${n}" data-mdrow="${n}">
+      <span class="logo2" style="background:${c}">${n[0]}</span>
+      <span class="who"><span class="nm">${n}</span><span class="sub">${s}</span></span>
+      <span class="meta">${m} · ${h(n)}</span>
+      <span class="switch${on?' on':''}" data-sw="${n}"></span>
+      <span class="chev">${open?'▾':'▸'}</span>
+    </button>${open?providerEditor({n,s,m,c}):''}`;
+  }).join('')}</div>`];
+}
 function mdProviders(){
   const items = ROWS.providers.map(([n,s,m,c])=>({n,s,c,meta:m}));
   return [mdSplit(items, x=>{
@@ -1009,7 +1044,7 @@ function bodyBlocks(page, kind){
   if(kind==='masking') return [maskStats(), mdMasking()];
   if(kind==='settings') return [settingsList()];
   if(kind==='gateway') return [listRows('gateway'), mdKeys()];
-  if(kind==='providers') return [mdProviders(), foldRow()];
+  if(kind==='providers') return [providersInline(), foldRow()];
   return [listRows(kind)];
 }
 function bodyNamesFor(page, tab){
@@ -1240,6 +1275,8 @@ stage.addEventListener('click', e=>{
   if(pt){ state.panelTab = pt.dataset.ptab; renderStage(); return; }
   const sw = e.target.closest('[data-sw]');
   if(sw){ const n = sw.dataset.sw; state.sw[n] = !sw.classList.contains('on'); renderStage(); return; }
+  const pr = e.target.closest('[data-provider]');
+  if(pr){ state.providerOpen = state.providerOpen===pr.dataset.provider ? null : pr.dataset.provider; renderStage(); return; }
   const act = e.target.closest('[data-act]');
   if(act){
     const a = act.dataset.act;
