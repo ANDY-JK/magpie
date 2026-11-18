@@ -96,6 +96,13 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
 .pagestrip::-webkit-scrollbar{display:none}
 .pagestrip .tab{flex:none;height:23px;padding:0 8px;border-radius:6px;font-size:11px;color:var(--muted);white-space:nowrap}
 .pagestrip .tab.on{background:var(--card-2);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.tabstrip{flex:none;display:flex;align-items:center;gap:3px;padding:0 8px;height:34px;border-bottom:.5px solid var(--line-2);overflow-x:auto;scrollbar-width:none}
+.tabstrip::-webkit-scrollbar{display:none}
+.tabstrip .tab{flex:none;height:23px;padding:0 8px;border-radius:6px;font-size:11px;color:var(--muted);white-space:nowrap}
+.tabstrip .tab.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.gchip{flex:none;height:17px;display:inline-flex;align-items:center;padding:0 5px;border-radius:5px;background:var(--pill);font-size:9.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.gchip.on{background:var(--accent-soft);color:var(--accent)}
+.tsep{flex:none;width:1px;height:14px;background:var(--line);margin:0 3px}
 
 /* 内容 */
 .view{flex:1;min-width:0;overflow:auto;padding:9px 12px 16px;scrollbar-width:none}
@@ -217,6 +224,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
     <button data-f="wide">宽窗</button>
   </div>
   <span class="sep"></span>
+  <button class="tbtn" id="navBtn">窄窗：两行</button>
   <button class="tbtn" id="specBtn">标注：关</button>
   <button class="tbtn" id="themeBtn">明 / 暗</button>
   <span class="sep"></span>
@@ -387,10 +395,11 @@ const COMPONENTS = [
 const state = {
   frame:'narrow', section:'model', page:'providers', theme:'light',
   tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
-  spec:false, sel:null, libSel:0, mdSel:0,
+  spec:false, sel:null, libSel:0, mdSel:0, compact:false,
 };
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
+if(qs.get('nav')==='one') state.compact = true;
 if(qs.get('p') && PAGES[qs.get('p')]) state.page = qs.get('p');
 if(qs.get('spec')==='1') state.spec = true;
 if(PAGES[state.page]){ const s=SECTIONS.find(x=>x.pages.includes(state.page)); if(s) state.section=s.id; }
@@ -975,15 +984,28 @@ function mainView(){
   const regions = regionsFor(state.page, p);
   return `<main class="view">${regions.map((r,i)=>reg(i+1, r[0], r[1])).join('')}</main>`;
 }
+function compactNav(){
+  let out = '';
+  SECTIONS.forEach((sec, si)=>{
+    if(si) out += '<span class="tsep"></span>';
+    out += `<span class="gchip${state.page!=='settings'&&state.section===sec.id?' on':''}">${sec.name}</span>`;
+    out += sec.pages.map(id=>`<button class="tab${state.page===id?' on':''}" data-page="${id}">${PAGES[id].name}</button>`).join('');
+  });
+  out += '<span class="tsep"></span>';
+  out += `<button class="tab${state.page==='settings'?' on':''}" data-page="settings">设置</button>`;
+  return `<nav class="tabstrip">${out}</nav>`;
+}
 function renderStage(){
   stage.innerHTML = state.frame==='wide'
     ? `<div class="win wide">${topbar(false)}<div class="main">${navSide()}${mainView()}</div>${footerbar()}</div>`
-    : `<div class="win narrow">${topbar(true)}${secStrip()}${pageStrip()}${mainView()}${footerbar()}</div>`;
+    : `<div class="win narrow">${topbar(true)}${state.compact ? compactNav() : secStrip()+pageStrip()}${mainView()}${footerbar()}</div>`;
   const sec = SECTIONS.find(s=>s.id===state.section);
   const where = state.page==='settings' ? '设置' : ((sec ? sec.name + ' › ' : '') + PAGES[state.page].name);
   document.getElementById('where').textContent = where;
   document.querySelectorAll('#frameSeg button[data-f]').forEach(b=>b.classList.toggle('on', b.dataset.f===state.frame));
   document.getElementById('specBtn').textContent = '标注：' + (state.spec ? '开' : '关');
+  document.getElementById('navBtn').textContent = '窄窗：' + (state.compact ? '一行' : '两行');
+  if(state.frame==='narrow' && state.compact){ const nav=document.querySelector('.win.narrow .tabstrip'); const on=nav && nav.querySelector('.tab.on'); if(on) nav.scrollLeft = Math.max(0, on.offsetLeft - 60); }
   const regions = regionsFor(state.page, PAGES[state.page]).map(r=>r[0]);
   const selTxt = state.sel ? ('已选：' + where + ' · 区域 ' + state.sel.n + ' · ' + state.sel.name) : ('当前页：' + where);
   document.getElementById('caption').textContent = selTxt + ' · 本页区域：' + regions.join(' · ') + '。';
@@ -1052,6 +1074,7 @@ document.getElementById('frameSeg').addEventListener('click', e=>{
   if(!b) return;
   state.frame = b.dataset.f; renderStage();
 });
+document.getElementById('navBtn').addEventListener('click', ()=>{ state.compact = !state.compact; renderStage(); });
 document.getElementById('specBtn').addEventListener('click', ()=>{
   state.spec = !state.spec; state.sel = null; renderStage();
 });
