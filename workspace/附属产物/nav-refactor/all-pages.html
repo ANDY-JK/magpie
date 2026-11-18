@@ -212,6 +212,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
 .spec-hint{font-size:10px;color:var(--muted);line-height:1.5;max-width:900px;text-align:center}
 .foldrow{display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:10.5px;color:var(--muted)}
 .foldrow .note{font-size:9.5px;color:var(--faint)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.font-preview{background:var(--bg);border-radius:6px;padding:8px 10px;font-size:14px;color:var(--fg-2);text-align:center}
+.err-state{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;background:color-mix(in srgb,var(--red) 10%,var(--card));color:var(--red);font-size:11px}
+button:focus-visible,.lib-item:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .formrow{display:flex;align-items:center;gap:8px}
 .formrow label{width:56px;font-size:10px;color:var(--muted);flex:none}
 .formrow .ov-search{flex:1}
@@ -343,7 +347,7 @@ const BODY_NAMES = {
   settings:['设置行'],
   agents:['列表'],
   sessions:['列表'],
-  gateway:['列表'],
+  gateway:['网关信息','密钥列表'],
   library:['列表'],
 };
 const SPEC_INFO = {
@@ -366,7 +370,8 @@ const SPEC_INFO = {
   },
   gateway:{
     '工具栏':['普通按钮（复制地址/刷新）','toolbarHtml · .toolbar'],
-    '列表':['列表行 ×3','listRows · .item'],
+    '网关信息':['列表行 ×3','listRows · .item'],
+    '密钥列表':['列表 + 详情面板','mdKeys · .lib-split'],
   },
   usage:{
     '标签条':['页内标签 ×5','viewTabs · .vtabs'],
@@ -432,7 +437,7 @@ const state = {
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
 if(qs.get('nav')==='one') state.compact = true;
-if(['empty','loading'].includes(qs.get('state'))) state.listState = qs.get('state');
+if(['empty','loading','error'].includes(qs.get('state'))) state.listState = qs.get('state');
 const ovq = qs.get('ov');
 if(ovq==='add') state.sheet = true;
 else if(ovq==='menu'){ state.ov = {kind:'menu'}; state.menuAt = {x:120,y:150}; }
@@ -443,6 +448,9 @@ else if(ovq==='shortcut') state.ov = {kind:'shortcut', title:'快速面板快捷
 else if(ovq==='request') state.ov = {kind:'request', title:'请求详情'};
 else if(ovq==='update') state.ov = {kind:'update', title:'发现新版本 0.1.2401'};
 else if(ovq==='quit') state.ov = {kind:'quit', title:'退出 magpie？'};
+else if(ovq==='import') state.ov = {kind:'import', title:'导入配置'};
+else if(ovq==='font') state.ov = {kind:'font', title:'界面字体'};
+else if(ovq==='edit') state.ov = {kind:'edit', title:'编辑密钥', fields:[['名称','openai-key'],['密钥','sk-••••••••'],['模型','全部']]};
 if(qs.get('p') && PAGES[qs.get('p')]) state.page = qs.get('p');
 if(qs.get('spec')==='1') state.spec = true;
 if(PAGES[state.page]){ const s=SECTIONS.find(x=>x.pages.includes(state.page)); if(s) state.section=s.id; }
@@ -603,6 +611,7 @@ function settingsGeneral(){
     ${settingRow('外观','跟随系统','<div class="segline"><button class="segbtn on">跟随</button><button class="segbtn">浅色</button><button class="segbtn">深色</button></div>')}
     ${settingRow('语言','','<button class="btn" data-act="lang">简体中文 ⌄</button>')}
     ${settingRow('文字大小','','<div class="segline"><button class="segbtn">小</button><button class="segbtn on">中</button><button class="segbtn">大</button></div>')}
+    ${settingRow('界面字体','','<button class="btn" data-act="font">系统默认 ⌄</button>')}
     ${settingRow('快速面板快捷键','','<button class="btn" data-act="shortcut">⌃ ⌘ Space</button>')}
     ${settingRow('减少动态效果','','<span class="switch"></span>')}
   </div>`];
@@ -624,9 +633,9 @@ function settingsNetwork(){
 }
 function settingsModels(){
   return [`<div class="list">
-    ${settingRow('图片模型','','<button class="btn">gpt-image ⌄</button>')}
-    ${settingRow('搜索模型','','<button class="btn">exa ⌄</button>')}
-    ${settingRow('回复模型','','<button class="btn">跟随请求 ⌄</button>')}
+    ${settingRow('图片模型','','<button class="btn" data-act="model">gpt-image ⌄</button>')}
+    ${settingRow('搜索模型','','<button class="btn" data-act="model">exa ⌄</button>')}
+    ${settingRow('回复模型','','<button class="btn" data-act="model">跟随请求 ⌄</button>')}
     ${settingRow('禁用模型','','<button class="btn">管理</button>')}
   </div>`];
 }
@@ -876,6 +885,18 @@ function mdProviders(){
       '<button class="btn">编辑</button><button class="btn">隐藏账号</button><button class="btn danger" data-act="delProvider">删除</button>');
   })];
 }
+const KEYS = [
+  ['openai-key','sk-•••• · 2 个模型','2 个模型'],
+  ['anthropic','sk-ant-•••• · 1 个模型','1 个模型'],
+];
+function mdKeys(){
+  const items = KEYS.map(([n,s,m])=>({n,s,m}));
+  return [mdSplit(items, x=>det(x.n, [
+    ['密钥', x.s],
+    ['模型', x.m],
+    ['最后使用', x.n==='openai-key' ? '今天 14:20' : '昨天 09:12'],
+  ], '<button class="btn" data-act="editKey">编辑</button><button class="btn danger" data-act="delKey">删除</button>'))];
+}
 function mdDoctor(){
   const items = CHECKS.map(([n,v,k])=>({n,s:v,dot:k}));
   return [mdSplit(items, x=>det(x.n, [
@@ -941,8 +962,9 @@ function listStateOn(){
 }
 function emptyState(){ return `<div class="empty-list">暂无内容</div>`; }
 function skeletonState(){ return `<div class="skel-list"><i></i><i></i><i></i><i></i></div>`; }
+function errorState(){ return `<div class="err-state"><span>读取失败：连接超时</span><button class="btn" data-act="retry">重试</button></div>`; }
 function bodyBlocks(page, kind){
-  if(listStateOn()) return [state.listState==='empty' ? emptyState() : skeletonState()];
+  if(listStateOn()) return [state.listState==='empty' ? emptyState() : state.listState==='loading' ? skeletonState() : errorState()];
   const p = PAGES[page];
   const tab = p && p.tabs ? (state.tabs[page] || p.tabs[0]) : null;
   const f = tab && TAB_BODIES[page] && TAB_BODIES[page][tab];
@@ -955,11 +977,12 @@ function bodyBlocks(page, kind){
   if(kind==='doctor') return mdDoctor();
   if(kind==='masking') return [maskStats(), mdMasking()];
   if(kind==='settings') return [settingsList()];
+  if(kind==='gateway') return [listRows('gateway'), mdKeys()];
   if(kind==='providers') return [mdProviders(), foldRow()];
   return [listRows(kind)];
 }
 function bodyNamesFor(page, tab){
-  if(listStateOn()) return [state.listState==='empty' ? '空状态' : '骨架屏'];
+  if(listStateOn()) return [state.listState==='empty' ? '空状态' : state.listState==='loading' ? '骨架屏' : '错误条'];
   const p = PAGES[page];
   const n = tab && TAB_BODY_NAMES[page] && TAB_BODY_NAMES[page][tab];
   return n || BODY_NAMES[p.kind] || ['内容'];
@@ -1038,7 +1061,7 @@ function addSheetInline(){
     <div class="ov-h"><span>添加供应商</span><span class="grow"></span><button class="ov-close" data-closesheet>×</button></div>
     <div class="ov-search">搜索厂商…</div>
     <div class="ov-tiles">${['Codex','Claude','Gemini','Qwen','Kimi','自定义…'].map(x=>`<button class="ov-tile">${x}</button>`).join('')}</div>
-    <div class="rowbtns"><button class="btn" data-closesheet>取消</button><button class="btn">导入…</button></div>
+    <div class="rowbtns"><button class="btn" data-closesheet>取消</button><button class="btn" data-act="import">导入…</button></div>
   </div>`;
 }
 function mainView(){
@@ -1098,6 +1121,12 @@ function overlayHtml(){
   if(o.kind==='update') return modalHtml(o.title || '发现新版本',
     `<p class="hint">更新会重启 magpie，正在运行的请求会先完成。</p>`,
     '<button class="btn" data-ovclose>稍后</button><button class="btn primary" data-ovclose>更新</button>');
+  if(o.kind==='import') return modalHtml(o.title || '导入配置',
+    `<div class="list"><div class="item"><div class="who"><div class="nm">Codex</div><div class="sub">~/.codex/config.toml</div></div><span class="switch on"></span></div><div class="item"><div class="who"><div class="nm">Claude Code</div><div class="sub">~/.claude/settings.json</div></div><span class="switch on"></span></div></div>`,
+    '<button class="btn" data-ovclose>取消</button><button class="btn primary" data-ovclose>导入选中</button>');
+  if(o.kind==='font') return modalHtml(o.title || '界面字体',
+    `<div class="two-col"><div class="ov-list">${['系统默认','Microsoft YaHei UI','Segoe UI','思源黑体'].map((x,i)=>`<button class="mi${i===0?' on':''}" data-ovclose>${x}</button>`).join('')}</div><div class="ov-list">${['Regular','Medium','Semibold'].map((x,i)=>`<button class="mi${i===0?' on':''}" data-ovclose>${x}</button>`).join('')}</div></div><div class="font-preview">Aa 0123 · 中文</div>`,
+    '<button class="btn" data-ovclose>取消</button><button class="btn primary" data-ovclose>保存</button>');
   if(o.kind==='quit') return modalHtml(o.title || '退出 magpie？',
     `<p class="hint">还有 4 个会话连着网关，退出会中断它们。</p>`,
     '<button class="btn" data-ovclose>取消</button><button class="btn danger" data-ovclose>退出</button>');
@@ -1113,7 +1142,7 @@ function renderStage(){
   document.querySelectorAll('#frameSeg button[data-f]').forEach(b=>b.classList.toggle('on', b.dataset.f===state.frame));
   document.getElementById('specBtn').textContent = '标注：' + (state.spec ? '开' : '关');
   document.getElementById('navBtn').textContent = '窄窗：' + (state.compact ? '一行' : '两行');
-  document.getElementById('stateBtn').textContent = '状态：' + ({normal:'正常',empty:'空',loading:'加载'}[state.listState]);
+  document.getElementById('stateBtn').textContent = '状态：' + ({normal:'正常',empty:'空',loading:'加载',error:'错误'}[state.listState]);
   if(state.sheet){ const sh=document.querySelector('.sheet-inline'); if(sh) sh.scrollIntoView({block:'nearest'}); }
   if(state.frame==='narrow' && state.compact){ const nav=document.querySelector('.win.narrow .tabstrip'); const on=nav && nav.querySelector('.tab.on'); if(on) nav.scrollLeft = Math.max(0, on.offsetLeft - 60); }
   const regions = regionsFor(state.page, PAGES[state.page]).map(r=>r[0]);
@@ -1143,6 +1172,12 @@ stage.addEventListener('click', e=>{
     else if(a==='shortcut') state.ov={kind:'shortcut', title:'快速面板快捷键', key:'⌃ ⌘ Space'};
     else if(a==='request') state.ov={kind:'request', title:'请求详情'};
     else if(a==='update') state.ov={kind:'update', title:'发现新版本 0.1.2401'};
+    else if(a==='delKey') state.ov={kind:'confirm', title:'删除密钥？', body:'删除后无法恢复，使用它的请求会失败。', ok:'删除'};
+    else if(a==='editKey') state.ov={kind:'edit', title:'编辑密钥', fields:[['名称','openai-key'],['密钥','sk-••••••••'],['模型','全部']]};
+    else if(a==='model') state.ov={kind:'pick', title:'选择模型', items:['gpt-5.6-sol','opus-4.6','gemini-3-pro','qwen-3-max'], selected:'gpt-5.6-sol'};
+    else if(a==='font') state.ov={kind:'font', title:'界面字体'};
+    else if(a==='import') state.ov={kind:'import', title:'导入配置'};
+    else if(a==='retry') state.listState='normal';
     else if(a==='quit') state.ov={kind:'quit', title:'退出 magpie？'};
     renderStage(); return;
   }
@@ -1218,7 +1253,7 @@ document.getElementById('frameSeg').addEventListener('click', e=>{
   state.frame = b.dataset.f; renderStage();
 });
 document.getElementById('navBtn').addEventListener('click', ()=>{ state.compact = !state.compact; renderStage(); });
-document.getElementById('stateBtn').addEventListener('click', ()=>{ state.listState = state.listState==='normal' ? 'empty' : (state.listState==='empty' ? 'loading' : 'normal'); renderStage(); });
+document.getElementById('stateBtn').addEventListener('click', ()=>{ const states=['normal','empty','loading','error']; state.listState = states[(states.indexOf(state.listState)+1)%states.length]; renderStage(); });
 document.getElementById('specBtn').addEventListener('click', ()=>{
   state.spec = !state.spec; state.sel = null; renderStage();
 });
