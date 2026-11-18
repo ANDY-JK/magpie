@@ -521,6 +521,9 @@ button.rt-session { cursor: pointer; }
 /* a classifier that failed (#1929): a dot, never a stripe */
 .rt-group .mem.clsfail { color: var(--amber); }
 .rt-group .mem.clsfail .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
+/* a member nothing serves now: its provider's list or picks no longer have
+   it, or the provider is gone. Listed in amber, never dropped unsaid. */
+.rt-group .mem.rt-stale { color: var(--amber); }
 .rt-patadd { display: flex; gap: 6px; align-items: center; }
 .rt-pats .fbl:not(:empty) + .rt-patadd { margin-top: 4px; }
 .rt-patadd input { flex: 1; min-width: 0; }

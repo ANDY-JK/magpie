@@ -5428,6 +5428,14 @@ function routingPage(part) {
   // has them, greyed with why. A group of the user's lists what they put in.
   const offIn = (g) => g.auto ? (g.memberInfo || []).filter((i) => i.providerOff && g.members.includes(i.id)) : [];
   const shownMembers = (g) => { const off = offIn(g).map((i) => i.id); const left = g.members.filter((id) => !off.includes(id)); return left.length ? left : g.members; };
+  // staleIn: the members the group names that nothing serves now, other than
+  // a provider switched off (its own words say that) and a group in the
+  // group (its own card says what it has): a model its provider's list or
+  // picks no longer have, or a provider magpie no longer has. The gateway
+  // skips them; the group's card says each in amber, where the member line
+  // alone left a bare id and "no member ready" spoke only when every one
+  // was gone.
+  const staleIn = (g) => (g.memberInfo || []).filter((i) => g.members.includes(i.id) && !i.ready && !i.providerOff && !i.group);
   const groupIcons = (g) => { const shown = shownMembers(g); return [...new Map((g.memberInfo || []).filter((i) => i.icon && shown.includes(i.id)).map((i) => [i.provider || i.icon, i.icon])).values()]; };
   // offOf: a member whose provider is switched off (groupsState's
   // providerOff), said by its provider's name and model rather than a bare
@@ -6039,6 +6047,12 @@ function routingPage(part) {
     const sep = g.routing === "order" ? " → " : " · ";
     const mem = manual ? pickRow(g) : el("div", "mem", shownMembers(g).map((id) => memberLabel(g, id) + (g.off?.includes(id) ? ` (${t("off")})` : "")).join(sep));
     main.append(nm, mem);
+    const stale = staleIn(g);
+    if (stale.length) {
+      const line = el("div", "mem rt-stale");
+      line.append(stale.map((i) => t("Member {member} is no longer in the list", { member: memberLabel(g, i.id) })).join(" · "));
+      main.append(line);
+    }
     if (!g.decides) main.append(...groupQuota(g));
     for (const p of g.patterns || []) {
       const line = el("div", "mem pat" + (p.models ? "" : " none"));
