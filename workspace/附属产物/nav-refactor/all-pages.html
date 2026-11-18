@@ -309,15 +309,15 @@ const BODY_NAMES = {
 const SPEC_INFO = {
   agents:{
     '工具栏':['普通按钮（刷新）','toolbarHtml · .toolbar'],
-    '列表':['列表行 ×3、图标、状态点','listRows · .item'],
+    '列表':['列表 + 详情面板','mdAgents · .lib-split'],
   },
   sessions:{
     '工具栏':['搜索框、普通按钮','toolbarHtml · .toolbar'],
-    '列表':['列表行 ×3','listRows · .item'],
+    '列表':['列表 + 详情面板','mdSessions · .lib-split'],
   },
   providers:{
     '工具栏':['搜索框、普通按钮、主按钮','toolbarHtml · .toolbar'],
-    '列表':['列表行 ×4、图标、状态点','listRows · .item'],
+    '列表':['列表 + 详情面板','mdProviders · .lib-split'],
     '已关闭':['折叠行','foldRow · .foldrow'],
   },
   routing:{
@@ -341,12 +341,12 @@ const SPEC_INFO = {
   },
   doctor:{
     '工具栏':['普通按钮（检查/刷新）','toolbarHtml · .toolbar'],
-    '检查列表':['列表行 ×4、状态点','checkList · .item/.dot'],
+    '检查列表':['列表 + 详情面板','mdDoctor · .lib-split'],
   },
   masking:{
     '工具栏':['分段控件、普通按钮','toolbarHtml · .toolbar'],
     '统计块':['统计块 ×4','maskStats · .stat'],
-    '掩码列表':['列表行 ×3','listRows · .item'],
+    '掩码列表':['列表 + 详情面板','mdMasking · .lib-split'],
   },
   library:{
     '标签条':['页内标签 ×7','viewTabs · .vtabs'],
@@ -387,7 +387,7 @@ const COMPONENTS = [
 const state = {
   frame:'narrow', section:'model', page:'providers', theme:'light',
   tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
-  spec:false, sel:null, libSel:0,
+  spec:false, sel:null, libSel:0, mdSel:0,
 };
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
@@ -685,10 +685,10 @@ function libSplit(kind, typeName){
 const TAB_BODIES = {
   usage:{
     '概览': () => [statsHtml(), chartHtml()],
-    '请求': () => [listRows('requests')],
-    '会话': () => [listRows('usageSessions')],
+    '请求': () => mdRequests(),
+    '会话': () => mdUsageSessions(),
     '上下文': () => usageContext(),
-    '榜单': () => [listRows('rank')],
+    '榜单': () => mdRank(),
   },
   library:{
     '指令': () => [libSplit('library','指令')],
@@ -700,9 +700,9 @@ const TAB_BODIES = {
     'RTK': () => [`<div class="optbar" style="margin-bottom:6px"><div class="segline"><button class="segbtn on">30 天</button><button class="segbtn">90 天</button><button class="segbtn">全部</button></div></div>` + libSplit('rtk','RTK')[0]],
   },
   plugins:{
-    '内置': () => [switchList()],
+    '内置': () => mdPlugins(),
     '发现': () => discoverList(),
-    '已安装 · 3': () => installedList(),
+    '已安装 · 3': () => mdInstalled(),
   },
   settings:{
     '通用': () => settingsGeneral(),
@@ -724,10 +724,10 @@ const TAB_BODY_NAMES = {
 };
 const TAB_SPEC = {
   usage:{
-    '请求列表':['列表行 ×4、状态点','listRows · .item'],
-    '会话列表':['列表行 ×3','listRows · .item'],
+    '请求列表':['列表 + 详情面板','mdRequests · .lib-split'],
+    '会话列表':['列表 + 详情面板','mdUsageSessions · .lib-split'],
     '上下文卡片':['卡片 ×2、列表行','usageContext · .cols/.card'],
-    '榜单列表':['列表行 ×4','listRows · .item'],
+    '榜单列表':['列表 + 详情面板','mdRank · .lib-split'],
   },
   library:{
     '指令列表':['列表 + 详情面板','libSplit · .lib-split'],
@@ -739,25 +739,161 @@ const TAB_SPEC = {
     'RTK 列表':['范围 + 列表 + 详情面板','libSplit · .lib-split'],
   },
   plugins:{
+    '开关列表':['列表 + 详情面板','mdPlugins · .lib-split'],
     '发现列表':['列表行 ×3、普通按钮','discoverList · .item/.btn'],
-    '已安装列表':['列表行 ×3、开关','installedList · .item/.switch'],
+    '已安装列表':['列表 + 详情面板','mdInstalled · .lib-split'],
   },
   settings:{
     '设置行':['列表行 ×3–4、开关、分段控件','settings* · .item/.switch/.segline'],
   },
 };
+const AGENT_INFO = {
+  'Codex':['运行中','3','12','codex'],
+  'Claude Code':['已连接','2','9','claude'],
+  'Gemini CLI':['未连接','1','7','gemini'],
+};
+const SESSION_INFO = {
+  '项目一':['Claude Code','12','2 小时前','~/work/project-one'],
+  '项目二':['Claude Code','8','昨天','~/work/project-two'],
+  '项目三':['Codex','5','3 天前','~/work/project-three'],
+};
+const PROVIDER_INFO = {
+  'Codex':['3 个账号','12 个模型','1.2M','98%'],
+  'Claude Code':['2 个账号','9 个模型','842K','96%'],
+  'Gemini CLI':['1 个账号','7 个模型','318K','99%'],
+  'Qwen Code':['1 个账号','6 个模型','96K','72%'],
+};
+const MASK_INFO = {
+  '邮箱':['邮箱','a***@example.com','3 次','今天 14:20'],
+  '手机号':['手机号','138****0000','1 次','昨天 09:12'],
+  '密钥':['密钥','sk-****','2 次','11-16 18:40'],
+};
+const REQUEST_INFO = {
+  'codex/gpt-5.6-sol':['1.2s','2.4K','成功'],
+  'claude/opus-4.6':['2.4s','3.1K','成功'],
+  'gemini/3-pro':['3.1s','1.8K','成功'],
+  'qwen/3-max':['0.9s','900','成功'],
+};
+const RANK_INFO = {
+  'gpt-5.6-sol':['1','1.2M','32%'],
+  'opus-4.6':['2','842K','22%'],
+  'gemini-3-pro':['3','318K','8%'],
+  'qwen-3-max':['4','96K','3%'],
+};
+function det(title, rows, actions){
+  return `<div class="det-h">${title}</div>` +
+    rows.map(([k,v])=>`<div class="det-row"><span>${k}</span><b>${v}</b></div>`).join('') +
+    `<div class="rowbtns">${actions}</div>`;
+}
+function mdSplit(items, detailFn){
+  const sel = Math.min(state.mdSel || 0, Math.max(0, items.length - 1));
+  return `<div class="lib-split">
+    <div class="lib-list">${items.map((x,i)=>{
+      const lead = x.c ? `<span class="logo2" style="background:${x.c}">${x.n[0]}</span>`
+        : (x.dot ? `<span class="dot ${x.dot==='warn'?'amber':''}"></span>`
+        : `<span class="logo2" style="background:var(--pill);color:var(--muted)">${x.n[0]}</span>`);
+      const tail = x.on !== undefined ? `<span class="switch${x.on?' on':''}"></span>`
+        : (x.meta ? `<span class="meta">${x.meta}</span>` : '');
+      return `<button class="lib-item${i===sel?' on':''}" data-mdsel="${i}">${lead}<span class="who"><span class="nm">${x.n}</span><span class="sub">${x.s||''}</span></span>${tail}</button>`;
+    }).join('')}</div>
+    <div class="lib-detail">${detailFn(items[sel])}</div>
+  </div>`;
+}
+function mdAgents(){
+  const items = ROWS.agents.map(([n,s,m,c])=>({n,s,c}));
+  return [mdSplit(items, x=>{
+    const i = AGENT_INFO[x.n] || ['—','—','—','—'];
+    return det(x.n, [['状态',i[0]],['账号',i[1]],['模型',i[2]],['命令',i[3]]],
+      '<button class="btn">打开配置</button><button class="btn">重启</button>');
+  })];
+}
+function mdSessions(){
+  const items = ROWS.sessions.map(([n,s,m,c])=>({n,s,c}));
+  return [mdSplit(items, x=>{
+    const i = SESSION_INFO[x.n] || ['—','—','—','—'];
+    return det(x.n, [['Agent',i[0]],['会话数',i[1]],['最近',i[2]],['文件夹',i[3]]],
+      '<button class="btn">打开</button><button class="btn">重命名</button><button class="btn">移动</button>');
+  })];
+}
+function mdProviders(){
+  const items = ROWS.providers.map(([n,s,m,c])=>({n,s,c,meta:m}));
+  return [mdSplit(items, x=>{
+    const i = PROVIDER_INFO[x.n] || ['—','—','—','—'];
+    return det(x.n, [['账号',i[0]],['模型',i[1]],['今日',i[2]],['健康度',i[3]]],
+      '<button class="btn">编辑</button><button class="btn">隐藏账号</button><button class="btn danger">删除</button>');
+  })];
+}
+function mdDoctor(){
+  const items = CHECKS.map(([n,v,k])=>({n,s:v,dot:k}));
+  return [mdSplit(items, x=>det(x.n, [
+    ['状态', x.dot==='warn' ? '需注意' : '正常'],
+    ['说明', x.s],
+    ['建议', x.dot==='warn' ? '更新证书' : '无需操作'],
+  ], '<button class="btn">重新检查</button><button class="btn">修复</button>'))];
+}
+function mdMasking(){
+  const items = ROWS.masking.map(([n,s,m])=>({n,s,m}));
+  return [mdSplit(items, x=>{
+    const i = MASK_INFO[x.n] || ['—','—','—','—'];
+    return det(x.n, [['类型',i[0]],['值',i[1]],['次数',i[2]],['最近',i[3]]],
+      '<button class="btn">查看记录</button><button class="btn">添加例外</button>');
+  })];
+}
+function mdPlugins(){
+  const items = PLUGINS.map(([n,d,on])=>({n,s:d,on}));
+  return [mdSplit(items, x=>det(x.n, [
+    ['说明', x.s],
+    ['状态', x.on ? '已启用' : '已停用'],
+    ['设置', '默认'],
+  ], '<button class="btn">设置</button><button class="btn">打开</button>'))];
+}
+function mdInstalled(){
+  const data = [['filesystem','v1.2.0',true],['github','v0.9.4',true],['web-search','v0.3.1',false]];
+  const items = data.map(([n,v,on])=>({n,s:v,on}));
+  return [mdSplit(items, x=>det(x.n, [
+    ['版本', x.s],
+    ['状态', x.on ? '已启用' : '已停用'],
+    ['来源', 'npm'],
+  ], '<button class="btn">更新</button><button class="btn danger">卸载</button>'))];
+}
+function mdRequests(){
+  const items = ROWS.requests.map(([n,s,m,c])=>({n,s,c,meta:m}));
+  return [mdSplit(items, x=>{
+    const i = REQUEST_INFO[x.n] || ['—','—','—'];
+    return det(x.n, [['耗时',i[0]],['令牌',i[1]],['状态',i[2]],['时间','今天 14:20']],
+      '<button class="btn">在路由页打开</button><button class="btn">复制</button>');
+  })];
+}
+function mdUsageSessions(){
+  const items = ROWS.usageSessions.map(([n,s,m,c])=>({n,s,c}));
+  return [mdSplit(items, x=>det(x.n, [
+    ['最近', x.s],
+    ['会话数', '12'],
+    ['Agent', 'Claude Code'],
+  ], '<button class="btn">打开</button><button class="btn">查看会话</button>'))];
+}
+function mdRank(){
+  const items = ROWS.rank.map(([n,s,m,c])=>({n,s,c,meta:m}));
+  return [mdSplit(items, x=>{
+    const i = RANK_INFO[x.n] || ['—','—','—'];
+    return det(x.n, [['排名',i[0]],['令牌',i[1]],['占比',i[2]]],
+      '<button class="btn">看请求</button>');
+  })];
+}
 function bodyBlocks(page, kind){
   const p = PAGES[page];
   const tab = p && p.tabs ? (state.tabs[page] || p.tabs[0]) : null;
   const f = tab && TAB_BODIES[page] && TAB_BODIES[page][tab];
   if(f) return f();
+  if(kind==='agents') return mdAgents();
+  if(kind==='sessions') return mdSessions();
   if(kind==='usage' || kind==='metrics') return [statsHtml(), chartHtml()];
   if(kind==='routing') return [routingCols()];
-  if(kind==='plugins') return [switchList()];
-  if(kind==='doctor') return [checkList()];
-  if(kind==='masking') return [maskStats(), listRows('masking')];
+  if(kind==='plugins') return mdPlugins();
+  if(kind==='doctor') return mdDoctor();
+  if(kind==='masking') return [maskStats(), mdMasking()];
   if(kind==='settings') return [settingsList()];
-  if(kind==='providers') return [listRows('providers'), foldRow()];
+  if(kind==='providers') return [mdProviders(), foldRow()];
   return [listRows(kind)];
 }
 function bodyNamesFor(page, tab){
@@ -865,24 +1001,26 @@ function renderStage(){
 stage.addEventListener('click', e=>{
   const h = e.target.closest('.spec-head');
   if(h){ state.sel = {n:+h.dataset.rn, name:h.dataset.rname}; renderStage(); return; }
+  const md = e.target.closest('[data-mdsel]');
+  if(md){ state.mdSel = +md.dataset.mdsel; renderStage(); return; }
   const ls = e.target.closest('[data-libsel]');
   if(ls){ state.libSel = +ls.dataset.libsel; renderStage(); return; }
   const s = e.target.closest('[data-sec]');
   if(s){
     const sec = SECTIONS.find(x=>x.id===s.dataset.sec);
-    state.section = sec.id; state.page = sec.pages[0]; state.sel = null; state.libSel = 0; renderStage(); return;
+    state.section = sec.id; state.page = sec.pages[0]; state.sel = null; state.libSel = 0; state.mdSel = 0; renderStage(); return;
   }
   const p = e.target.closest('[data-page]');
   if(p){
     state.page = p.dataset.page;
     const sec = sectionOf(state.page);
     if(sec) state.section = sec.id;
-    state.sel = null; state.libSel = 0; renderStage(); return;
+    state.sel = null; state.libSel = 0; state.mdSel = 0; renderStage(); return;
   }
   const v = e.target.closest('[data-vtab]');
-  if(v){ state.tabs[state.page] = v.dataset.vtab; state.sel = null; state.libSel = 0; renderStage(); return; }
+  if(v){ state.tabs[state.page] = v.dataset.vtab; state.sel = null; state.libSel = 0; state.mdSel = 0; renderStage(); return; }
   const l = e.target.closest('[data-l3]');
-  if(l){ state.l3 = l.dataset.l3; state.sel = null; state.libSel = 0; renderStage(); }
+  if(l){ state.l3 = l.dataset.l3; state.sel = null; state.libSel = 0; state.mdSel = 0; renderStage(); }
 });
 function renderAllIndex(){
   const rows = [];
