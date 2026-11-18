@@ -116,6 +116,7 @@ type aRequest struct {
 	MaxTokens     int      `json:"max_tokens"`
 	Temperature   *float64 `json:"temperature,omitempty"`
 	TopP          *float64 `json:"top_p,omitempty"`
+	TopK          *int     `json:"top_k,omitempty"`
 	StopSequences []string `json:"stop_sequences,omitempty"`
 	Stream        bool     `json:"stream,omitempty"`
 	Thinking      *struct {
@@ -155,7 +156,7 @@ func readAnthropic(body []byte, clientMarks, facts bool) (*Request, error) {
 		return nil, fmt.Errorf("invalid request: %v", err)
 	}
 	r := &Request{Model: a.Model, System: stringOrText(a.System), MaxTokens: a.MaxTokens,
-		Temp: a.Temperature, TopP: a.TopP, Stop: a.StopSequences, Stream: a.Stream, Fast: a.Speed == "fast"}
+		Temp: a.Temperature, TopP: a.TopP, TopK: a.TopK, Stop: a.StopSequences, Stream: a.Stream, Fast: a.Speed == "fast"}
 	if clientMarks {
 		var err error
 		r.clientCache, err = readClientCache(a)
@@ -1063,10 +1064,18 @@ func anthropicBody(r *Request, model, host string, replay bool) []byte {
 		if r.Effort != "" && outputEffortAt(host, model) {
 			out["output_config"] = map[string]any{"effort": r.Effort}
 		}
-	} else if r.Temp != nil {
-		out["temperature"] = *r.Temp
-	} else if r.TopP != nil {
-		out["top_p"] = *r.TopP
+	} else {
+		if r.Temp != nil {
+			out["temperature"] = *r.Temp
+		} else if r.TopP != nil {
+			out["top_p"] = *r.TopP
+		}
+		// top_k goes beside whichever of the two is sent; thinking takes
+		// none of the three. A Chat client's seed, penalties and logit_bias
+		// have no Messages field and are dropped.
+		if r.TopK != nil {
+			out["top_k"] = *r.TopK
+		}
 	}
 	if s := r.Format.schema(); len(s) > 0 {
 		oc, _ := out["output_config"].(map[string]any)

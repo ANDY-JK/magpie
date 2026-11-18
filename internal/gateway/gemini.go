@@ -75,6 +75,10 @@ type gRequest struct {
 		MaxOutputTokens    int             `json:"maxOutputTokens,omitempty"`
 		Temperature        *float64        `json:"temperature,omitempty"`
 		TopP               *float64        `json:"topP,omitempty"`
+		TopK               *int            `json:"topK,omitempty"`
+		Seed               *int64          `json:"seed,omitempty"`
+		PresencePenalty    *float64        `json:"presencePenalty,omitempty"`
+		FrequencyPenalty   *float64        `json:"frequencyPenalty,omitempty"`
 		StopSequences      []string        `json:"stopSequences,omitempty"`
 		ResponseMimeType   string          `json:"responseMimeType,omitempty"`
 		ResponseSchema     json.RawMessage `json:"responseSchema,omitempty"`
@@ -239,6 +243,7 @@ func parseGemini(body []byte) (*Request, error) {
 	r.System = geminiText(g.SystemInstruction)
 	if gc := g.GenerationConfig; gc != nil {
 		r.MaxTokens, r.Temp, r.TopP, r.Stop = gc.MaxOutputTokens, gc.Temperature, gc.TopP, gc.StopSequences
+		r.TopK, r.Seed, r.PresencePenalty, r.FrequencyPenalty = gc.TopK, gc.Seed, gc.PresencePenalty, gc.FrequencyPenalty
 		if tc := gc.ThinkingConfig; tc != nil {
 			r.Effort = tc.effort()
 			r.Thinking = r.Effort != ""

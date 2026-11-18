@@ -60,13 +60,21 @@ type cRequest struct {
 	MaxCompletionTokens int             `json:"max_completion_tokens,omitempty"`
 	Temperature         *float64        `json:"temperature,omitempty"`
 	TopP                *float64        `json:"top_p,omitempty"`
-	Stop                json.RawMessage `json:"stop,omitempty"`
-	Stream              bool            `json:"stream,omitempty"`
-	ReasoningEffort     string          `json:"reasoning_effort,omitempty"`
-	ParallelToolCalls   *bool           `json:"parallel_tool_calls,omitempty"`
-	ServiceTier         string          `json:"service_tier,omitempty"`
-	PromptCacheKey      string          `json:"prompt_cache_key,omitempty"`
-	ResponseFormat      json.RawMessage `json:"response_format,omitempty"`
+	Seed                *int64          `json:"seed,omitempty"`
+	FrequencyPenalty    *float64        `json:"frequency_penalty,omitempty"`
+	PresencePenalty     *float64        `json:"presence_penalty,omitempty"`
+	// TopK is no Chat Completions field: some clients send it beside their
+	// sampling fields, so it is read from the body when there is one, for
+	// an upstream that takes it (an Anthropic one).
+	TopK              *int               `json:"top_k,omitempty"`
+	LogitBias         map[string]float64 `json:"logit_bias,omitempty"`
+	Stop              json.RawMessage    `json:"stop,omitempty"`
+	Stream            bool               `json:"stream,omitempty"`
+	ReasoningEffort   string             `json:"reasoning_effort,omitempty"`
+	ParallelToolCalls *bool              `json:"parallel_tool_calls,omitempty"`
+	ServiceTier       string             `json:"service_tier,omitempty"`
+	PromptCacheKey    string             `json:"prompt_cache_key,omitempty"`
+	ResponseFormat    json.RawMessage    `json:"response_format,omitempty"`
 	// not a Chat field: OpenCode merges a model's options into its body
 	// whichever API it speaks, and a Codex model it asks on Chat is asked
 	// on Responses (Request.AccessPrograms)
@@ -92,6 +100,7 @@ func readChat(body []byte, facts bool) (*Request, error) {
 		return nil, fmt.Errorf("invalid request: %v", err)
 	}
 	r := &Request{Model: c.Model, MaxTokens: c.MaxCompletionTokens, Temp: c.Temperature, TopP: c.TopP,
+		Seed: c.Seed, FrequencyPenalty: c.FrequencyPenalty, PresencePenalty: c.PresencePenalty, TopK: c.TopK, LogitBias: c.LogitBias,
 		Stream: c.Stream, Effort: effortOf(c.ReasoningEffort), Parallel: c.ParallelToolCalls, Fast: c.ServiceTier == "priority" || c.ServiceTier == "ultrafast", Ultrafast: c.ServiceTier == "ultrafast", Tier: c.ServiceTier,
 		CacheKey: c.PromptCacheKey, Format: openAIFormat(c.ResponseFormat), AccessPrograms: c.AccessPrograms}
 	if r.MaxTokens == 0 {
@@ -554,6 +563,20 @@ func buildChat(r *Request, model, host string, rejectTemp bool) []byte {
 		if r.TopP != nil {
 			out["top_p"] = *r.TopP
 		}
+	}
+	// the sampling fields Chat has of its own. top_k has none: it goes to a
+	// Messages upstream (anthropicBody), and is left out here.
+	if r.Seed != nil {
+		out["seed"] = *r.Seed
+	}
+	if r.FrequencyPenalty != nil {
+		out["frequency_penalty"] = *r.FrequencyPenalty
+	}
+	if r.PresencePenalty != nil {
+		out["presence_penalty"] = *r.PresencePenalty
+	}
+	if len(r.LogitBias) > 0 {
+		out["logit_bias"] = r.LogitBias
 	}
 	if len(r.Stop) > 0 {
 		out["stop"] = r.Stop

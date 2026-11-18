@@ -247,10 +247,22 @@ type Request struct {
 	MaxTokens  int
 	Temp       *float64
 	TopP       *float64
-	Stop       []string
-	Stream     bool
-	Effort     string // low | medium | high | xhigh | max, when the client asked
-	Thinking   bool   // the client asked for visible reasoning
+	// The sampling fields the APIs name differently or not at all: a Chat
+	// request's seed, frequency_penalty, presence_penalty and logit_bias
+	// (top_k is no Chat field, but some clients send it and a Messages
+	// upstream takes it), and a Gemini request's generationConfig seed,
+	// presencePenalty, frequencyPenalty and topK. A protocol with no such
+	// field is sent the request without it, the rest unchanged (buildChat,
+	// anthropicBody, buildCodeAssistSent).
+	Seed             *int64
+	FrequencyPenalty *float64
+	PresencePenalty  *float64
+	TopK             *int
+	LogitBias        map[string]float64
+	Stop             []string
+	Stream           bool
+	Effort           string // low | medium | high | xhigh | max, when the client asked
+	Thinking         bool   // the client asked for visible reasoning
 	// ThinkOff is the client turning reasoning off: effort "none" (which
 	// Effort reads as low, for vendors with no way to turn it off) or an
 	// Anthropic request with thinking disabled.

@@ -550,6 +550,20 @@ func buildCodeAssistSent(r *Request, sent, agent string) []byte {
 	if r.TopP != nil {
 		gen["topP"] = *r.TopP
 	}
+	// the sampling fields Gemini has of its own; a Chat client's logit_bias
+	// has no field here and is dropped
+	if r.TopK != nil {
+		gen["topK"] = *r.TopK
+	}
+	if r.Seed != nil {
+		gen["seed"] = *r.Seed
+	}
+	if r.PresencePenalty != nil {
+		gen["presencePenalty"] = *r.PresencePenalty
+	}
+	if r.FrequencyPenalty != nil {
+		gen["frequencyPenalty"] = *r.FrequencyPenalty
+	}
 	if len(r.Stop) > 0 {
 		gen["stopSequences"] = r.Stop
 	}
