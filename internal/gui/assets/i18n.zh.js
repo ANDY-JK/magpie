@@ -637,6 +637,7 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "Move down": "下移",
     "Apply again": "重新应用",
     "List not written": "清单未写入",
+    "Each one is a real, billable call on a metered provider: the smallest this model takes": "每个模型都发一次真实计费调用；这是该模型能接受的最小请求",
     "magpie couldn't write this agent's model list: {error}. It is written again on the next change or a pick": "magpie 没能写入这个 agent 的模型清单：{error}。下次改动或选择模型时会重新写入",
     "Keep current settings": "保留当前设置",
     "{agent} no longer goes through magpie — its config was changed": "{agent} 已不经过 magpie：配置已变更",

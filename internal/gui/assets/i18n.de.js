@@ -625,6 +625,7 @@ I18N.de = Object.assign(I18N.de || {}, {
     "Move down": "Nach unten",
     "Apply again": "Erneut anwenden",
     "List not written": "Liste nicht geschrieben",
+    "Each one is a real, billable call on a metered provider: the smallest this model takes": "Jedes ist ein echter, abgerechneter Aufruf bei einem nutzungsbasierten Anbieter: die kleinste Anfrage, die dieses Modell annimmt",
     "magpie couldn't write this agent's model list: {error}. It is written again on the next change or a pick": "magpie konnte die Modellliste dieses Agenten nicht schreiben: {error}. Sie wird bei der nächsten Änderung oder Auswahl erneut geschrieben",
     "Keep current settings": "Aktuelle Einstellungen behalten",
     "{agent} no longer goes through magpie — its config was changed": "{agent} läuft nicht mehr über magpie — seine Konfiguration wurde geändert",

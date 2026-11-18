@@ -641,6 +641,7 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "Move down": "下移",
     "Apply again": "重新應用",
     "List not written": "清單未寫入",
+    "Each one is a real, billable call on a metered provider: the smallest this model takes": "每個模型都發一次真實計費呼叫；這是該模型能接受的最小請求",
     "magpie couldn't write this agent's model list: {error}. It is written again on the next change or a pick": "magpie 沒能寫入這個 agent 的模型清單：{error}。下次改動或選擇模型時會重新寫入",
     "Keep current settings": "保留目前設定",
     "{agent} no longer goes through magpie — its config was changed": "{agent} 已不經過 magpie：設定已變更",

@@ -12217,7 +12217,8 @@ function renderModels(p) {
   // a tiny request to each model agents see (a vendor that answers can have one that doesn't),
   // with the first ticked key that serves it (keySeeing, water5433)
   const byKey = p.keyList?.filter((k) => k.on)[1] ? "\n" + t("Each model is tested with the first ticked key that can serve it") : "";
-  const testAll = testButton(p, t("Test models"), t("Send a tiny request to each model agents see, to find the ones that don't answer") + byKey + "\n" + t("Right-click a model to test just it"), async () => {
+  const testAll = testButton(p, t("Test models"), t("Send a tiny request to each model agents see, to find the ones that don't answer") + "
+" + t("Each one is a real, billable call on a metered provider: the smallest this model takes") + byKey + "\n" + t("Right-click a model to test just it"), async () => {
     const ids = servedIds(p).filter((id) => p.decideTest || !decidesModel(p, id));
     if (!ids.length) { status(t("Pick a model first."), "err"); return; }
     // merge, not reset: the caps letters a Test capabilities run earned

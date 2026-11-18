@@ -625,6 +625,7 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "Move down": "下へ移動",
     "Apply again": "再適用",
     "List not written": "リスト未書き込み",
+    "Each one is a real, billable call on a metered provider: the smallest this model takes": "各モデルに実際の課金対象リクエストを 1 回送ります。これはそのモデルが受け付ける最小のリクエストです",
     "magpie couldn't write this agent's model list: {error}. It is written again on the next change or a pick": "magpie はこのエージェントのモデルリストを書き込めませんでした：{error}。次回の変更またはモデル選択時に再び書き込みます",
     "Keep current settings": "現在の設定を維持",
     "{agent} no longer goes through magpie — its config was changed": "{agent} は magpie を経由しなくなりました — 設定が変更されています",
