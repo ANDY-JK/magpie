@@ -265,6 +265,7 @@ button:focus-visible,.lib-item:focus-visible{outline:2px solid var(--accent);out
 .skel-list i:nth-child(3){width:66%}
 .skel-list i:nth-child(4){width:74%}
 .sheet-inline{background:var(--card);border-radius:10px;box-shadow:var(--shadow-sm);padding:10px 12px;margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.toast{position:absolute;left:50%;bottom:38px;transform:translateX(-50%);z-index:40;background:var(--fg);color:var(--bg);font-size:11px;padding:7px 11px;border-radius:8px;box-shadow:var(--shadow);white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis}
 .ov{position:absolute;inset:0;z-index:30;background:rgba(20,22,30,.18);display:flex;align-items:center;justify-content:center}
 .ov-sheet{width:min(430px,92%);background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;display:flex;flex-direction:column;gap:7px}
 .ov-h{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
@@ -466,7 +467,7 @@ const COMPONENTS = [
 const state = {
   frame:'narrow', section:'model', page:'providers', theme:'light',
   tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
-  spec:false, sel:null, libSel:0, mdSel:0, compact:false, sheet:false, ov:null, menuAt:null, sw:{}, listState:'normal', editDirty:false, form:'window', panelTab:'额度', providerOpen:null,
+  spec:false, sel:null, libSel:0, mdSel:0, compact:false, sheet:false, ov:null, menuAt:null, sw:{}, listState:'normal', editDirty:false, form:'window', panelTab:'额度', providerOpen:null, toast:null,
 };
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
@@ -474,6 +475,7 @@ if(qs.get('nav')==='one') state.compact = true;
 if(['empty','loading','error'].includes(qs.get('state'))) state.listState = qs.get('state');
 if(['panel','phone'].includes(qs.get('form'))) state.form = qs.get('form');
 if(qs.get('open')) state.providerOpen = qs.get('open');
+if(qs.get('toast')) state.toast = qs.get('toast');
 const ovq = qs.get('ov');
 if(ovq==='add') state.sheet = true;
 else if(ovq==='menu'){ state.ov = {kind:'menu'}; state.menuAt = {x:120,y:150}; }
@@ -1208,6 +1210,13 @@ function overlayHtml(){
     '<button class="btn" data-ovclose>取消</button><button class="btn danger" data-ovclose>退出</button>');
   return '';
 }
+function toastHtml(){ return state.toast ? `<div class="toast">${state.toast}</div>` : ''; }
+function showToast(msg){
+  state.toast = msg;
+  renderStage();
+  clearTimeout(showToast.t);
+  showToast.t = setTimeout(()=>{ if(state.toast===msg){ state.toast = null; renderStage(); } }, 1600);
+}
 function closeOv(){
   if(state.ov && state.ov.kind==='providerEdit' && state.editDirty){
     state.ov = {kind:'confirm', title:'放弃未保存的修改？', body:'离开后这次编辑不会保留。', ok:'放弃'};
@@ -1227,8 +1236,8 @@ function panelShell(){
     <div class="panel-top"><span>magpie</span><span class="grow"></span><button class="iconbtn" data-act="update">↻</button></div>
     <div class="panel-tabs">${['智能体','额度','用量','路由'].map(x=>`<button class="ptab${state.panelTab===x?' on':''}" data-ptab="${x}">${x}</button>`).join('')}</div>
     <div class="panel-body">${panelBody()}</div>
-    <div class="panel-foot"><button class="textbtn">打开窗口</button><span class="grow"></span><button class="textbtn" data-act="quit">退出</button></div>
-    ${overlayHtml()}
+    <div class="panel-foot"><button class="textbtn" data-act="openWindow">打开窗口</button><span class="grow"></span><button class="textbtn" data-act="quit">退出</button></div>
+    ${overlayHtml()}${toastHtml()}
   </div>`;
 }
 function phoneShell(){
@@ -1237,15 +1246,15 @@ function phoneShell(){
     ${state.page==='settings' ? '' : pageStrip()}
     <div class="phone-main">${mainView()}</div>
     <nav class="phone-secs">${SECTIONS.map(sec=>`<button class="psec${state.page!=='settings'&&state.section===sec.id?' on':''}" data-sec="${sec.id}">${sec.name}</button>`).join('')}</nav>
-    ${overlayHtml()}
+    ${overlayHtml()}${toastHtml()}
   </div>`;
 }
 function renderStage(){
   if(state.form==='panel') stage.innerHTML = panelShell();
   else if(state.form==='phone') stage.innerHTML = phoneShell();
   else stage.innerHTML = state.frame==='wide'
-    ? `<div class="win wide">${topbar(false)}<div class="main">${navSide()}${mainView()}</div>${footerbar()}${overlayHtml()}</div>`
-    : `<div class="win narrow">${topbar(true)}${state.compact ? compactNav() : secStrip()+pageStrip()}${mainView()}${footerbar()}${overlayHtml()}</div>`;
+    ? `<div class="win wide">${topbar(false)}<div class="main">${navSide()}${mainView()}</div>${footerbar()}${overlayHtml()}${toastHtml()}</div>`
+    : `<div class="win narrow">${topbar(true)}${state.compact ? compactNav() : secStrip()+pageStrip()}${mainView()}${footerbar()}${overlayHtml()}${toastHtml()}</div>`;
   const sec = SECTIONS.find(s=>s.id===state.section);
   const where = state.page==='settings' ? '设置' : ((sec ? sec.name + ' › ' : '') + PAGES[state.page].name);
   document.getElementById('where').textContent = where;
@@ -1296,6 +1305,7 @@ stage.addEventListener('click', e=>{
     else if(a==='font') state.ov={kind:'font', title:'界面字体'};
     else if(a==='import') state.ov={kind:'import', title:'导入配置'};
     else if(a==='retry') state.listState='normal';
+    else if(a==='openWindow') state.form='window';
     else if(a==='quit') state.ov={kind:'quit', title:'退出 magpie？'};
     renderStage(); return;
   }
@@ -1307,6 +1317,10 @@ stage.addEventListener('click', e=>{
     if(!e.target.closest('.ov-sheet') && !e.target.closest('.ov-menu')){ closeOv(); return; }
     return;
   }
+  const danger = e.target.closest('.btn.danger');
+  if(danger){ state.ov={kind:'confirm', title:'确认删除？', body:'此操作不可撤销。', ok:'删除'}; renderStage(); return; }
+  const btn = e.target.closest('.btn, .textbtn');
+  if(btn){ showToast('已执行：' + (btn.textContent.trim() || '操作')); return; }
   const h = e.target.closest('.spec-head');
   if(h){ state.sel = {n:+h.dataset.rn, name:h.dataset.rname}; renderStage(); return; }
   const md = e.target.closest('[data-mdsel]');
@@ -1356,6 +1370,17 @@ document.addEventListener('keydown', e=>{
   renderStage();
   const sel = document.querySelector(isLib ? `[data-libsel="${state.libSel}"]` : `[data-mdsel="${state.mdSel}"]`);
   if(sel) sel.focus();
+});
+document.addEventListener('keydown', e=>{
+  if(e.key!=='ArrowLeft' && e.key!=='ArrowRight') return;
+  const el = document.activeElement, tab = el && el.closest && el.closest('.tab, .ptab, .sec, .psec');
+  if(!tab) return;
+  e.preventDefault();
+  const group = tab.parentElement;
+  const tabs = [...group.querySelectorAll('.tab, .ptab, .sec, .psec')];
+  const i = tabs.indexOf(tab);
+  const next = tabs[e.key==='ArrowRight' ? Math.min(tabs.length-1, i+1) : Math.max(0, i-1)];
+  if(next) next.focus();
 });
 function renderAllIndex(){
   const rows = [];
