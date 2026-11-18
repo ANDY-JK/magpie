@@ -4,7 +4,9 @@
 // null when it is empty, and refuses one that isn't a whole number before
 // anything is posted. A signed-in account (Codex) opens on what it has, and
 // a plugin's provider shows what its plugin says as the placeholder. A
-// click in the field leaves the page where it is. In English and Chinese.
+// provider's First byte wait, in minutes, is saved the same way: 0 is
+// refused, empty is magpie's 10. A click in the field leaves the page where
+// it is. In English and Chinese.
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -61,8 +63,10 @@ function serve(lang, posts) {
 }
 
 const words = {
-  en: { label: "Concurrency", save: "Save", none: "No limit", plugin: "4, as its plugin says", hint: "Over it, requests queue and go out in order; 0 or empty is no limit", bad: "Concurrency: a whole number from 0 to 1000" },
-  zh: { label: "并发上限", save: "保存", none: "不限制", plugin: "4（插件的默认值）", hint: "超出时排队，按顺序发出；0 或留空为不限制", bad: "并发上限：请填写 0 到 1000 之间的整数" },
+  en: { label: "Concurrency", save: "Save", none: "No limit", plugin: "4, as its plugin says", hint: "Over it, requests queue and go out in order; 0 or empty is no limit", bad: "Concurrency: a whole number from 0 to 1000",
+    hwLabel: "First byte wait", hwPlaceholder: "10, as magpie gives it", hwBad: "First byte wait: a whole number of minutes from 1 to 1440" },
+  zh: { label: "并发上限", save: "保存", none: "不限制", plugin: "4（插件的默认值）", hint: "超出时排队，按顺序发出；0 或留空为不限制", bad: "并发上限：请填写 0 到 1000 之间的整数",
+    hwLabel: "首字节等待", hwPlaceholder: "10，留空即此", hwBad: "首字节等待：1 到 1440 的整数分钟" },
 };
 
 for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium", "webkit"])) {
@@ -149,6 +153,25 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       // a left border thicker or another colour than the right one is a stripe
       const stripes = await page.evaluate(() => [...document.querySelectorAll(".editor input.concurrency, .editor input.concurrency ~ *")].map((e) => getComputedStyle(e)).filter((s) => parseFloat(s.borderLeftWidth) > parseFloat(s.borderRightWidth) || (parseFloat(s.borderLeftWidth) > 0 && s.borderLeftColor !== s.borderRightColor)).length);
       assert.equal(stripes, 0, "no border stripes");
+      assert.deepEqual(errors, []);
+    });
+
+    // F-02: how long this provider's vendors are given to begin answering,
+    // in minutes; empty is magpie's 10, and 0 is refused
+    test(`${engine} ${lang}: a provider's first byte wait is typed and saved`, async (t) => {
+      const { page, errors, posts } = await open(t, "Relay");
+      assert.equal(await page.locator(".editor label", { hasText: w.hwLabel }).count(), 1);
+      const hw = page.locator(".editor input.header-wait");
+      assert.equal(await hw.count(), 1);
+      assert.equal(await hw.getAttribute("placeholder"), w.hwPlaceholder);
+      await hw.fill("0");
+      await page.locator(".editor .bar").getByRole("button", { name: w.save, exact: true }).click();
+      await page.locator(".editor .editor-error").waitFor();
+      assert.equal(await page.locator(".editor .editor-error").textContent(), w.hwBad);
+      assert.equal(posts.length, 0, "nothing posted for a wait of 0");
+      await hw.fill("5");
+      const saved = await save(page, posts);
+      assert.equal(saved.body.headerWait, 5);
       assert.deepEqual(errors, []);
     });
 

@@ -102,6 +102,10 @@ const providerUsage = `usage:
                                           how many of its accounts or keys take requests at the same time, the first
                                           in the list; the next takes over when one runs out or fails (off: no limit,
                                           default: what its plugin says)
+  magpie provider header-wait <id> [minutes|default]
+                                          how long its vendors are given to begin answering before the request
+                                          is given up on and another provider is tried (default: 10 minutes);
+                                          1 to 1440
   magpie provider quota-rest <id> [30m|6h|7d|until 08:00|until 00:00+08:00|default]
                                           how long a key sits out once the vendor says it is out of its allowance
                                           without saying when it is back (default: the day; at most 8 days),
@@ -642,6 +646,8 @@ func providerCmd(args []string) error {
 		return rpmCmd(rest)
 	case "at-once", "accounts-at-once":
 		return atOnceCmd(rest)
+	case "header-wait", "first-byte-wait":
+		return headerWaitCmd(rest)
 	case "refresh-every":
 		return refreshEveryCmd(rest)
 	case "auto-include":
@@ -1896,6 +1902,45 @@ func atOnceCmd(rest []string) error {
 		fmt.Printf("%s · %d of its accounts or keys take requests at once, the first in the list; the others wait in reserve\n", p.Name, n)
 	} else {
 		fmt.Printf("%s · every account or key takes requests\n", p.Name)
+	}
+	return nil
+}
+
+// headerWaitCmd shows, or sets, how long a provider's vendors are given to
+// begin answering before the request is given up on and another candidate
+// is tried (F-02): a slow reasoning channel can be given more than the
+// gateway's 10 minutes, a fast relay less.
+func headerWaitCmd(rest []string) error {
+	usage := fmt.Errorf("magpie provider header-wait <id> [minutes|default]")
+	if len(rest) < 1 || len(rest) > 2 {
+		return usage
+	}
+	p, err := provider.Find(rest[0])
+	if err != nil {
+		return err
+	}
+	if len(rest) > 1 {
+		var n *int
+		switch s := strings.ToLower(strings.TrimSpace(rest[1])); s {
+		case "default", "auto", "magpie":
+		default:
+			v, err := strconv.Atoi(s)
+			if err != nil {
+				return fmt.Errorf("a first byte wait is a whole number of minutes or default, not %q", rest[1])
+			}
+			n = &v
+		}
+		if err := provider.SetHeaderWait(p.ID, n); err != nil {
+			return err
+		}
+		if p, err = provider.Find(p.ID); err != nil {
+			return err
+		}
+	}
+	if p.HeaderWait != nil {
+		fmt.Printf("%s · its vendors are given %d minutes to begin answering\n", p.Name, *p.HeaderWait)
+	} else {
+		fmt.Printf("%s · its vendors are given magpie's %d minutes to begin answering\n", p.Name, provider.DefaultHeaderWait)
 	}
 	return nil
 }

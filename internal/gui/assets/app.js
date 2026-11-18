@@ -7825,19 +7825,24 @@ function concurrencyField(p) {
   // the rest wait in reserve (01huadalang: ZCode bans 3 per IP)
   const accounts = input(draft.maxAccounts ?? "", p?.pluginAccounts ? t("{n}, as its plugin says", { n: p.pluginAccounts }) : t("No limit"), "number");
   accounts.classList.add("max-accounts");
-  for (const [b, max, k] of [[box, 1000, "concurrency"], [queue, 10000, "queueLimit"], [wait, 3600, "queueWait"], [rpm, 10000, "maxRPM"], [accounts, 1000, "maxAccounts"]]) {
+  // how long a slow vendor is given to begin answering (F-02), minutes
+  const headerWait = input(draft.headerWait ?? "", t("10, as magpie gives it"), "number");
+  headerWait.classList.add("header-wait");
+  for (const [b, max, k] of [[box, 1000, "concurrency"], [queue, 10000, "queueLimit"], [wait, 3600, "queueWait"], [rpm, 10000, "maxRPM"], [accounts, 1000, "maxAccounts"], [headerWait, 1440, "headerWait"]]) {
     b.min = "0";
     b.max = String(max);
     b.step = "1";
     b.inputMode = "numeric";
     b.oninput = () => { draft[k] = b.value; };
   }
+  headerWait.min = "1";
   return [
     ...field(t("Concurrency"), box, (plugin ? t("Over it, requests queue and go out in order; empty takes the plugin's {n}, 0 is no limit", { n: plugin }) : t("Over it, requests queue and go out in order; 0 or empty is no limit"))),
     ...field(t("Accounts at once"), accounts, t("How many of its accounts or keys take requests at once, the first in the list; the next takes over when one runs out or fails. 0 is no limit")),
     ...field(t("Requests per minute"), rpm, t("How many requests each key or account sends in any minute, retries included; one more waits for room, up to 2 minutes. 0 or empty is no limit")),
     ...field(t("Queue size"), queue, t("How many requests may wait for each key or account; one more is turned away at once. 0 or empty is no bound")),
     ...field(t("Queue wait"), wait, t("Seconds a request waits for a free slot before it is turned away. 0 or empty waits as long as it takes")),
+    ...field(t("First byte wait"), headerWait, t("Minutes a vendor is given to begin answering, before the request is given up on; empty is 10")),
   ];
 }
 // priceRateField: a relay's rate on the official price (#819), which
@@ -7993,7 +7998,7 @@ document.addEventListener("click", (e) => {
 function advancedSet(d, p) {
   return (d.headers || []).some(([k]) => (k || "").trim()) || !!(d.extraBody || "").trim() || !!(d.replyHeaders || "").trim() ||
     !!d.proxyMode || Object.values(d.accountProxies || {}).some((x) => x?.mode) ||
-    [d.concurrency, d.maxAccounts, d.queueLimit, d.queueWait, d.maxRPM, d.priceRate, d.contexts, d.outputs, d.compacts].some((v) => String(v ?? "").trim()) ||
+    [d.concurrency, d.maxAccounts, d.queueLimit, d.queueWait, d.maxRPM, d.headerWait, d.priceRate, d.contexts, d.outputs, d.compacts].some((v) => String(v ?? "").trim()) ||
     !!d.rateWindows?.length ||
     !!(d.searches || d.authHeader || d.passUserAgent || d.unredacted || d.countFree || d.pinUpstream || d.nativeCompaction || d.balanceToken || d.limitRestOff) ||
     !!d.fallback?.length || !!p?.balanceToken?.set;
@@ -8005,7 +8010,8 @@ function priceRateError(ed) {
 function concurrencyDraft(p) {
   return { concurrency: p?.maxConcurrency == null ? "" : String(p.maxConcurrency), priceRate: p?.priceRate ? String(p.priceRate) : "",
     queueLimit: p?.queueLimit ? String(p.queueLimit) : "", queueWait: p?.queueWait ? String(p.queueWait) : "",
-    maxRPM: p?.maxRPM ? String(p.maxRPM) : "", maxAccounts: p?.maxAccounts == null ? "" : String(p.maxAccounts) };
+    maxRPM: p?.maxRPM ? String(p.maxRPM) : "", maxAccounts: p?.maxAccounts == null ? "" : String(p.maxAccounts),
+    headerWait: p?.headerWait == null ? "" : String(p.headerWait) };
 }
 // queueOfDraft: { queueLimit, queueWait, maxRPM } as saved, 0 for none, or { bad }
 function queueOfDraft() {
@@ -8038,6 +8044,18 @@ function concurrencyError(ed, c = "concurrency", m = t("Concurrency: a whole num
   return editorError(m, "warn");
 }
 const accountsError = (ed) => concurrencyError(ed, "max-accounts", t("Accounts at once: a whole number from 0 to 1000"));
+// headerWaitOfDraft: draft.headerWait as saved, null for the 10 magpie gives,
+// undefined if typed wrong
+function headerWaitOfDraft() {
+  const v = String(draft.headerWait ?? "").trim();
+  if (!v) return null;
+  if (!/^\d+$/.test(v) || +v < 1 || +v > 1440) return undefined;
+  return +v;
+}
+function headerWaitError(ed) {
+  shown(ed.querySelector("input.header-wait"))?.focus(NO_SCROLL);
+  return editorError(t("First byte wait: a whole number of minutes from 1 to 1440"), "warn");
+}
 function proxyDraft(p) {
   const v = (p?.proxy || "").trim();
   // each account's own (accountProxies), by its name in lower case
@@ -9620,6 +9638,8 @@ function drawEditor(p, presetID) {
       if (maxConcurrency === undefined) return concurrencyError(ed);
       const maxAccounts = concurrencyOfDraft("maxAccounts");
       if (maxAccounts === undefined) return accountsError(ed);
+      const headerWait = headerWaitOfDraft();
+      if (headerWait === undefined) return headerWaitError(ed);
       const queue = queueOfDraft();
       if (queue.bad) return queueError(ed, queue.bad);
       const priceRate = priceRateOfDraft();
@@ -9629,7 +9649,7 @@ function drawEditor(p, presetID) {
       if (priceTypedError(ed)) return;
       const picked = accountModelsDraft(p);
       if (picked === false) return pickError();
-      const body = { id: p.id, models: chosenIds(), noModels: noneChosen(), bestInFamily: bestChosen(), unlisted: draft.unlisted, hiddenDrawers: draft.hiddenDrawers, fallback: draft.fallback, contexts: cx.map, outputs: ox.map, compacts: cpx.map, proxy, accountProxies: own.map, maxConcurrency, maxAccounts, ...queue, priceRate, rateWindows, modelPrefs: modelPrefsOfDraft(), pinUpstream: !!draft.pinUpstream, unredacted: !!draft.unredacted, countFree: !!draft.countFree, ...(p.carriesCompaction ? { nativeCompaction: !!draft.nativeCompaction } : {}), ...routingOfDraft(p) };
+      const body = { id: p.id, models: chosenIds(), noModels: noneChosen(), bestInFamily: bestChosen(), unlisted: draft.unlisted, hiddenDrawers: draft.hiddenDrawers, fallback: draft.fallback, contexts: cx.map, outputs: ox.map, compacts: cpx.map, proxy, accountProxies: own.map, maxConcurrency, maxAccounts, headerWait, ...queue, priceRate, rateWindows, modelPrefs: modelPrefsOfDraft(), pinUpstream: !!draft.pinUpstream, unredacted: !!draft.unredacted, countFree: !!draft.countFree, ...(p.carriesCompaction ? { nativeCompaction: !!draft.nativeCompaction } : {}), ...routingOfDraft(p) };
       saving(saveBtn, t("Saving…"));
       saveAccountModelsDraft(picked).then(() => savePluginOptions(subOf(a.agent))).then(() => providerAction("save", body, t("{name} saved", { name: p.name })), (e) => { doneSaving(saveBtn); editorError(e.message || String(e)); }); };
     bar.append(cancel, saveBtn);
@@ -10290,6 +10310,8 @@ function drawEditor(p, presetID) {
     if (body.maxConcurrency === undefined) return concurrencyError(ed);
     body.maxAccounts = concurrencyOfDraft("maxAccounts");
     if (body.maxAccounts === undefined) return accountsError(ed);
+    body.headerWait = headerWaitOfDraft();
+    if (body.headerWait === undefined) return headerWaitError(ed);
     const queue = queueOfDraft();
     if (queue.bad) return queueError(ed, queue.bad);
     Object.assign(body, queue);

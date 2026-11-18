@@ -5132,6 +5132,9 @@ func (s *Server) forward(ctx context.Context, p provider.Provider, to provider.P
 // no try's ticket — a count_tokens of its own, a relay — it is metered at
 // the key or account's, no model in hand to take a model's own by.
 func (s *Server) forwardOnce(ctx context.Context, p provider.Provider, to provider.Protocol, path string, body []byte, in http.Header) (*http.Response, error) {
+	// the vendor's own first-byte wait, where it set one (F-02): a slow
+	// reasoning channel can be given more than the gateway's default
+	ctx = withHeaderWait(ctx, headerWaitOfProvider(p))
 	ctx = s.metered(p.Via(ctx), p, "", "")
 	body = deepseekToolPatterns(p, to, body)
 	body = grokToolPatterns(p, to, body)

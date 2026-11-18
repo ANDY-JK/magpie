@@ -209,6 +209,12 @@ type Provider struct {
 	// can't keep to); one more waits for room (see RPMLimit). 0 is no
 	// limit.
 	MaxRPM int `json:"maxRPM,omitempty"`
+	// HeaderWait is how long, in minutes (1 to 1440), one of its vendors is
+	// given to begin answering a request that isn't a drawing, before
+	// magpie gives up on it: a slow reasoning channel can be given more
+	// than the gateway's 10 minutes, a fast one less. nil keeps the 10. An
+	// images API is given Settings' image timeout instead.
+	HeaderWait *int `json:"headerWait,omitempty"`
 	// QuotaRest is how many minutes one of its keys sits out once the
 	// vendor says it is out of its allowance without saying when it is
 	// back (#1772: Ollama Cloud's weekly limit); 0 is the gateway's own
@@ -913,6 +919,10 @@ func (p Provider) clone() Provider {
 	if p.MaxAccounts != nil {
 		v := *p.MaxAccounts
 		p.MaxAccounts = &v
+	}
+	if p.HeaderWait != nil {
+		v := *p.HeaderWait
+		p.HeaderWait = &v
 	}
 	if p.ZhipuTeam != nil {
 		v := *p.ZhipuTeam
@@ -1761,6 +1771,14 @@ func normalize(p Provider) Provider {
 	if p.MaxAccounts != nil {
 		v := min(max(*p.MaxAccounts, 0), MaxLimit)
 		p.MaxAccounts = &v
+	}
+	if p.HeaderWait != nil {
+		v := min(max(*p.HeaderWait, 0), MaxHeaderWait)
+		if v == 0 {
+			p.HeaderWait = nil
+		} else {
+			p.HeaderWait = &v
+		}
 	}
 	p.AccountConcurrency = normalAccountConcurrency(p.AccountConcurrency)
 	p.AccountWeights = normalAccountWeights(p.AccountWeights)

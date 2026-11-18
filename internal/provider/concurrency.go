@@ -275,6 +275,29 @@ func CheckRPM(n int) error {
 // and a day over, the longest the gateway rests anyone out of quota.
 const MaxQuotaRest = 8 * 24 * 60
 
+// DefaultHeaderWait is how many minutes a vendor is given to begin
+// answering when its provider sets no HeaderWait: the gateway's own wait.
+const DefaultHeaderWait = 10
+
+// MaxHeaderWait bounds HeaderWait, in minutes: a day, longer than any
+// vendor's answer can take before its own client has given up.
+const MaxHeaderWait = 24 * 60
+
+// SetHeaderWait sets how many minutes the provider's vendors are given to
+// begin answering (F-02): nil for the gateway's own wait, 1 to
+// MaxHeaderWait minutes otherwise.
+func SetHeaderWait(id string, minutes *int) error {
+	if minutes != nil && (*minutes < 1 || *minutes > MaxHeaderWait) {
+		return fmt.Errorf("the first byte wait is from 1 to %d minutes, not %d", MaxHeaderWait, *minutes)
+	}
+	p, err := Find(id)
+	if err != nil {
+		return err
+	}
+	p.HeaderWait = minutes
+	return Save(*p)
+}
+
 // QuotaRestFor is how long one of p's keys sits out of quota when the
 // vendor doesn't say when it is back, 0 for the gateway's own.
 func (p Provider) QuotaRestFor() time.Duration {

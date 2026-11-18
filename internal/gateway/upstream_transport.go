@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -8,10 +9,12 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/yetone/magpie/internal/netproxy"
+	"github.com/yetone/magpie/internal/provider"
 )
 
 // upstreamTLS is what the gateway's transports dial TLS with: nil, the
@@ -32,7 +35,7 @@ var upstreamTLS *tls.Config
 // it goes through a transport of its own that waits as long as Settings'
 // Image generation timeout gives it (drawWithin), up to 60 minutes.
 func upstreamTransport() http.RoundTripper {
-	return drawsApart{
+	return &drawsApart{
 		any:     codexSocket{replayable{netproxy.Dispatch(vendorTransport(upstreamHeaderWait))}},
 		draws:   replayable{netproxy.Dispatch(vendorTransport(0))},
 		uploads: codexSocket{replayable{netproxy.Dispatch(uploadTransport(upstreamHeaderWait))}},
@@ -41,8 +44,38 @@ func upstreamTransport() http.RoundTripper {
 }
 
 // upstreamHeaderWait is how long a vendor is given to begin answering a
-// request that isn't a drawing.
-var upstreamHeaderWait = 10 * time.Minute
+// request that isn't a drawing: provider.DefaultHeaderWait unless a test
+// sets another.
+var upstreamHeaderWait = provider.DefaultHeaderWait * time.Minute
+
+// providerHeaderWaitUnit is what a provider's HeaderWait counts: minutes,
+// which a test shrinks so a slow vendor can be tried without waiting one.
+var providerHeaderWaitUnit = time.Minute
+
+// headerWaitOfProvider is how long p's vendors are given to begin
+// answering, none when p sets none (the gateway's own stands).
+func headerWaitOfProvider(p provider.Provider) time.Duration {
+	if p.HeaderWait == nil || *p.HeaderWait <= 0 {
+		return 0
+	}
+	return time.Duration(*p.HeaderWait) * providerHeaderWaitUnit
+}
+
+// headerWaitKey carries a provider's own first-byte wait through the
+// request's context; none for the gateway's default.
+type headerWaitKey struct{}
+
+func withHeaderWait(ctx context.Context, wait time.Duration) context.Context {
+	if wait <= 0 {
+		return ctx
+	}
+	return context.WithValue(ctx, headerWaitKey{}, wait)
+}
+
+func headerWaitOf(ctx context.Context) (time.Duration, bool) {
+	w, ok := ctx.Value(headerWaitKey{}).(time.Duration)
+	return w, ok
+}
 
 // uploadBytes is the body size from which a request goes to a vendor over
 // a connection the read-idle ping does not watch: on an uplink under about
@@ -111,19 +144,49 @@ type drawsApart struct {
 	any, draws, uploads http.RoundTripper
 	// slow is when the uplink was last found slow, in Unix nanoseconds.
 	slow *atomic.Int64
+	// mu guards waits: a provider's own first-byte wait has transports of
+	// its own, built the first time one is asked for.
+	mu    sync.Mutex
+	waits map[time.Duration]*waitTransports
 }
 
-func (t drawsApart) RoundTrip(r *http.Request) (*http.Response, error) {
+// waitTransports is the two transports a provider's own first-byte wait
+// needs: any, and uploads for a large body on an uplink found slow.
+type waitTransports struct{ any, uploads http.RoundTripper }
+
+// forWait is the transports for a provider's own wait, built once per wait.
+func (t *drawsApart) forWait(wait time.Duration) (http.RoundTripper, http.RoundTripper) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if p, ok := t.waits[wait]; ok {
+		return p.any, p.uploads
+	}
+	p := &waitTransports{
+		any:     codexSocket{replayable{netproxy.Dispatch(vendorTransport(wait))}},
+		uploads: codexSocket{replayable{netproxy.Dispatch(uploadTransport(wait))}},
+	}
+	if t.waits == nil {
+		t.waits = map[time.Duration]*waitTransports{}
+	}
+	t.waits[wait] = p
+	return p.any, p.uploads
+}
+
+func (t *drawsApart) RoundTrip(r *http.Request) (*http.Response, error) {
 	if _, ok := drawWaitOf(r.Context()); ok {
 		return t.draws.RoundTrip(r)
 	}
+	anyT, uploadsT := t.any, t.uploads
+	if wait, ok := headerWaitOf(r.Context()); ok && wait != upstreamHeaderWait {
+		anyT, uploadsT = t.forWait(wait)
+	}
 	if !uploading(r) || t.slow == nil {
-		return t.any.RoundTrip(r)
+		return anyT.RoundTrip(r)
 	}
 	if time.Since(time.Unix(0, t.slow.Load())) < slowFor {
-		return t.uploads.RoundTrip(r)
+		return uploadsT.RoundTrip(r)
 	}
-	res, err := t.any.RoundTrip(r)
+	res, err := anyT.RoundTrip(r)
 	if err == nil || !lostPing(err) || r.GetBody == nil || r.Context().Err() != nil {
 		return res, err
 	}
@@ -134,7 +197,7 @@ func (t drawsApart) RoundTrip(r *http.Request) (*http.Response, error) {
 	t.slow.Store(time.Now().UnixNano())
 	again := r.Clone(r.Context())
 	again.Body = body
-	return t.uploads.RoundTrip(again)
+	return uploadsT.RoundTrip(again)
 }
 
 // lostPing says err is Go's HTTP/2 transport closing a connection whose

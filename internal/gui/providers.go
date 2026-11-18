@@ -285,6 +285,9 @@ type providerJSON struct {
 	// on Discord, ZCode)
 	MaxAccounts    *int `json:"maxAccounts"`
 	PluginAccounts int  `json:"pluginAccounts,omitempty"`
+	// minutes this provider's vendors are given to begin answering, before
+	// the request is given up on (F-02); null is magpie's 10
+	HeaderWait *int `json:"headerWait"`
 	// each key's or account's own limit over it (#892), by its name in
 	// lower case or its key id; 0 there is none
 	AccountConcurrency map[string]int `json:"accountConcurrency,omitempty"`
@@ -726,7 +729,7 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 		Proxy: p.Proxy, AccountProxies: p.AccountProxies, AccountModels: p.AccountModels, AccountCaps: p.AccountCaps, AccountWindowCaps: p.AccountWindowCaps, AccountNames: p.AccountNames, Headers: p.Headers, ExtraBody: p.ExtraBody, ReplyHeaders: p.ReplyHeaders, Searches: p.Searches, Cline: p.ClinePinnable(), PinUpstream: p.PinUpstream, Unredacted: p.Unredacted, CountFree: p.CountFree, InsecureTLS: p.InsecureTLS, TakesInsecureTLS: p.TakesInsecureTLS(), LimitRestOff: p.LimitRestOff, NativeCompaction: p.NativeCompaction, CarriesCompaction: p.CarriesCompaction(), PassUserAgent: p.PassUserAgent, OwnClient: p.OwnClient(), AuthHeader: p.AuthHeader, BothAuth: p.BothAuth(), BalanceURL: p.BalanceURL, BalancePath: p.BalancePath, BalanceMethod: p.BalanceMethod, ModelsURL: p.ModelsURL,
 		Ready: p.Ready(), Chosen: p.PicksOf(avail), Agents: make([]providerAgent, 0, len(agents)),
 		Fallback: p.Fallback, Routing: p.Routing, Sink: p.Sink, Affinity: p.Affinity, KeepLogin: p.KeepLogin, KeepLoginAs: p.KeepLoginAs, SwitchOnly: p.SwitchOnly, CapStop: p.CapStop, CapCareful: p.CapCareful, Unlisted: p.Unlisted, NoModels: p.ServesNone(), BestInFamily: p.BestInFamily && len(p.Models) == 0 && !p.NoModels, Off: p.Off, Contexts: p.Contexts, Caps: p.Caps,
-		MaxConcurrency: p.MaxConcurrency, PluginConcurrency: p.PluginConcurrency(), MaxAccounts: p.MaxAccounts, PluginAccounts: p.PluginAtOnce(), PriceRate: p.PriceRate,
+		MaxConcurrency: p.MaxConcurrency, PluginConcurrency: p.PluginConcurrency(), MaxAccounts: p.MaxAccounts, PluginAccounts: p.PluginAtOnce(), HeaderWait: p.HeaderWait, PriceRate: p.PriceRate,
 		RateWindows: p.RateWindows, RateNow: rateNowOf(p, time.Now()),
 		AccountConcurrency: p.AccountConcurrency, AccountWeights: p.AccountWeights, QueueLimit: p.QueueLimit, QueueWait: p.QueueWait, MaxRPM: p.MaxRPM,
 		Outputs: provider.OutputsOf(p.ID), Compacts: provider.CompactsOf(p.ID),
@@ -1290,6 +1293,7 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 	importAppsRoutes(mux)
 	pluginRoutes(mux, w)
 	traceRoutes(mux)
+	doctorModelRoutes(mux)
 	contextRoutesAPI(mux)
 	tuneRoutes(mux)
 	groupRoutes(mux)
@@ -1523,6 +1527,10 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			// requests at once: a number (0 none), null for what its
 			// plugin says or none; a save that leaves it out keeps it
 			MaxAccounts json.RawMessage `json:"maxAccounts"`
+			// HeaderWait is how many minutes this provider's vendors are
+			// given to begin answering (F-02): a number from 1 to 1440,
+			// null for magpie's 10; a save that leaves it out keeps it
+			HeaderWait json.RawMessage `json:"headerWait"`
 			// QueueLimit and QueueWait are how many may wait for each key
 			// or account and for how many seconds (#892): numbers, 0 or
 			// null for no bound; a save that leaves them out keeps them
@@ -1827,6 +1835,12 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 				return
 			}
 			in.MaxAccounts = ma
+			hw, keepHW, err := headerWaitOf(req.HeaderWait)
+			if err != nil {
+				fail(rw, err)
+				return
+			}
+			in.HeaderWait = hw
 			ql, keepQL, err := queueOf(req.QueueLimit, "queue length")
 			if err != nil {
 				fail(rw, err)
@@ -1942,6 +1956,9 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 				}
 				if keepMA && old != nil {
 					in.MaxAccounts = old.MaxAccounts
+				}
+				if keepHW && old != nil {
+					in.HeaderWait = old.HeaderWait
 				}
 				if keepQL && old != nil {
 					in.QueueLimit = old.QueueLimit
@@ -3083,6 +3100,22 @@ func limitOf(raw json.RawMessage, what string) (n *int, keep bool, err error) {
 	}
 	if n != nil && (*n < 0 || *n > 1000) {
 		return nil, false, fmt.Errorf("%s must be from 0 to 1000, not %d", what, *n)
+	}
+	return n, false, nil
+}
+
+// headerWaitOf is a save's headerWait, how many minutes the provider's
+// vendors are given to begin answering (F-02): keep when the save left it
+// out, nil for magpie's 10, else 1 to MaxHeaderWait minutes.
+func headerWaitOf(raw json.RawMessage) (n *int, keep bool, err error) {
+	if len(raw) == 0 {
+		return nil, true, nil
+	}
+	if err := json.Unmarshal(raw, &n); err != nil {
+		return nil, false, fmt.Errorf("the first byte wait must be a whole number of minutes, not %s", raw)
+	}
+	if n != nil && (*n < 1 || *n > provider.MaxHeaderWait) {
+		return nil, false, fmt.Errorf("the first byte wait must be from 1 to %d minutes, not %d", provider.MaxHeaderWait, *n)
 	}
 	return n, false, nil
 }
