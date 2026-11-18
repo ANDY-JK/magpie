@@ -54,6 +54,25 @@ func TestParseScutil(t *testing.T) {
 	}
 }
 
+// TestForHostBypassesLoopback: a request to this computer is never sent
+// through a proxy, whatever the environment names. transportPath relies on
+// the same resolution to tell one failing route from another.
+func TestForHostBypassesLoopback(t *testing.T) {
+	t.Setenv("HTTP_PROXY", "http://127.0.0.1:9")
+	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:9")
+	t.Setenv("ALL_PROXY", "http://127.0.0.1:9")
+	t.Setenv("NO_PROXY", "")
+	for _, raw := range []string{"http://127.0.0.1:3425/v1", "http://localhost:3425/v1"} {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p, err := ForHost(u); err != nil || p != nil {
+			t.Errorf("%s: %v %v, want direct", raw, p, err)
+		}
+	}
+}
+
 func TestParseWindows(t *testing.T) {
 	for server, want := range map[string]string{
 		"127.0.0.1:7890":                     "http://127.0.0.1:7890",

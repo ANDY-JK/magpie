@@ -300,6 +300,20 @@ func For(u *url.URL) (*url.URL, error) {
 	return Parse(sys.URL)
 }
 
+// ForHost is the global proxy a request to u goes through when no provider
+// names one of its own, as Func sends it: nil for loopback, and for a host
+// on the user's own network while a proxy is set (onLAN).
+func ForHost(u *url.URL) (*url.URL, error) {
+	if u == nil || loopback(u.Hostname()) {
+		return nil, nil
+	}
+	p, err := For(u)
+	if p != nil && onLAN(u.Hostname()) {
+		return nil, nil
+	}
+	return p, err
+}
+
 // Env is env (the process's own when nil) for an agent's CLI that magpie
 // starts — a sign-in, or a subscription's run — told to use the proxy
 // magpie's own requests would: the CLI reads only *_PROXY, which an app

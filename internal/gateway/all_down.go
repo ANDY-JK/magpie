@@ -6,7 +6,9 @@ package gateway
 // Providers page, which the user has to be on). The gateway notices the
 // transition: a request that failed with every candidate of the model
 // resting says the channels went out, once on the way in and at most once
-// a minute while the outage holds. An answer says the outage of that
+// a minute while the outage holds. A request whose every try failed before
+// it reached a vendor — the proxy or this computer's network down — is as
+// unreachable, and says the same outage. An answer says the outage of that
 // model is over, silently: the notice is the outage's, not the
 // recovery's. A request the agent canceled (its 499, its going away)
 // says nothing: the channels are not at fault for that.
@@ -59,6 +61,23 @@ func downSaid(cs []candidate, model string, status int) {
 	if AllDownAlert == nil || status == 499 || model == "" || !allResting(cs) {
 		return
 	}
+	sayDown(model)
+}
+
+// transportSaid is downSaid for a request whose every try failed before it
+// reached a vendor: the proxy it sends through or this computer's network
+// is down, so every candidate left would fail the same way. The model is
+// as unreachable as one whose every candidate rests, and says the same
+// outage episode, at most once a minute.
+func transportSaid(model string, status int) {
+	if AllDownAlert == nil || status == 499 || model == "" {
+		return
+	}
+	sayDown(model)
+}
+
+// sayDown says model's outage unless it was said within AllDownRests.
+func sayDown(model string) {
 	allDown.Lock()
 	say := allDown.said[model].IsZero() || time.Since(allDown.said[model]) >= AllDownRests
 	if say {

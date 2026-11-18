@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -32,6 +33,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/yetone/magpie/internal/netproxy"
 	"github.com/yetone/magpie/internal/plugin"
 	"github.com/yetone/magpie/internal/provider"
 	"github.com/yetone/magpie/internal/settings"
@@ -1876,7 +1878,34 @@ const (
 	// clear than a busy moment: pauses of 1, 2 and 4s, or what Retry-After
 	// says, under half a minute in all
 	rateRetries = 3
+	// transportFailMost is how many tries in a row may fail before a
+	// vendor was reached: a dead local proxy or a network that reaches
+	// nobody fails every candidate left the same way, and one outage of
+	// that kind asked 24 channels in 34 tries (the review's F-4, 11-16).
+	// Only failProxy and failOffline count — a vendor's own 5xx or timeout
+	// reached it, says nothing of the network, and still asks the next.
+	// The loop stops only when every candidate left would take the same
+	// proxy (or go direct too): another path may still answer.
+	transportFailMost = 3
 )
+
+// transportRun counts a request's tries in a row that never reached a
+// vendor, and whether every try so far was one. A try that reached its
+// vendor — an answer, a slow start, a loop, or its own 5xx — resets it.
+type transportRun struct {
+	fails int
+	why   string
+	all   bool
+}
+
+func (r *transportRun) failed(why string) {
+	r.fails++
+	r.why = why
+}
+
+func (r *transportRun) reachedVendor() {
+	r.fails, r.why, r.all = 0, "", false
+}
 
 // longestPause is the longest the vendor's Retry-After is waited for by
 // the same-one retries; longer, and a plain provider or a group waits it
@@ -1911,6 +1940,101 @@ func passing(status int, header http.Header, body []byte, again int) (time.Durat
 		return wait, again < rateRetries && failure(status, body) == failRate && !creditWords.Match(wordsOf(body)) && !walled(body)
 	}
 	return 0, false
+}
+
+// passingWhy is passing for a try whose failure reason is already known: a
+// proxy or a network that reaches nobody never got the request to a vendor,
+// so no pause of the vendor's makes it pass.
+func passingWhy(status int, header http.Header, body []byte, again int, why string) (time.Duration, bool) {
+	if why == failProxy || why == failOffline {
+		return 0, false
+	}
+	return passing(status, header, body, again)
+}
+
+// busyWhy is busy for a try whose failure reason is already known: a proxy
+// or an offline failure is no member's moment, and asking it again within
+// the group's patience only keeps the agent waiting on a network that isn't
+// there (F-9, the review).
+func busyWhy(status int, body []byte, why string) bool {
+	if why == failProxy || why == failOffline {
+		return false
+	}
+	return busy(status, body)
+}
+
+// transportPath is where a candidate's request would go on the wire: the
+// proxy it names (its own, its account's or key's), the global proxy that
+// request resolves to, a local address (loopback or the user's own network),
+// or direct. Two candidates share a path only when both would take the same
+// proxy (or go direct too); an unknown path never matches another, so a stop
+// never assumes it.
+func transportPath(c candidate, proto provider.Protocol) string {
+	base := c.p.Base(proto)
+	if base == "" {
+		return "unknown " + c.p.ID
+	}
+	u, err := url.Parse(base)
+	if err != nil || u.Host == "" {
+		return "unknown " + c.p.ID
+	}
+	host := u.Hostname()
+	if localHost(host) {
+		// netproxy.Func never sends a loopback request through a proxy,
+		// whatever the provider names; another local address is another
+		// service
+		return "local " + u.Host
+	}
+	choice := strings.TrimSpace(c.p.ProxyChoice())
+	if choice != "" && choice != "direct" {
+		if u, err := netproxy.Parse(choice); err == nil && u.Host != "" {
+			choice = u.String()
+		}
+		return "proxy " + choice
+	}
+	if nearHost(host) {
+		// the user's own network: a global proxy is bypassed for it, so a
+		// network outage elsewhere says nothing of it; another address is
+		// another service
+		return "local " + u.Host
+	}
+	if choice == "direct" {
+		return "direct"
+	}
+	p, err := netproxy.ForHost(u)
+	if err != nil {
+		return "unknown " + c.p.ID
+	}
+	if p == nil {
+		return "direct"
+	}
+	return "proxy " + p.String()
+}
+
+// localHost says host is this computer: loopback never goes through a proxy
+// (netproxy.Func).
+func localHost(host string) bool {
+	h := strings.ToLower(host)
+	if h == "localhost" || strings.HasSuffix(h, ".localhost") {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
+}
+
+// sameTransportPath says every candidate left would go the same way as the
+// try that failed: the same proxy, or direct too. An unknown path is never
+// taken for another's.
+func sameTransportPath(left []candidate, path string, proto provider.Protocol) bool {
+	if path == "" || strings.HasPrefix(path, "unknown ") {
+		return false
+	}
+	for _, c := range left {
+		if transportPath(c, proto) != path {
+			return false
+		}
+	}
+	return true
 }
 
 // wallCodes are the error codes a vendor gives a 429 for an account's

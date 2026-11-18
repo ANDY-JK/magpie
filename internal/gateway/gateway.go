@@ -3008,6 +3008,14 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 	// the row of the try before, when it failed, billed something and
 	// handed the request on, written once the next try begins
 	var failedRow func()
+	// transport counts the tries in a row that never reached a vendor
+	// (failProxy, failOffline): a dead local proxy fails every provider
+	// left the same way, and the loop stops before it asks them all (F-4),
+	// but only when every candidate left would take the same proxy (or go
+	// direct too). askedTries is every try asked, and transport.all whether
+	// every one of them was such a failure, for the all-down notice (F-9).
+	transport := transportRun{all: true}
+	askedTries := 0
 	for i := 0; i < len(cands); i++ {
 		if failedRow != nil {
 			failedRow()
@@ -3532,19 +3540,19 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			}
 			queuedAlive()
 			queued = (inLane + inMinute).Milliseconds()
-				// a provider's DayCalls bounds the requests it takes in a
-				// calendar day, all keys and accounts together (daycalls.go);
-				// over it this try counts nothing, and the agent is told
-				// until when (the 429 below). Its slot goes back first, so
-				// another key or account of it, or another provider, may go.
-				if err == nil {
-					if limit := c.p.DayCallLimit(); limit > 0 {
-						if ok, left := s.days.take(c.p.ID, limit, dayNow()); !ok {
-							release()
-							err = &errDayCalls{limit: limit, after: left}
-						}
+			// a provider's DayCalls bounds the requests it takes in a
+			// calendar day, all keys and accounts together (daycalls.go);
+			// over it this try counts nothing, and the agent is told
+			// until when (the 429 below). Its slot goes back first, so
+			// another key or account of it, or another provider, may go.
+			if err == nil {
+				if limit := c.p.DayCallLimit(); limit > 0 {
+					if ok, left := s.days.take(c.p.ID, limit, dayNow()); !ok {
+						release()
+						err = &errDayCalls{limit: limit, after: left}
 					}
 				}
+			}
 			var tooMany *errRPM
 			var dayFull *errDayCalls
 			if errors.Is(err, errQueueFull) || errors.Is(err, errQueueWait) || errors.As(err, &tooMany) || errors.As(err, &dayFull) {
@@ -3595,9 +3603,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				after := "1"
 				if e := (*errRPM)(nil); errors.As(laneErr, &e) {
 					after = e.retryAfter() // when the minute has room
+				}
 				if e := (*errDayCalls)(nil); errors.As(laneErr, &e) {
 					after = e.retryAfter() // when the day turns
-				}
 				}
 				w.Header().Set("Retry-After", after)
 			}
@@ -3666,6 +3674,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 		try := Try{ID: c.rest, Model: c.model, Effort: wentAt, Picked: picked, Fixed: fixed, RuleEffort: ruled, Fast: fast, Start: began, Done: true, Status: call.Status, Millis: ended.Sub(began).Milliseconds(), Error: call.Error, Queued: queued,
 			Served: call.Usage.Served, Upstream: call.Usage.Upstream, Pin: c.p.ClinePassAsked(c.model), Tier: wentTier, TierServed: call.Usage.Tier, Auto: autoPicked(),
 			Net: nt.timing(began, queued), SentBy: sentBy(c.p)}
+		askedTries++
 		if resetFirst != nil {
 			// the reset spent for it before it was asked
 			try.Reset, resetFirst = resetFirst, nil
@@ -3736,6 +3745,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			// rest the first time, a long prompt being slow to start
 			// anywhere; slow again and again, its model rests on this
 			// account (restSlow)
+			transport.reachedVendor() // it reached its vendor and was slow
 			call.Status, call.Error = http.StatusGatewayTimeout, fmt.Sprintf("%s: no first token in %ds", c.p.Name, firstToken)
 			try.Status, try.Error, try.Fail = call.Status, call.Error, failSlow
 			if rest, ok := restSlow(c, time.Now()); ok {
@@ -3767,6 +3777,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			// loop. The agent keeps what it has, and the next try's stream
 			// follows it. Nobody rests: the model looped, not the account
 			// (#2436: pi's Chat to WorkBuddy was ended at once)
+			transport.reachedVendor() // it reached its vendor and looped
 			reloops++
 			call.Error = c.p.Name + ": " + reloopedError
 			try.Status, try.Error, try.Fail = call.Status, call.Error, failLoop
@@ -3781,6 +3792,55 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			continue
 		}
 		watched.attempt(call, try, c.p.ID, sent, hw, capture)
+		// A proxy or a network that took no connection fails every
+		// provider left the same way: stop after transportFailMost
+		// tries in a row and let the agent have the last one's error
+		// now (F-4, F-9). A provider's own proxy and its accounts are one
+		// path; another proxy, or a direct one, is another and keeps the
+		// chain going. failOffline already found the network reaches none
+		// of the other providers' direct hosts; a candidate with its own
+		// proxy is still asked. A vendor's own 5xx or timeout reached it
+		// and resets the count, so the next is still asked. try.Fail is
+		// set here for the terminal retry checks below, which read it
+		// before the last try's failure is classified.
+		if hw.failed() {
+			why := ""
+			switch {
+			case failure(hw.code(), hw.errBody()) == failProxy:
+				why = failProxy
+			case offlineFailure(c, hw.code(), hw.errBody()):
+				why = failOffline
+			}
+			if why != "" {
+				transport.failed(why)
+				try.Fail = why
+				proto := call.To
+				if proto == "" {
+					proto = from
+				}
+				// only when every candidate left would go the same way:
+				// another proxy, or a direct one, may still answer
+				if transport.fails >= transportFailMost && sameTransportPath(cands[i+1:], transportPath(c, proto), proto) {
+					if failedRow != nil {
+						failedRow()
+						failedRow = nil
+					}
+					s.trace.update(tr, func(t *Route) { t.Tries[len(t.Tries)-1] = try })
+					skipped = append(skipped, c.label()+": "+call.Error)
+					if other == nil {
+						other = &Try{Status: call.Status, Error: call.Error}
+					}
+					// the last try's 502 is the agent's now, not after
+					// every candidate left met the same dead proxy
+					hw.release()
+					break
+				}
+			} else {
+				transport.reachedVendor()
+			}
+		} else {
+			transport.reachedVendor()
+		}
 		if autoPicks(c) && repicked < 2 && !hw.passing && hw.code() == http.StatusBadRequest &&
 			(provider.CopilotRefusal(hw.errBody()) || wrongEndpoint(hw.code(), hw.errBody())) {
 			// Copilot refused the model its Auto picked, and Auto has
@@ -4185,7 +4245,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 		}
 		// nor is it asked again after a moment
 		protected = protected || zdr || noRoom
-		if wait, ok := passing(hw.code(), hw.header, hw.errBody(), again); ok && !protected && !last && hw.failed() && spentAfter(cands[i+1:]) {
+		if wait, ok := passingWhy(hw.code(), hw.header, hw.errBody(), again, transport.why); ok && !protected && !last && hw.failed() && spentAfter(cands[i+1:]) {
 			// the others left are out of their allowance (Discord, waroy: a
 			// Codex account run out, Grok busy a moment): this one is the
 			// last that may answer, and is tried again as the last is
@@ -4379,7 +4439,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				forbade = append(forbade, forbidden{c: c, rest: rest, try: at})
 			}
 			skipped = append(skipped, c.label()+": "+call.Error)
-			if waitsOf(c.patience, patienceFallback) > 0 && !hw.turnedAway && busy(hw.code(), hw.errBody()) {
+			if waitsOf(c.patience, patienceFallback) > 0 && !hw.turnedAway && busyWhy(hw.code(), hw.errBody(), transport.why) {
 				busyNow = noteBusy(busyNow, c, hw.header)
 			}
 			continue
@@ -4396,9 +4456,9 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 		// its allowance, asked only as the one back soonest, isn't: the
 		// members before it were asked again as the last that may answer
 		// (spentAfter) and the agent is told theirs
-		lastSpent := last && isGroup && len(busyNow) > 0 && !hw.passing && hw.failed() && !busy(hw.code(), hw.errBody()) &&
+		lastSpent := last && isGroup && len(busyNow) > 0 && !hw.passing && hw.failed() && !busyWhy(hw.code(), hw.errBody(), transport.why) &&
 			slices.Contains([]string{failQuota, failCredit}, failure(hw.code(), hw.errBody())) && !spentAfter([]candidate{c})
-		if _, same := passing(hw.code(), hw.header, hw.errBody(), again); last && patience > 0 && !protected && !hw.turnedAway && !hw.refused && hw.failed() && (busy(hw.code(), hw.errBody()) || lastSpent) &&
+		if _, same := passingWhy(hw.code(), hw.header, hw.errBody(), again, transport.why); last && patience > 0 && !protected && !hw.turnedAway && !hw.refused && hw.failed() && (busyWhy(hw.code(), hw.errBody(), transport.why) || lastSpent) &&
 			(isGroup || !codexReset(hw.code(), hw.errBody())) &&
 			(len(busyNow) > 0 || waitsOf(c.patience, patienceFallback) > 0 && !same) {
 			// every member has failed, each in a way that passes — busy,
@@ -4448,7 +4508,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 				break
 			}
 		}
-		if wait, ok := passing(hw.code(), hw.header, hw.errBody(), again); ok && !protected && !hw.turnedAway && hw.failed() && waitFrom.IsZero() && !kept.tooQuiet(wait) {
+		if wait, ok := passingWhy(hw.code(), hw.header, hw.errBody(), again, transport.why); ok && !protected && !hw.turnedAway && hw.failed() && waitFrom.IsZero() && !kept.tooQuiet(wait) {
 			// nobody else is left: the same one again, after a moment (not
 			// what Antigravity turned away: it turns it away again; nor
 			// once the group's patience is spent)
@@ -4720,6 +4780,12 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 	// the recovery's: an answer resets the state without a word.
 	if call.Status >= 400 {
 		downSaid(all, call.Model, call.Status)
+		if transport.all && askedTries > 0 {
+			// every try failed before reaching a vendor: the proxy or this
+			// computer's network is out, and the model is as unreachable
+			// as one whose candidates all rest (F-9)
+			transportSaid(call.Model, call.Status)
+		}
 	}
 	call.Millis = time.Since(start).Milliseconds()
 	if !ended.IsZero() {

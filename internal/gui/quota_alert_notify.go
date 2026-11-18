@@ -195,9 +195,10 @@ func (h *host) watchAlerts() {
 			title, body := turnDoneText(trayLang(settings.Load().Lang, systemLang), agentName(t.Agent), t)
 			n.sendAs(turnNotice, title, body)
 		}
-		// every key and account of a model resting, as a request for it
-		// found it (the review's D-01, 11-16): the outage's notice, once
-		// on the way in and at most once a minute while it holds
+		// no channel of a model can answer, as a request for it found it —
+		// every key or account resting, or the proxy or network down (the
+		// review's D-01, 11-16): the outage's notice, once on the way in and
+		// at most once a minute while it holds
 		gateway.AllDownAlert = func(model string) {
 			if !settings.Load().AllDownAlert {
 				return
