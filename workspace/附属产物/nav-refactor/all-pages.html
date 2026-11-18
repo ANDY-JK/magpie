@@ -143,6 +143,21 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
 .bars i{flex:1;border-radius:3px 3px 1px 1px;background:var(--accent);opacity:.85;min-height:3px}
 .bars i:nth-child(3n){opacity:.5}
 
+.lib-split{display:grid;grid-template-columns:1.05fr 1fr;gap:8px}
+.win.narrow .lib-split{grid-template-columns:1fr}
+.lib-list{display:flex;flex-direction:column;gap:4px}
+.lib-item{display:flex;align-items:center;gap:7px;padding:6px 8px;background:var(--card);border-radius:8px;box-shadow:var(--shadow-sm);width:100%;text-align:left}
+.lib-item.on{box-shadow:0 0 0 1.5px var(--accent),var(--shadow-sm)}
+.lib-item .who{flex:1;min-width:0}
+.lib-item .nm,.lib-item .sub{display:block}
+.lib-detail{background:var(--card);border-radius:8px;box-shadow:var(--shadow-sm);padding:9px 10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.det-h{font-size:12px;font-weight:600;margin-bottom:1px}
+.det-row{display:flex;gap:7px;font-size:10px;line-height:1.4}
+.det-row span{width:54px;color:var(--muted);flex:none}
+.det-row b{font-weight:500;color:var(--fg-2);word-break:break-all}
+.det-row b.mono{font-family:ui-monospace,Consolas,monospace;font-size:9px}
+.rowbtns{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
+.btn.danger{color:var(--red);box-shadow:0 0 0 .5px color-mix(in srgb,var(--red) 35%,transparent)}
 .cols{display:grid;grid-template-columns:1.2fr 1fr;gap:7px}
 .win.narrow .cols{grid-template-columns:1fr}
 .card{background:var(--card);border-radius:9px;box-shadow:var(--shadow-sm);overflow:hidden}
@@ -215,7 +230,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
   <div><h3>本页元素<span class="tag">编号 · 区域 · 由哪些组件组成 · 改动位置</span></h3><section class="uses" id="pageSpec"></section></div>
   <div><h3>组件索引<span class="tag">C 编号 · 组件 · 样式类 · 用在哪 · 改这里</span></h3><section class="uses" id="compIndex"></section></div>
 </div>
-<details class="index"><summary>全部视图索引（31 个）</summary><section class="uses" id="allIndex"></section></details>
+<details class="index"><summary>全部视图索引（32 个）</summary><section class="uses" id="allIndex"></section></details>
 <p class="spec-hint" id="specHint">描述示例：「供应商 · 2 · 列表 的行距改小」→ 改 C01 列表行（.item）的 padding。外壳（标题栏/分区/页面/底栏）见骨架页，不重复。打开「标注」可在页面上看到区域编号；点编号可选中该区域。</p>
 
 <script>
@@ -258,7 +273,7 @@ const PAGES = {
   metrics:{name:'指标',icon:'gauge',kind:'metrics',period:['今天','7 天','30 天'],buttons:['刷新']},
   doctor:{name:'诊断',icon:'doctor',kind:'doctor',buttons:['检查','刷新']},
   masking:{name:'掩码',icon:'shield',kind:'masking',period:['7 天','30 天'],buttons:['刷新']},
-  library:{name:'资源库',icon:'library',kind:'library',tabs:['指令','MCP · 3','技能 · 12','钩子 · 2','子代理 · 4','RTK'],search:'搜索资源',buttons:['发现']},
+  library:{name:'资源库',icon:'library',kind:'library',tabs:['指令','MCP · 3','技能 · 12','钩子 · 2','子代理 · 4','插件库 · 4','RTK'],search:'搜索资源',buttons:['发现','文件夹']},
   plugins:{name:'插件',icon:'plug',kind:'plugins',tabs:['内置','发现','已安装 · 3'],search:'搜索插件',buttons:[]},
   settings:{name:'设置',icon:'gear',kind:'settings',tabs:['通用','额度','网络与共享','模型','隐私','可观测','同步与备份','插件','关于'],search:'查找设置',buttons:[]},
 };
@@ -334,7 +349,7 @@ const SPEC_INFO = {
     '掩码列表':['列表行 ×3','listRows · .item'],
   },
   library:{
-    '标签条':['页内标签 ×6','viewTabs · .vtabs'],
+    '标签条':['页内标签 ×7','viewTabs · .vtabs'],
     '工具栏':['搜索框、普通按钮','toolbarHtml · .toolbar'],
     '列表':['列表行 ×3','listRows · .item'],
   },
@@ -372,7 +387,7 @@ const COMPONENTS = [
 const state = {
   frame:'narrow', section:'model', page:'providers', theme:'light',
   tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
-  spec:false, sel:null,
+  spec:false, sel:null, libSel:0,
 };
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
@@ -622,6 +637,51 @@ function installedList(){
     ['web-search','v0.3.1',false],
   ].map(([n,v,on])=>`<div class="item"><div class="who"><div class="nm">${n}</div><div class="sub">${v}</div></div><span class="switch${on?' on':''}"></span></div>`).join('')}</div>`];
 }
+const PLUGINLIB = [
+  {short:'code-review', agent:'Claude Code', src:'github.com/anthropics/claude-plugins', v:'1.4.0', path:'~/.claude/plugins/cache/code-review', on:true, color:'#d97757'},
+  {short:'chrome', agent:'Codex', src:'marketplace/codex', v:'0.9.2', path:'~/.codex/plugins/chrome', on:true, color:'#10a37f'},
+  {short:'search', agent:'Gemini CLI', src:'npm/@gemini/plugin-search', v:'2.1.1', path:'~/.gemini/plugins/search', on:false, color:'#4285f4'},
+  {short:'pdf', agent:'Claude Code', src:'github.com/anthropics/claude-plugins', v:'1.2.3', path:'~/.claude/plugins/cache/pdf', on:true, color:'#d97757'},
+];
+function pluginLibBody(){
+  const sel = Math.min(state.libSel || 0, PLUGINLIB.length - 1);
+  const it = PLUGINLIB[sel];
+  return [`<div class="lib-split">
+    <div class="lib-list">${PLUGINLIB.map((x,i)=>`<button class="lib-item${i===sel?' on':''}" data-libsel="${i}">
+      <span class="logo2" style="background:${x.color}">${x.short[0].toUpperCase()}</span>
+      <span class="who"><span class="nm">${x.short}</span><span class="sub">${x.agent} · v${x.v}</span></span>
+      <span class="switch${x.on?' on':''}"></span>
+    </button>`).join('')}</div>
+    <div class="lib-detail">
+      <div class="det-h">${it.short}</div>
+      <div class="det-row"><span>适用 agent</span><b>${it.agent}</b></div>
+      <div class="det-row"><span>来源</span><b>${it.src}</b></div>
+      <div class="det-row"><span>版本</span><b>v${it.v}</b></div>
+      <div class="det-row"><span>位置</span><b class="mono">${it.path}</b></div>
+      <div class="det-row"><span>状态</span><b>${it.on?'已启用':'已停用'}</b></div>
+      <div class="rowbtns"><button class="btn">打开目录</button><button class="btn">更新</button><button class="btn danger">卸载</button></div>
+    </div>
+  </div>`];
+}
+function libSplit(kind, typeName){
+  const rows = ROWS[kind] || [];
+  const sel = Math.min(state.libSel || 0, Math.max(0, rows.length - 1));
+  const it = rows[sel] || ['—','',''];
+  return [`<div class="lib-split">
+    <div class="lib-list">${rows.map(([n,s,m,c],i)=>`<button class="lib-item${i===sel?' on':''}" data-libsel="${i}">
+      ${c?`<span class="logo2" style="background:${c}">${n[0]}</span>`:`<span class="logo2" style="background:var(--pill);color:var(--muted)">${n[0]}</span>`}
+      <span class="who"><span class="nm">${n}</span><span class="sub">${s||m||''}</span></span>
+    </button>`).join('')}</div>
+    <div class="lib-detail">
+      <div class="det-h">${it[0]}</div>
+      <div class="det-row"><span>类型</span><b>${typeName}</b></div>
+      <div class="det-row"><span>说明</span><b>${it[1]||it[2]||'—'}</b></div>
+      <div class="det-row"><span>适用 agent</span><b>全部 agent</b></div>
+      <div class="det-row"><span>状态</span><b>可用</b></div>
+      <div class="rowbtns"><button class="btn">打开</button><button class="btn">复制路径</button><button class="btn danger">删除</button></div>
+    </div>
+  </div>`];
+}
 const TAB_BODIES = {
   usage:{
     '概览': () => [statsHtml(), chartHtml()],
@@ -631,12 +691,13 @@ const TAB_BODIES = {
     '榜单': () => [listRows('rank')],
   },
   library:{
-    '指令': () => [listRows('library')],
-    'MCP · 3': () => [listRows('mcp')],
-    '技能 · 12': () => [listRows('skills')],
-    '钩子 · 2': () => [listRows('hooks')],
-    '子代理 · 4': () => [listRows('subagents')],
-    'RTK': () => [listRows('rtk')],
+    '指令': () => [libSplit('library','指令')],
+    'MCP · 3': () => [`<div class="optbar" style="margin-bottom:6px"><div class="segline"><button class="segbtn on">Agents</button><button class="segbtn">其它应用</button></div></div>` + libSplit('mcp','MCP 服务器')[0]],
+    '技能 · 12': () => [libSplit('skills','技能')],
+    '钩子 · 2': () => [libSplit('hooks','钩子')],
+    '子代理 · 4': () => [libSplit('subagents','子代理')],
+    '插件库 · 4': () => pluginLibBody(),
+    'RTK': () => [`<div class="optbar" style="margin-bottom:6px"><div class="segline"><button class="segbtn on">30 天</button><button class="segbtn">90 天</button><button class="segbtn">全部</button></div></div>` + libSplit('rtk','RTK')[0]],
   },
   plugins:{
     '内置': () => [switchList()],
@@ -657,7 +718,7 @@ const TAB_BODIES = {
 };
 const TAB_BODY_NAMES = {
   usage:{'概览':['统计块','图表'],'请求':['请求列表'],'会话':['会话列表'],'上下文':['上下文卡片'],'榜单':['榜单列表']},
-  library:{'指令':['指令列表'],'MCP · 3':['MCP 列表'],'技能 · 12':['技能列表'],'钩子 · 2':['钩子列表'],'子代理 · 4':['子代理列表'],'RTK':['RTK 列表']},
+  library:{'指令':['指令列表'],'MCP · 3':['MCP 列表'],'技能 · 12':['技能列表'],'钩子 · 2':['钩子列表'],'子代理 · 4':['子代理列表'],'插件库 · 4':['插件库'],'RTK':['RTK 列表']},
   plugins:{'内置':['开关列表'],'发现':['发现列表'],'已安装 · 3':['已安装列表']},
   settings:{'通用':['设置行'],'额度':['设置行'],'网络与共享':['设置行'],'模型':['设置行'],'隐私':['设置行'],'可观测':['设置行'],'同步与备份':['设置行'],'插件':['设置行'],'关于':['设置行']},
 };
@@ -669,11 +730,13 @@ const TAB_SPEC = {
     '榜单列表':['列表行 ×4','listRows · .item'],
   },
   library:{
-    'MCP 列表':['列表行 ×3','listRows · .item'],
-    '技能列表':['列表行 ×3','listRows · .item'],
-    '钩子列表':['列表行 ×2','listRows · .item'],
-    '子代理列表':['列表行 ×3','listRows · .item'],
-    'RTK 列表':['列表行 ×2','listRows · .item'],
+    '指令列表':['列表 + 详情面板','libSplit · .lib-split'],
+    'MCP 列表':['Agents/其它应用 + 列表 + 详情面板','libSplit · .lib-split'],
+    '技能列表':['列表 + 详情面板','libSplit · .lib-split'],
+    '钩子列表':['列表 + 详情面板','libSplit · .lib-split'],
+    '子代理列表':['列表 + 详情面板','libSplit · .lib-split'],
+    '插件库':['列表 + 详情面板','pluginLibBody · .lib-split'],
+    'RTK 列表':['范围 + 列表 + 详情面板','libSplit · .lib-split'],
   },
   plugins:{
     '发现列表':['列表行 ×3、普通按钮','discoverList · .item/.btn'],
@@ -802,22 +865,24 @@ function renderStage(){
 stage.addEventListener('click', e=>{
   const h = e.target.closest('.spec-head');
   if(h){ state.sel = {n:+h.dataset.rn, name:h.dataset.rname}; renderStage(); return; }
+  const ls = e.target.closest('[data-libsel]');
+  if(ls){ state.libSel = +ls.dataset.libsel; renderStage(); return; }
   const s = e.target.closest('[data-sec]');
   if(s){
     const sec = SECTIONS.find(x=>x.id===s.dataset.sec);
-    state.section = sec.id; state.page = sec.pages[0]; state.sel = null; renderStage(); return;
+    state.section = sec.id; state.page = sec.pages[0]; state.sel = null; state.libSel = 0; renderStage(); return;
   }
   const p = e.target.closest('[data-page]');
   if(p){
     state.page = p.dataset.page;
     const sec = sectionOf(state.page);
     if(sec) state.section = sec.id;
-    state.sel = null; renderStage(); return;
+    state.sel = null; state.libSel = 0; renderStage(); return;
   }
   const v = e.target.closest('[data-vtab]');
-  if(v){ state.tabs[state.page] = v.dataset.vtab; state.sel = null; renderStage(); return; }
+  if(v){ state.tabs[state.page] = v.dataset.vtab; state.sel = null; state.libSel = 0; renderStage(); return; }
   const l = e.target.closest('[data-l3]');
-  if(l){ state.l3 = l.dataset.l3; state.sel = null; renderStage(); }
+  if(l){ state.l3 = l.dataset.l3; state.sel = null; state.libSel = 0; renderStage(); }
 });
 function renderAllIndex(){
   const rows = [];
