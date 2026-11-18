@@ -33,6 +33,22 @@ internal` must print nothing.
 `node --test internal/gui/tests/<name>.test.cjs`. The tests run against the
 real pages on `magpie.test` with the API faked in the test (no backend).
 
+## A live gateway
+
+`scripts/gateway-smoke.cjs` sends one minimal request on each API the
+gateway serves — Chat, Responses, Anthropic, Gemini and Ollama — to a
+running magpie, and exits 1 naming whichever failed:
+
+```
+MAGPIE_URL=http://127.0.0.1:3425 node scripts/gateway-smoke.cjs
+MAGPIE_URL=... MAGPIE_KEY=sk-magpie-... MAGPIE_MODEL=relay/m1 node scripts/gateway-smoke.cjs
+```
+
+`MAGPIE_KEY` defaults to the local token `magpie` (a gateway not shared on
+the network takes it); `MAGPIE_MODEL` defaults to the first model
+`/v1/models` lists; `MAGPIE_SMOKE_TIMEOUT_MS` bounds each request. It reads
+`/api/hello` and `/readyz` first and changes nothing about the gateway.
+
 ## Budgets
 
 | Budget | Value | Owner |
