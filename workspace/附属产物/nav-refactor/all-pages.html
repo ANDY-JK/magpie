@@ -294,7 +294,6 @@ button:focus-visible,.lib-item:focus-visible{outline:2px solid var(--accent);out
   </div>
   <span class="sep"></span>
   <button class="tbtn" id="formBtn">形态：窗口</button>
-  <button class="tbtn" id="navBtn">窄窗：两行</button>
   <button class="tbtn" id="stateBtn">状态：正常</button>
   <button class="tbtn" id="specBtn">标注：关</button>
   <button class="tbtn" id="themeBtn">明 / 暗</button>
@@ -467,11 +466,10 @@ const COMPONENTS = [
 const state = {
   frame:'narrow', section:'model', page:'providers', theme:'light',
   tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
-  spec:false, sel:null, libSel:0, mdSel:0, compact:false, sheet:false, ov:null, menuAt:null, sw:{}, listState:'normal', editDirty:false, form:'window', panelTab:'额度', providerOpen:null, toast:null,
+  spec:false, sel:null, libSel:0, mdSel:0, sheet:false, ov:null, menuAt:null, sw:{}, listState:'normal', editDirty:false, form:'window', panelTab:'额度', providerOpen:null, toast:null,
 };
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
-if(qs.get('nav')==='one') state.compact = true;
 if(['empty','loading','error'].includes(qs.get('state'))) state.listState = qs.get('state');
 if(['panel','phone'].includes(qs.get('form'))) state.form = qs.get('form');
 if(qs.get('open')) state.providerOpen = qs.get('open');
@@ -1138,16 +1136,19 @@ function mainView(){
   const sheet = state.sheet && state.page==='providers' ? addSheetInline() : '';
   return `<main class="view">${regions.map((r,i)=>reg(i+1, r[0], r[1])).join('')}${sheet}</main>`;
 }
-function compactNav(){
-  let out = '';
-  SECTIONS.forEach((sec, si)=>{
-    if(si) out += '<span class="tsep"></span>';
-    out += `<span class="gchip${state.page!=='settings'&&state.section===sec.id?' on':''}">${sec.name}</span>`;
-    out += sec.pages.map(id=>`<button class="tab${state.page===id?' on':''}" data-page="${id}">${PAGES[id].name}</button>`).join('');
-  });
-  out += '<span class="tsep"></span>';
-  out += `<button class="tab${state.page==='settings'?' on':''}" data-page="settings">设置</button>`;
-  return `<nav class="tabstrip">${out}</nav>`;
+function toastHtml(){ return state.toast ? `<div class="toast">${state.toast}</div>` : ''; }
+function showToast(msg){
+  state.toast = msg;
+  renderStage();
+  clearTimeout(showToast.t);
+  showToast.t = setTimeout(()=>{ if(state.toast===msg){ state.toast = null; renderStage(); } }, 1600);
+}
+function closeOv(){
+  if(state.ov && state.ov.kind==='providerEdit' && state.editDirty){
+    state.ov = {kind:'confirm', title:'放弃未保存的修改？', body:'离开后这次编辑不会保留。', ok:'放弃'};
+    renderStage(); return;
+  }
+  state.ov = null; state.editDirty = false; renderStage();
 }
 function modalHtml(title, body, actions){
   return `<div class="ov"><div class="ov-sheet">
@@ -1186,19 +1187,18 @@ function overlayHtml(){
   if(o.kind==='request') return modalHtml(o.title || '请求详情',
     `<div class="det-row"><span>模型</span><b>codex/gpt-5.6-sol</b></div><div class="det-row"><span>耗时</span><b>1.2s</b></div><div class="det-row"><span>令牌</span><b>2.4K</b></div><div class="det-row"><span>状态</span><b>成功</b></div>`,
     '<button class="btn" data-ovclose>关闭</button><button class="btn">在路由页打开</button>');
+  if(o.kind==='ctxtext') return modalHtml(o.title || '上下文文本',
+    `<pre class="preview">你是 magpie 的助手……\n（最近 10 次请求，已掩码）</pre>`,
+    '<button class="btn" data-ovclose>关闭</button><button class="btn">复制</button>');
+  if(o.kind==='updateProgress') return modalHtml(o.title || '正在下载',
+    `<div class="progress"><i style="width:64%"></i></div><p class="hint">下载完成后重启；正在运行的请求会先完成。</p>`,
+    '<button class="btn" data-ovclose>后台</button><button class="btn primary" data-ovclose>完成即重启</button>');
   if(o.kind==='update') return modalHtml(o.title || '发现新版本',
     `<p class="hint">更新会重启 magpie，正在运行的请求会先完成。</p>`,
     '<button class="btn" data-ovclose>稍后</button><button class="btn primary" data-act="updateProgress">更新</button>');
   if(o.kind==='providerEdit') return modalHtml(o.title || '编辑供应商',
     `<div class="formrow"><label>名称</label><input class="ov-input" value="Codex"></div><div class="formrow"><label>账号</label><input class="ov-input" value="3 个账号"></div><div class="formrow"><label>模型</label><input class="ov-input" value="12 个模型"></div>`,
     '<button class="btn" data-ovclose>取消</button><button class="btn primary" data-ovsave>保存</button>');
-  if(o.kind==='ctxtext') return modalHtml(o.title || '上下文文本',
-    `<pre class="preview">你是 magpie 的助手……
-（最近 10 次请求，已掩码）</pre>`,
-    '<button class="btn" data-ovclose>关闭</button><button class="btn">复制</button>');
-  if(o.kind==='updateProgress') return modalHtml(o.title || '正在下载',
-    `<div class="progress"><i style="width:64%"></i></div><p class="hint">下载完成后重启；正在运行的请求会先完成。</p>`,
-    '<button class="btn" data-ovclose>后台</button><button class="btn primary" data-ovclose>完成即重启</button>');
   if(o.kind==='import') return modalHtml(o.title || '导入配置',
     `<div class="list"><div class="item"><div class="who"><div class="nm">Codex</div><div class="sub">~/.codex/config.toml</div></div><span class="switch on"></span></div><div class="item"><div class="who"><div class="nm">Claude Code</div><div class="sub">~/.claude/settings.json</div></div><span class="switch on"></span></div></div>`,
     '<button class="btn" data-ovclose>取消</button><button class="btn primary" data-ovclose>导入选中</button>');
@@ -1209,20 +1209,6 @@ function overlayHtml(){
     `<p class="hint">还有 4 个会话连着网关，退出会中断它们。</p>`,
     '<button class="btn" data-ovclose>取消</button><button class="btn danger" data-ovclose>退出</button>');
   return '';
-}
-function toastHtml(){ return state.toast ? `<div class="toast">${state.toast}</div>` : ''; }
-function showToast(msg){
-  state.toast = msg;
-  renderStage();
-  clearTimeout(showToast.t);
-  showToast.t = setTimeout(()=>{ if(state.toast===msg){ state.toast = null; renderStage(); } }, 1600);
-}
-function closeOv(){
-  if(state.ov && state.ov.kind==='providerEdit' && state.editDirty){
-    state.ov = {kind:'confirm', title:'放弃未保存的修改？', body:'离开后这次编辑不会保留。', ok:'放弃'};
-    renderStage(); return;
-  }
-  state.ov = null; state.editDirty = false; renderStage();
 }
 function panelBody(){
   const tab = state.panelTab || '额度';
@@ -1254,17 +1240,15 @@ function renderStage(){
   else if(state.form==='phone') stage.innerHTML = phoneShell();
   else stage.innerHTML = state.frame==='wide'
     ? `<div class="win wide">${topbar(false)}<div class="main">${navSide()}${mainView()}</div>${footerbar()}${overlayHtml()}${toastHtml()}</div>`
-    : `<div class="win narrow">${topbar(true)}${state.compact ? compactNav() : secStrip()+pageStrip()}${mainView()}${footerbar()}${overlayHtml()}${toastHtml()}</div>`;
+    : `<div class="win narrow">${topbar(true)}${secStrip()}${pageStrip()}${mainView()}${footerbar()}${overlayHtml()}${toastHtml()}</div>`;
   const sec = SECTIONS.find(s=>s.id===state.section);
   const where = state.page==='settings' ? '设置' : ((sec ? sec.name + ' › ' : '') + PAGES[state.page].name);
   document.getElementById('where').textContent = where;
   document.querySelectorAll('#frameSeg button[data-f]').forEach(b=>b.classList.toggle('on', b.dataset.f===state.frame));
   document.getElementById('specBtn').textContent = '标注：' + (state.spec ? '开' : '关');
-  document.getElementById('navBtn').textContent = '窄窗：' + (state.compact ? '一行' : '两行');
   document.getElementById('stateBtn').textContent = '状态：' + ({normal:'正常',empty:'空',loading:'加载',error:'错误'}[state.listState]);
   document.getElementById('formBtn').textContent = '形态：' + ({window:'窗口',panel:'托盘',phone:'手机'}[state.form]);
   if(state.sheet){ const sh=document.querySelector('.sheet-inline'); if(sh) sh.scrollIntoView({block:'nearest'}); }
-  if(state.frame==='narrow' && state.compact){ const nav=document.querySelector('.win.narrow .tabstrip'); const on=nav && nav.querySelector('.tab.on'); if(on) nav.scrollLeft = Math.max(0, on.offsetLeft - 60); }
   const regions = regionsFor(state.page, PAGES[state.page]).map(r=>r[0]);
   const selTxt = state.sel ? ('已选：' + where + ' · 区域 ' + state.sel.n + ' · ' + state.sel.name) : ('当前页：' + where);
   document.getElementById('caption').textContent = selTxt + ' · 本页区域：' + regions.join(' · ') + '。';
@@ -1412,7 +1396,6 @@ document.getElementById('frameSeg').addEventListener('click', e=>{
   if(!b) return;
   state.frame = b.dataset.f; renderStage();
 });
-document.getElementById('navBtn').addEventListener('click', ()=>{ state.compact = !state.compact; renderStage(); });
 document.getElementById('formBtn').addEventListener('click', ()=>{ const forms=['window','panel','phone']; state.form = forms[(forms.indexOf(state.form)+1)%forms.length]; renderStage(); });
 document.getElementById('stateBtn').addEventListener('click', ()=>{ const states=['normal','empty','loading','error']; state.listState = states[(states.indexOf(state.listState)+1)%states.length]; renderStage(); });
 document.getElementById('specBtn').addEventListener('click', ()=>{
