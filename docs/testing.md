@@ -49,6 +49,22 @@ the network takes it); `MAGPIE_MODEL` defaults to the first model
 `/v1/models` lists; `MAGPIE_SMOKE_TIMEOUT_MS` bounds each request. It reads
 `/api/hello` and `/readyz` first and changes nothing about the gateway.
 
+## Watching a fault
+
+`MAGPIE_FAULT` makes a provider answer as a broken vendor, so a group's
+fallback, a group's patience or a rest cap can be watched under the fault it
+was set for (`internal/gateway/fault.go`). It is env-only and off unless
+set; every injected answer carries `X-Magpie-Fault` and the try's error says
+"fault injected", so a Routing trace and the recent calls show it:
+
+```
+MAGPIE_FAULT="relay=500,openrouter=delay:2000,gemini=cut" magpie serve
+```
+
+`<provider id>=500` (or `status:429`), `=delay:<ms>`, `=cut` (an answer that
+stops half-way); `*=` matches any provider; the first rule that matches is
+the one used.
+
 ## Budgets
 
 | Budget | Value | Owner |

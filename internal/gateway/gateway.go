@@ -5144,6 +5144,17 @@ func (s *Server) forwardOnce(ctx context.Context, p provider.Provider, to provid
 	ctx = withHeaderWait(ctx, headerWaitOfProvider(p))
 	was := images(to, body)
 	ctx = s.metered(p.Via(ctx), p, "", "")
+	// a debugging fault, when MAGPIE_FAULT names this provider (fault.go)
+	if r, ok := faultOf(p); ok {
+		res, wait, err := faultAnswer(ctx, r)
+		if err != nil {
+			return nil, err
+		}
+		if !wait {
+			log.Printf("fault injected: %s %s", p.ID, r.raw)
+			return res, nil
+		}
+	}
 	body = deepseekToolPatterns(p, to, body)
 	body = grokToolPatterns(p, to, body)
 	body = deepseekTokenField(p, to, body)
