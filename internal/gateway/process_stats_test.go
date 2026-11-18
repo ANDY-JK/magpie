@@ -1,10 +1,40 @@
 package gateway
 
 import (
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/yetone/magpie/internal/usage"
 )
+
+// K-02: /api/process carries how many usage records the ledger could not
+// write, so a Usage total short of the calls made is explained, not a
+// mystery; a process that dropped none says so too (the field is absent,
+// omitempty). The count is the ledger's own (usage.AppendsFailed, counted
+// and said there), not one the process keeps apart.
+func TestProcessNowSaysTheUsageRecordsNotWritten(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	resetProcessRing()
+	defer resetProcessRing()
+	st := ProcessNow()
+	if st.UsageDrops != usage.AppendsFailed() {
+		t.Fatalf("the reading says %d records not written, the ledger %d", st.UsageDrops, usage.AppendsFailed())
+	}
+
+	// a ledger that can't write (its path a folder: the open fails on every
+	// platform, no read-only folder's enforcement needed) is read back here
+	// — the count the page shows is the one the ledger counts
+	os.MkdirAll(usage.Path(), 0o755)
+	usage.Append(usage.Record{Agent: "codex", Provider: "relay", Model: "m", Input: 2, Status: 200})
+	if st := ProcessNow(); st.UsageDrops != usage.AppendsFailed() || st.UsageDrops < 1 {
+		t.Fatalf("a record not written, the reading says %d, the ledger %d", st.UsageDrops, usage.AppendsFailed())
+	}
+}
 
 // resetProcessRing gives a test a ring of its own: the sampler's readings
 // are the process's, and a test counts only the ones it put there.

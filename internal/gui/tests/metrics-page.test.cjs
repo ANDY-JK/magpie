@@ -5,7 +5,9 @@
 // time), /api/process (memory, CPU, goroutines, with the sampler's last four
 // hours as two small canvas charts) and /api/usage/hourly (calls and
 // failures by hour, with their averages) — and links to the pages that
-// already show the rest. A read that fails keeps the page: the section says
+// already show the rest. When the ledger couldn't write usage records
+// (usageDrops), the process panel says how many, so a Usage total short of
+// the calls made is explained; none says nothing. A read that fails keeps the page: the section says
 // so where its numbers would be, and what was read before stays drawn.
 // Nothing here scrolls by itself. English and Chinese, Chromium and WebKit;
 // no backend, the API is faked.
@@ -41,6 +43,7 @@ const PROC = {
   stackSys: 8e6, sys: 560e6, numGC: 91, goroutines: 43, cpuKnown: true, cpuTotal: 104.5,
   numCPU: 8, gomaxprocs: 8, history: HIST,
 };
+const PROC_DROPS = { ...PROC, usageDrops: 7 };
 const CALLS = [3, 0, 5, 9, 4, 0, 12, 7];
 const HOURS = {
   since: new Date(now - 24 * 3600e3).toISOString(), hours: 24,
@@ -58,7 +61,7 @@ function server(lang, state) {
     if (url.pathname === "/wails/runtime.js") return route.fulfill({ contentType: "text/javascript", body: "export const Window = {};" });
     if (url.pathname === "/api/state") return json({ agents: [], profiles: [], settings: { lang, theme: "light" } });
     if (url.pathname === "/api/busy") return state.busyFail ? route.fulfill({ status: 500, body: "" }) : json(BUSY);
-    if (url.pathname === "/api/process") return json(PROC);
+    if (url.pathname === "/api/process") return json(state.drops ? PROC_DROPS : PROC);
     if (url.pathname === "/api/usage/hourly") return state.hourFail ? route.fulfill({ status: 500, body: "" }) : json(HOURS);
     if (url.pathname === "/api/providers") return json({ providers: [], presets: [], excluded: [], gateway: { running: true } });
     if (url.pathname === "/api/usage/requests") return json({ rows: [], total: 0, offset: 0 });
@@ -79,7 +82,7 @@ const L = {
     slot: "queued for a key or account", proc: "The process itself",
     mem: "Memory, the last four hours", cpu: "CPU, the last four hours",
     memk: "live memory", sysk: "taken from the system", backk: "returned so far", gok: "Go routines",
-    cpuk: "CPU share", upk: "running since",
+    cpuk: "CPU share", upk: "running since", dropk: "usage records not written",
     hour: "Calls by hour", avg: "An average of 5 calls an hour, 0.2 failed",
     callsH: "Calls an hour", failedH: "Failed an hour",
     more: "Shown elsewhere", usageSub: "Which provider answered, and what it cost",
@@ -92,7 +95,7 @@ const L = {
     slot: "在 key 或账号的队列中", proc: "本进程",
     mem: "内存，最近四小时", cpu: "CPU，最近四小时",
     memk: "在用内存", sysk: "向系统申请的", backk: "已归还的", gok: "Go 例程",
-    cpuk: "CPU 占用", upk: "已运行",
+    cpuk: "CPU 占用", upk: "已运行", dropk: "未写入的用量记录",
     hour: "按小时的调用", avg: "平均每小时 5 次调用，0.2 次失败",
     callsH: "每小时调用", failedH: "每小时失败",
     more: "别处已有", usageSub: "哪个供应商应答、花了多少",
@@ -105,7 +108,7 @@ const KEYS = ["Read now", "Read at {time}", "Running now", "Turns waiting on too
   "The gateway is served by another magpie on this computer.",
   "queued for a key or account", "waiting for the minute", "asking a vendor", "masking its words",
   "The process itself", "live memory", "taken from the system", "returned so far", "Go routines",
-  "CPU share", "running since", "Memory, the last four hours", "CPU, the last four hours",
+  "CPU share", "running since", "usage records not written", "Memory, the last four hours", "CPU, the last four hours",
   "Idle past half a minute, the gateway hands its memory back.", "Calls by hour", "Calls an hour",
   "Failed an hour", "An average of {n} calls an hour, {m} failed",
   "Waiting requests aren't counted by hour yet.", "Shown elsewhere",
@@ -133,7 +136,7 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       page.setDefaultTimeout(5000);
       page.setDefaultNavigationTimeout(60000);
       const errors = [];
-      const state = { busyFail: false, hourFail: false };
+      const state = { busyFail: false, hourFail: false, drops: true };
       page.on("pageerror", (e) => errors.push(e.message));
       await page.addInitScript(ticker);
       await page.route("http://magpie.test/**", server(lang, state));
@@ -164,9 +167,9 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       assert((await page.locator("#mtProcMeta").textContent()).includes("pid 4242"));
       const pk = await page.locator("#mtProc .kpi").all();
       assert.deepEqual(await Promise.all(pk.map((c) => c.locator("b").textContent())),
-        ["328 MB", "560 MB", "120 MB", "43", "1%", "2h3m4s"]);
+        ["328 MB", "560 MB", "120 MB", "43", "1%", "2h3m4s", "7"]);
       assert.deepEqual(await Promise.all(pk.map((c) => c.locator("span").textContent())),
-        [w.memk, w.sysk, w.backk, w.gok, w.cpuk, w.upk]);
+        [w.memk, w.sysk, w.backk, w.gok, w.cpuk, w.upk, w.dropk]);
       assert.equal((await page.locator("#mtMemHead").textContent()).trim(), w.mem);
       assert.equal((await page.locator("#mtCpuHead").textContent()).trim(), w.cpu);
       // the three charts are painted, and the idle note is there
@@ -223,6 +226,8 @@ for (const engine of (process.env.BROWSER ? [process.env.BROWSER] : ["chromium",
       await page.locator("#view-metrics").waitFor();
       // busy's placeholder is drawn where its numbers would be; the page as
       // a whole is there, and the reads that worked still show
+      // no drops (the fixture without usageDrops): the panel says nothing
+      // of them — the seven KPIs above need state.drops
       await page.waitForFunction(() => document.querySelectorAll("#mtProc .kpi").length === 6);
       await page.waitForFunction(() => (document.querySelector("#mtLive .none")?.textContent || "").length > 0);
       assert.equal((await page.locator("#mtTitle").textContent()).trim(), w.title);

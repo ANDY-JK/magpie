@@ -22,6 +22,7 @@ magpie.strings({
     "Go routines": "Go-Routinen",
     "CPU share": "CPU-Last",
     "running since": "läuft seit",
+    "usage records not written": "nicht geschriebene Nutzungseinträge",
     "Memory, the last four hours": "Speicher, die letzten vier Stunden",
     "CPU, the last four hours": "CPU, die letzten vier Stunden",
     "Idle past half a minute, the gateway hands its memory back.": "Eine halbe Minute ohne Arbeit, und das Gateway gibt seinen Speicher zurück.",

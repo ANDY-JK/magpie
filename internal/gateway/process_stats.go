@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/yetone/magpie/internal/usage"
 )
 
 // processSampleEvery is how long between the sampler's readings, and
@@ -127,7 +129,11 @@ func sampleProcess() {
 // Its fields are named as the profiles' headers name theirs (HeapStats,
 // CPUStats), without the two a collection is for: LiveHeap is the heap
 // profile's, and CPU the CPU profile's over its recording. CPUTotal is 0
-// with CPUKnown false where the system doesn't say.
+// with CPUKnown false where the system doesn't say. UsageDrops is how many
+// usage records the ledger could not write since start (K-02): a filled
+// disk or a read-only folder dropping the account of every call, said in
+// the log and shown here so a Usage number that falls short of the calls
+// made is not a mystery.
 type ProcessStats struct {
 	PID          int     `json:"pid"`
 	Program      string  `json:"program"`
@@ -147,6 +153,7 @@ type ProcessStats struct {
 	CPUTotal     float64 `json:"cpuTotal"` // seconds of CPU used since the process started
 	NumCPU       int     `json:"numCPU"`
 	GOMAXPROCS   int     `json:"gomaxprocs"`
+	UsageDrops   int64   `json:"usageDrops,omitempty"` // usage records the ledger could not write
 }
 
 // ProcessNow reads the process's memory, CPU and goroutines once. Nothing
@@ -171,6 +178,7 @@ func ProcessNow() ProcessStats {
 		Goroutines:   runtime.NumGoroutine(),
 		NumCPU:       runtime.NumCPU(),
 		GOMAXPROCS:   runtime.GOMAXPROCS(0),
+		UsageDrops:   usage.AppendsFailed(),
 	}
 	if exe, err := os.Executable(); err == nil {
 		st.Program = filepath.Base(exe)

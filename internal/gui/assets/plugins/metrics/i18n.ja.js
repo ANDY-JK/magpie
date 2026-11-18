@@ -22,6 +22,7 @@ magpie.strings({
     "Go routines": "Go ルーチン",
     "CPU share": "CPU 使用率",
     "running since": "起動してから",
+    "usage records not written": "書き込めなかった使用量の記録",
     "Memory, the last four hours": "メモリ、過去4時間",
     "CPU, the last four hours": "CPU、過去4時間",
     "Idle past half a minute, the gateway hands its memory back.": "30秒以上アイドルが続くと、ゲートウェイはメモリをシステムに返します。",

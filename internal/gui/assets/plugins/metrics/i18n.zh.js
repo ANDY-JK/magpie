@@ -22,6 +22,7 @@ magpie.strings({
     "Go routines": "Go 例程",
     "CPU share": "CPU 占用",
     "running since": "已运行",
+    "usage records not written": "未写入的用量记录",
     "Memory, the last four hours": "内存，最近四小时",
     "CPU, the last four hours": "CPU，最近四小时",
     "Idle past half a minute, the gateway hands its memory back.": "空闲超过半分钟，网关就把内存交还给系统。",

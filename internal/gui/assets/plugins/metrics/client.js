@@ -216,6 +216,9 @@ magpie.plugin("metrics", (ctx) => {
       kpi(String(st.goroutines), t("Go routines")),
       kpi(cpu.now === null ? "—" : Math.round(cpu.now) + "%", t("CPU share")),
       kpi(st.uptime || "—", t("running since")),
+      // K-02: usage records the ledger couldn't write, so a Usage total
+      // short of the calls made is explained, not a mystery. None is none.
+      ...(st.usageDrops ? [kpi(String(st.usageDrops), t("usage records not written"))] : []),
     );
     line(page.querySelector("#mtMem"), [{ v: hist.map((s) => s.heapAlloc / 1e6), c: cs("--accent") }], 72);
     line(page.querySelector("#mtCpu"), [{ v: cpu.series, c: cs("--accent") }], 72);
