@@ -285,6 +285,8 @@ func Merge(body []byte, cur settings.Settings, web bool) (settings.Settings, err
 	in.CORSOrigins = cur.CORSOrigins                   // set on its own (cors)
 	in.AllowIPs = cur.AllowIPs                         // set on its own (allowips)
 	in.FetchPrivate = cur.FetchPrivate                 // in settings.json only
+	in.ScoreRouting = cur.ScoreRouting                 // in settings.json only, set by no page yet
+	in.StabilityGuard = cur.StabilityGuard             // and the health hysteresis's switch, likewise
 	in.RouterNote = cur.RouterNote                     // set on its own (the Library's servers/hub-note)
 	in.GitHubToken = cur.GitHubToken                   // set on its own (github-token), never sent to the page
 	in.ProxyCustom = cur.ProxyCustom                   // set by settings.Save from the proxy, never by the page

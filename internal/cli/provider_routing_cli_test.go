@@ -7,11 +7,12 @@ import (
 )
 
 // routing= on a provider spreads requests over its keys or accounts as
-// the editor's Routing does: fast (fastest, speed) is Speed first; manual
-// and cheapest are a group's alone, and a name magpie doesn't know is refused.
+// the editor's Routing does: fast (fastest, speed) is Speed first, score
+// (scored) by score; manual and cheapest are a group's alone, and a name
+// magpie doesn't know is refused.
 func TestProviderRoutingPair(t *testing.T) {
 	var p provider.Provider
-	for in, want := range map[string]string{"fast": provider.Fastest, "fastest": provider.Fastest, "Speed": provider.Fastest, "order": provider.Ordered, "smart": ""} {
+	for in, want := range map[string]string{"fast": provider.Fastest, "fastest": provider.Fastest, "Speed": provider.Fastest, "score": provider.Score, "scored": provider.Score, "order": provider.Ordered, "smart": ""} {
 		if err := applyPairs(&p, []string{"routing=" + in}); err != nil || p.Routing != want {
 			t.Errorf("routing=%s: %q %v, want %q", in, p.Routing, err, want)
 		}

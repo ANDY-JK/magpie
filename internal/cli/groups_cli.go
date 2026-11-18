@@ -101,6 +101,9 @@ const groupUsage = `usage:
                    model is the fallback, a group in it is one model, a model's keys go as its provider routes
            manual  only the model you pick (pick=, or click it on the group's card): the others and
                    the rules wait until you pick another or route it otherwise; no failover to them
+           score   the member that has answered steadily and fast lately with room left first: a
+                   member at 90% of a window goes behind those with room, and one at 98% behind those,
+                   however well it has answered; weights in source, not settable
   stays    auto    (default) with the account or key that answered, while its cache is worth keeping
            session for the whole session
            turn    within a turn only; routing decides afresh when you speak again
@@ -149,6 +152,7 @@ var routingNames = []struct {
 	{provider.Fastest, "fast", []string{"fastest", "speed", "speed-first"}},
 	{provider.Cheapest, "cheap", []string{"cheapest", "cheapest-first", "price", "cost"}},
 	{provider.Drain, "drain", []string{"until-used-up", "use-up", "sticky"}},
+	{provider.Score, "score", []string{"scored", "score-first"}},
 	{provider.Manual, "manual", []string{"pick", "picked", "pinned"}},
 }
 

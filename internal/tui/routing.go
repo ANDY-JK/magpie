@@ -68,7 +68,7 @@ func (m model) listedMembers(g provider.Group) ([]string, int) {
 	return on, len(g.Members) - len(on)
 }
 
-var routings = []string{"", provider.Ordered, provider.Rotate, provider.LeastUsed, provider.Pace, provider.Balanced, provider.Weighted, provider.FreeFirst, provider.Fastest, provider.Cheapest, provider.Drain, provider.Manual}
+var routings = []string{"", provider.Ordered, provider.Rotate, provider.LeastUsed, provider.Pace, provider.Balanced, provider.Weighted, provider.FreeFirst, provider.Fastest, provider.Cheapest, provider.Drain, provider.Score, provider.Manual}
 
 func routingName(v string) string {
 	switch v {
@@ -92,6 +92,8 @@ func routingName(v string) string {
 		return "cheapest first"
 	case provider.Drain:
 		return "until used up"
+	case provider.Score:
+		return "by score"
 	case provider.Manual:
 		return "manual"
 	}

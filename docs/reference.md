@@ -1746,10 +1746,12 @@ So routing decides who goes first only for a conversation nobody has
 answered yet. An account that has used 90% goes behind the others for new
 conversations, but a conversation already on it stays there until 98%.
 
-**The routings.** Smart, Least used first, Use before expiry and Balanced go
+**The routings.** Smart, Least used first, Use before expiry, Balanced and
+By score go
 by the share
 used of the fullest window that counts the model, the 5-hour window
-included. Smart, Use before expiry and Balanced put an account behind the
+included. Smart, Use before expiry, Balanced and By score put an account
+behind the
 others once a
 window is at 90% or more, and behind those once one is at 98% or more,
 each of these groups ordered by the share used.
@@ -1876,6 +1878,23 @@ each of these groups ordered by the share used.
   time window sends a member first at its hours, and a Pause rule leaves
   one out at its hours. The Routing page says why the first went first:
   "costs least on Ollama now — $0.150 in, $0.600 out a million tokens".
+- **By score**: the account, key or group member that has done best lately
+  first: how steadily it has answered (a 30-minute half-life over its
+  answers and intermittent failures, a model new at it counting as
+  steady), how fast it answers (a 20-minute half-life), and how much of its
+  allowance is left for when that renews. Quota comes first as a whole: one
+  at 90% or more goes behind those with room, and one at 98% or more behind
+  those, however well it has answered, and one about to renew with much of
+  it unspent goes first. Within that, one that failed since it last
+  answered goes behind those that answered since, and one resting behind
+  every one awake (as in any routing), then the score decides: how
+  steadily it has answered, its first token, its tokens a second and its
+  allowance left, in the shares 40:18:12:20 — about 44%, 20%, 13% and 22%
+  of the score — with nothing measured counting neither way.
+  Those alike keep their order. The weights are not settable.
+  settings.json's `scoreRouting` (on by default) turns the routing off: a
+  group or provider saved with it is then tried in its listed order, as
+  with the plugin `rotation` off.
 
 The routings besides Smart are the built-in plugin `rotation` (Routing
 strategies in Plugins › Built-in). It stays on while a provider or group is
@@ -1900,6 +1919,7 @@ depends on the routing:
 | Use before expiry | Only between accounts in the same pace band that magpie sent the same tokens lately, in practice none since magpie started. |
 | Balanced | Only between accounts in the same pace band that have failed as often lately and been sent as many tokens for their weight, in practice none since magpie started. |
 | Speed first | Only between those within a tenth of each other's speed, and among those not measured lately. |
+| By score | Only between those whose scores are equal, in practice none. |
 | Cheapest first | Only between those that cost the same now, and among those with no known price. |
 
 For Claude Code and Codex, *Make first* also signs the agent in to that
@@ -3574,6 +3594,9 @@ What magpie set on your agents:
 The gateway and usage:
 
 - `usage.jsonl` — one line per request: the Usage page's numbers
+- `usage-<date>.jsonl` — records rotated out of the active log, older than
+  the windows the pages and keys read; the app does not read them (see
+  [the usage log](subsystems/gateway-sessions.md))
 - `routing/` — each day's routing attempts (`<date>.jsonl`), the Routing
   page's history
 - `affinity.json` — which key or account answered each conversation, so a

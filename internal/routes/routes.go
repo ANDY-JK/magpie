@@ -6,7 +6,7 @@
 //
 // Smart, the default, is the core's. The others a provider or group can be
 // routed by (order, rotate, usage, pace, balance, weight, free, fast,
-// cheap, drain) are here for a plugin to
+// cheap, drain, score) are here for a plugin to
 // register: plugins/rotation does, and off, a pool routed by one of them is
 // tried in its listed order, as an unknown routing always was.
 package routes
@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/provider"
+	"github.com/yetone/magpie/internal/settings"
 )
 
 // Seat is one route of a pool, as a strategy weighs it.
@@ -68,6 +69,10 @@ type Seat struct {
 	Failures int
 	// Resting: it rests after a failure now
 	Resting bool
+	// Health is how it has answered lately, 0–1: the gateway's health score,
+	// wins and losses with half an hour's half-life, and 0 for a seat with
+	// no record yet. Score goes by it.
+	Health float64
 	// Spent: it rests because it is out of quota or credit, not for a
 	// rate limit or a failure. Drain goes on from it.
 	Spent bool
@@ -131,6 +136,10 @@ type Strategy struct {
 	// BySpeed: it weighs by TTFT and TPS, so the gateway reads each seat's
 	// recent speed, and the routing trace then shows it.
 	BySpeed bool
+	// ByHealth: it weighs by Health, so the gateway fills each seat's
+	// health lately (gateway health.go) from the one snapshot its weighing
+	// already takes.
+	ByHealth bool
 	// ByPrice: it weighs by Priced, Cost and CacheCost, so the gateway
 	// prices each seat's model at the request's time, and the routing
 	// trace then shows it. Only when set: pricing reads each provider's
@@ -161,10 +170,15 @@ func Register(routing string, s Strategy) (remove func()) {
 }
 
 // Find is the strategy serving routing: Smart for "", else the last one
-// registered; ok is false when none is.
+// registered; ok is false when none is. A score is served only while the
+// user's ScoreRouting is on: off, a saved one is read as In order, as a
+// routing no plugin serves is (gateway routingOf).
 func Find(routing string) (Strategy, bool) {
 	if routing == "" {
 		return Smart, true
+	}
+	if routing == provider.Score && !settings.Shared().ScoreRoutingOn() {
+		return Strategy{}, false
 	}
 	reg.RLock()
 	defer reg.RUnlock()

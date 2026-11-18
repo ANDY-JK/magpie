@@ -56,6 +56,12 @@ const (
 	// before it that renews meanwhile doesn't take its requests back
 	// (dzxx0496 on Discord; routes.Drain).
 	Drain = "drain"
+	// Score goes by a seat's score: how it has answered lately, how fast
+	// it answers, what its allowance has left and what it can do, the best
+	// first (routes.Score). Its weights are source constants; the gateway
+	// fills the health and speed it reads only for a routing that asks
+	// (routes.Strategy.ByHealth, BySpeed).
+	Score = "score"
 )
 
 // pluginRouting is a routing a plugin serves: "<plugin>/<name>".
@@ -67,7 +73,7 @@ var pluginRouting = regexp.MustCompile(`^[A-Za-z0-9._-]+/[A-Za-z0-9][A-Za-z0-9._
 // Smart ("") instead.
 func keptRouting(routing string, group bool) bool {
 	switch routing {
-	case "", Ordered, Rotate, LeastUsed, Pace, Balanced, Weighted, FreeFirst, Fastest, Drain:
+	case "", Ordered, Rotate, LeastUsed, Pace, Balanced, Weighted, FreeFirst, Fastest, Drain, Score:
 		return true
 	case Cheapest, Manual:
 		return group

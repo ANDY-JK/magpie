@@ -528,4 +528,5 @@ var Builtin = map[string]Strategy{
 	provider.Fastest:   Fastest,
 	provider.Cheapest:  Cheapest,
 	provider.Drain:     Drain,
+	provider.Score:     Score,
 }

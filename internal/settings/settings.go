@@ -656,11 +656,12 @@ type Settings struct {
 	// requests the app's own gateway serves; off until turned on.
 	MaskAlert bool `json:"maskAlert,omitempty"`
 	// AllDownAlert has magpie say with a notification when a request finds
-	// every key or account that can answer its model resting (the review's
-	// D-01, 11-16: the channels went out, and the user had to open the
-	// Providers page to learn it). Said once on the way into the outage
-	// and at most once a minute while it holds; the recovery is not said.
-	// Only requests the app's own gateway serves; off until turned on.
+	// no channel that can answer its model — every key or account resting,
+	// or the proxy or network down (the review's D-01, 11-16: the channels
+	// went out, and the user had to open the Providers page to learn it).
+	// Said once on the way into the outage and at most once a minute while
+	// it holds; the recovery is not said. Only requests the app's own
+	// gateway serves; off until turned on.
 	AllDownAlert bool `json:"allDownAlert,omitempty"`
 	// PlainNames has the model lists magpie gives agents name each model
 	// by its name alone, without its provider's or "routing group" after it
@@ -746,6 +747,18 @@ type Settings struct {
 	// the health score existed, the order the user set is tried as it
 	// stands and an unstable model is not moved behind the steady ones
 	NoHealthDemotion bool `json:"noHealthDemotion,omitempty"`
+	// ScoreRouting serves a pool routed by score, the routing that orders
+	// its seats by how they have answered, how fast, what they have left
+	// and what they can do (routes.Score). On by default: nil is a file
+	// that never chose (ScoreRoutingOn). Off, a saved score is read as In
+	// order, as a routing plugins/rotation doesn't serve is.
+	ScoreRouting *bool `json:"scoreRouting,omitempty"`
+	// StabilityGuard keeps a model the health score's relative line put
+	// behind its steady peers there until it has answered a few times in
+	// a row (gateway health.go), so one good answer doesn't send it
+	// forward to fail again. On by default: nil is a file that never chose
+	// (StabilityGuardOn). Off, one answer brings it back, as before.
+	StabilityGuard *bool `json:"stabilityGuard,omitempty"`
 	// DesktopLongest has Claude Desktop list a model of 1M tokens or more
 	// once, as its 1M entry (its id with Claude Code's "[1m]"), instead of
 	// twice (#1272): Desktop adds a "1M context window" entry beside any
@@ -839,7 +852,8 @@ type Settings struct {
 	// (CrazyMouse_TT on X: a local model benchmarked again from nothing),
 	// each the calls up to its time, of one provider's model or of
 	// everything. Only what the usage pages report: usage.jsonl keeps every
-	// call, and a key's spending limit, the allowances' window holds and
+	// call in the window the readers use (a rotation moves only what is
+	// older), and a key's spending limit, the allowances' window holds and
 	// the gateway's own reads of its log still count them. It rides the
 	// settings part of a sync, so a clear holds on every computer that
 	// syncs with this one, other computers' shared days included.
@@ -1383,6 +1397,18 @@ const WorkingWindow = 272000
 // minute on Windows under steady requests, #2515), but each opening then
 // waited for the page to load again.
 func (s Settings) LightweightOn() bool { return s.Lightweight != nil && *s.Lightweight }
+
+// ScoreRoutingOn says whether a pool may be routed by score: on unless the
+// user turned it off. A file that never chose has no value, and a new
+// install and one written before the routing was there both read as on.
+func (s Settings) ScoreRoutingOn() bool { return s.ScoreRouting == nil || *s.ScoreRouting }
+
+// StabilityGuardOn says whether a model the health score's relative line
+// demoted waits for a few answers in a row before it is tried among the
+// steady ones again: on unless the user turned it off. A file that never
+// chose has no value, and a new install and one written before the guard
+// was there both read as on.
+func (s Settings) StabilityGuardOn() bool { return s.StabilityGuard == nil || *s.StabilityGuard }
 
 // Working is the context window an agent is told for a model with one of
 // n tokens (see FullContext).
