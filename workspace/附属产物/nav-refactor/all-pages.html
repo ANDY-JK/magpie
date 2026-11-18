@@ -31,7 +31,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{font-family:var(--font);color:var(--fg);background:var(--stage);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:54px 12px 24px;gap:10px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font);color:var(--fg);background:var(--stage);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:84px 12px 24px;gap:10px;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;background:none;border:0;cursor:default;appearance:none;text-align:left}
 .ic{width:16px;height:16px;flex:none;color:var(--muted)}
 
@@ -212,6 +212,30 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
 .spec-hint{font-size:10px;color:var(--muted);line-height:1.5;max-width:900px;text-align:center}
 .foldrow{display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:10.5px;color:var(--muted)}
 .foldrow .note{font-size:9.5px;color:var(--faint)}
+.preview{background:var(--bg);border-radius:6px;padding:8px 10px;font:10px/1.5 ui-monospace,Consolas,monospace;color:var(--fg-2);white-space:pre-wrap}
+.progress{height:6px;border-radius:3px;background:var(--pill);overflow:hidden}
+.progress i{display:block;height:100%;background:var(--accent);border-radius:3px}
+.panelwin{width:360px;height:480px;background:var(--bg);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;position:relative;overflow:hidden}
+.panel-top{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:.5px solid var(--line-2);font-weight:600;font-size:13px}
+.panel-tabs{display:flex;gap:2px;padding:6px 8px;border-bottom:.5px solid var(--line-2)}
+.ptab{height:24px;padding:0 9px;border-radius:6px;font-size:11px;color:var(--muted)}
+.ptab.on{background:var(--card);color:var(--fg);box-shadow:var(--seg-edge);font-weight:500}
+.panel-body{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;scrollbar-width:none}
+.panel-body::-webkit-scrollbar{display:none}
+.panel-foot{height:34px;display:flex;align-items:center;padding:0 10px;border-top:.5px solid var(--line-2)}
+.phonewin{width:360px;height:720px;background:var(--bg);border-radius:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;position:relative}
+.phone-top{height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:.5px solid var(--line-2);font-weight:600;font-size:13px}
+.phone-main{flex:1;min-height:0;display:flex}
+.phone-secs{height:44px;display:flex;align-items:center;justify-content:space-around;border-top:.5px solid var(--line-2)}
+.psec{font-size:10px;color:var(--muted);padding:4px 6px;border-radius:6px}
+.psec.on{color:var(--fg);background:var(--card);box-shadow:var(--seg-edge);font-weight:500}
+.phonewin .lib-split{grid-template-columns:1fr}
+.phonewin .cols{grid-template-columns:1fr}
+.phonewin .stats{grid-template-columns:1fr 1fr}
+.panel-body .who,.phonewin .who{display:flex;flex-direction:column;min-width:0}
+.panel-body .nm,.panel-body .sub,.phonewin .nm,.phonewin .sub{display:block}
+.panelwin .stats{grid-template-columns:1fr 1fr}
+.ov-input{flex:1;height:26px;border:0;border-radius:6px;background:var(--bg);box-shadow:0 0 0 .5px var(--line);padding:0 8px;font-size:11px;color:var(--fg);min-width:0}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .font-preview{background:var(--bg);border-radius:6px;padding:8px 10px;font-size:14px;color:var(--fg-2);text-align:center}
 .err-state{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;background:color-mix(in srgb,var(--red) 10%,var(--card));color:var(--red);font-size:11px}
@@ -259,6 +283,7 @@ button:focus-visible,.lib-item:focus-visible{outline:2px solid var(--accent);out
     <button data-f="wide">宽窗</button>
   </div>
   <span class="sep"></span>
+  <button class="tbtn" id="formBtn">形态：窗口</button>
   <button class="tbtn" id="navBtn">窄窗：两行</button>
   <button class="tbtn" id="stateBtn">状态：正常</button>
   <button class="tbtn" id="specBtn">标注：关</button>
@@ -432,12 +457,13 @@ const COMPONENTS = [
 const state = {
   frame:'narrow', section:'model', page:'providers', theme:'light',
   tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
-  spec:false, sel:null, libSel:0, mdSel:0, compact:false, sheet:false, ov:null, menuAt:null, sw:{}, listState:'normal',
+  spec:false, sel:null, libSel:0, mdSel:0, compact:false, sheet:false, ov:null, menuAt:null, sw:{}, listState:'normal', editDirty:false, form:'window', panelTab:'额度',
 };
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
 if(qs.get('nav')==='one') state.compact = true;
 if(['empty','loading','error'].includes(qs.get('state'))) state.listState = qs.get('state');
+if(['panel','phone'].includes(qs.get('form'))) state.form = qs.get('form');
 const ovq = qs.get('ov');
 if(ovq==='add') state.sheet = true;
 else if(ovq==='menu'){ state.ov = {kind:'menu'}; state.menuAt = {x:120,y:150}; }
@@ -445,12 +471,16 @@ else if(ovq==='confirm') state.ov = {kind:'confirm', title:'删除供应商？',
 else if(ovq==='rename') state.ov = {kind:'rename', title:'重命名 / 移动会话'};
 else if(ovq==='lang') state.ov = {kind:'pick', title:'语言', items:['简体中文','繁體中文','English','日本語','Deutsch'], selected:'简体中文'};
 else if(ovq==='shortcut') state.ov = {kind:'shortcut', title:'快速面板快捷键', key:'⌃ ⌘ Space'};
+else if(ovq==='ctxtext') state.ov = {kind:'ctxtext', title:'上下文 · 系统提示'};
+else if(ovq==='updateProgress') state.ov = {kind:'updateProgress', title:'正在下载 0.1.2401'};
 else if(ovq==='request') state.ov = {kind:'request', title:'请求详情'};
 else if(ovq==='update') state.ov = {kind:'update', title:'发现新版本 0.1.2401'};
 else if(ovq==='quit') state.ov = {kind:'quit', title:'退出 magpie？'};
 else if(ovq==='import') state.ov = {kind:'import', title:'导入配置'};
 else if(ovq==='font') state.ov = {kind:'font', title:'界面字体'};
 else if(ovq==='edit') state.ov = {kind:'edit', title:'编辑密钥', fields:[['名称','openai-key'],['密钥','sk-••••••••'],['模型','全部']]};
+else if(ovq==='editProvider') state.ov = {kind:'providerEdit', title:'编辑供应商'};
+else if(ovq==='discard') state.ov = {kind:'confirm', title:'放弃未保存的修改？', body:'离开后这次编辑不会保留。', ok:'放弃'};
 if(qs.get('p') && PAGES[qs.get('p')]) state.page = qs.get('p');
 if(qs.get('spec')==='1') state.spec = true;
 if(PAGES[state.page]){ const s=SECTIONS.find(x=>x.pages.includes(state.page)); if(s) state.section=s.id; }
@@ -683,7 +713,8 @@ function usageContext(){
     <div class="card"><h4>工具调用</h4>
       ${[['read_file','32 次'],['grep','18 次'],['apply_patch','9 次']].map(([n,v])=>`<div class="item"><div class="who"><div class="nm">${n}</div></div><span class="meta">${v}</span></div>`).join('')}
     </div>
-  </div>`];
+  </div>
+  <div class="rowbtns"><button class="btn" data-act="ctxtext">查看上下文文本</button></div>`];
 }
 function discoverList(){
   return [`<div class="list">${[
@@ -882,7 +913,7 @@ function mdProviders(){
   return [mdSplit(items, x=>{
     const i = PROVIDER_INFO[x.n] || ['—','—','—','—'];
     return det(x.n, [['账号',i[0]],['模型',i[1]],['今日',i[2]],['健康度',i[3]]],
-      '<button class="btn">编辑</button><button class="btn">隐藏账号</button><button class="btn danger" data-act="delProvider">删除</button>');
+      '<button class="btn" data-act="editProvider">编辑</button><button class="btn">隐藏账号</button><button class="btn danger" data-act="delProvider">删除</button>');
   })];
 }
 const KEYS = [
@@ -1120,7 +1151,17 @@ function overlayHtml(){
     '<button class="btn" data-ovclose>关闭</button><button class="btn">在路由页打开</button>');
   if(o.kind==='update') return modalHtml(o.title || '发现新版本',
     `<p class="hint">更新会重启 magpie，正在运行的请求会先完成。</p>`,
-    '<button class="btn" data-ovclose>稍后</button><button class="btn primary" data-ovclose>更新</button>');
+    '<button class="btn" data-ovclose>稍后</button><button class="btn primary" data-act="updateProgress">更新</button>');
+  if(o.kind==='providerEdit') return modalHtml(o.title || '编辑供应商',
+    `<div class="formrow"><label>名称</label><input class="ov-input" value="Codex"></div><div class="formrow"><label>账号</label><input class="ov-input" value="3 个账号"></div><div class="formrow"><label>模型</label><input class="ov-input" value="12 个模型"></div>`,
+    '<button class="btn" data-ovclose>取消</button><button class="btn primary" data-ovsave>保存</button>');
+  if(o.kind==='ctxtext') return modalHtml(o.title || '上下文文本',
+    `<pre class="preview">你是 magpie 的助手……
+（最近 10 次请求，已掩码）</pre>`,
+    '<button class="btn" data-ovclose>关闭</button><button class="btn">复制</button>');
+  if(o.kind==='updateProgress') return modalHtml(o.title || '正在下载',
+    `<div class="progress"><i style="width:64%"></i></div><p class="hint">下载完成后重启；正在运行的请求会先完成。</p>`,
+    '<button class="btn" data-ovclose>后台</button><button class="btn primary" data-ovclose>完成即重启</button>');
   if(o.kind==='import') return modalHtml(o.title || '导入配置',
     `<div class="list"><div class="item"><div class="who"><div class="nm">Codex</div><div class="sub">~/.codex/config.toml</div></div><span class="switch on"></span></div><div class="item"><div class="who"><div class="nm">Claude Code</div><div class="sub">~/.claude/settings.json</div></div><span class="switch on"></span></div></div>`,
     '<button class="btn" data-ovclose>取消</button><button class="btn primary" data-ovclose>导入选中</button>');
@@ -1132,8 +1173,42 @@ function overlayHtml(){
     '<button class="btn" data-ovclose>取消</button><button class="btn danger" data-ovclose>退出</button>');
   return '';
 }
+function closeOv(){
+  if(state.ov && state.ov.kind==='providerEdit' && state.editDirty){
+    state.ov = {kind:'confirm', title:'放弃未保存的修改？', body:'离开后这次编辑不会保留。', ok:'放弃'};
+    renderStage(); return;
+  }
+  state.ov = null; state.editDirty = false; renderStage();
+}
+function panelBody(){
+  const tab = state.panelTab || '额度';
+  if(tab==='智能体') return `<div class="list">${[['Codex','运行中','#10a37f'],['Claude Code','已连接','#d97757'],['Gemini CLI','未连接','#4285f4']].map(([n,s,c])=>`<div class="item"><span class="logo2" style="background:${c}">${n[0]}</span><span class="who"><span class="nm">${n}</span><span class="sub">${s}</span></span></div>`).join('')}</div>`;
+  if(tab==='用量') return `<div class="stats">${[['请求','1,284'],['令牌','8.4M'],['花费','$12.40'],['失败','0.8%']].map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}</div>`;
+  if(tab==='路由') return `<div class="list">${[['codex/gpt-5.6-sol','1.2s'],['claude/opus-4.6','2.4s']].map(([n,t])=>`<div class="item"><span class="dot"></span><span class="who"><span class="nm">${n}</span></span><span class="meta">${t}</span></div>`).join('')}</div>`;
+  return `<div class="list">${[['Codex','62%','#10a37f'],['Claude','31%','#d97757']].map(([n,w,c])=>`<div class="item"><span class="logo2" style="background:${c}">${n[0]}</span><span class="who"><span class="nm">${n}</span><span class="sub">5 小时 · ${w}</span></span></div>`).join('')}</div>`;
+}
+function panelShell(){
+  return `<div class="panelwin">
+    <div class="panel-top"><span>magpie</span><span class="grow"></span><button class="iconbtn" data-act="update">↻</button></div>
+    <div class="panel-tabs">${['智能体','额度','用量','路由'].map(x=>`<button class="ptab${state.panelTab===x?' on':''}" data-ptab="${x}">${x}</button>`).join('')}</div>
+    <div class="panel-body">${panelBody()}</div>
+    <div class="panel-foot"><button class="textbtn">打开窗口</button><span class="grow"></span><button class="textbtn" data-act="quit">退出</button></div>
+    ${overlayHtml()}
+  </div>`;
+}
+function phoneShell(){
+  return `<div class="phonewin">
+    <div class="phone-top"><span>magpie</span><span class="grow"></span><button class="iconbtn" data-page="settings">${ic('gear')}</button></div>
+    ${state.page==='settings' ? '' : pageStrip()}
+    <div class="phone-main">${mainView()}</div>
+    <nav class="phone-secs">${SECTIONS.map(sec=>`<button class="psec${state.page!=='settings'&&state.section===sec.id?' on':''}" data-sec="${sec.id}">${sec.name}</button>`).join('')}</nav>
+    ${overlayHtml()}
+  </div>`;
+}
 function renderStage(){
-  stage.innerHTML = state.frame==='wide'
+  if(state.form==='panel') stage.innerHTML = panelShell();
+  else if(state.form==='phone') stage.innerHTML = phoneShell();
+  else stage.innerHTML = state.frame==='wide'
     ? `<div class="win wide">${topbar(false)}<div class="main">${navSide()}${mainView()}</div>${footerbar()}${overlayHtml()}</div>`
     : `<div class="win narrow">${topbar(true)}${state.compact ? compactNav() : secStrip()+pageStrip()}${mainView()}${footerbar()}${overlayHtml()}</div>`;
   const sec = SECTIONS.find(s=>s.id===state.section);
@@ -1143,6 +1218,7 @@ function renderStage(){
   document.getElementById('specBtn').textContent = '标注：' + (state.spec ? '开' : '关');
   document.getElementById('navBtn').textContent = '窄窗：' + (state.compact ? '一行' : '两行');
   document.getElementById('stateBtn').textContent = '状态：' + ({normal:'正常',empty:'空',loading:'加载',error:'错误'}[state.listState]);
+  document.getElementById('formBtn').textContent = '形态：' + ({window:'窗口',panel:'托盘',phone:'手机'}[state.form]);
   if(state.sheet){ const sh=document.querySelector('.sheet-inline'); if(sh) sh.scrollIntoView({block:'nearest'}); }
   if(state.frame==='narrow' && state.compact){ const nav=document.querySelector('.win.narrow .tabstrip'); const on=nav && nav.querySelector('.tab.on'); if(on) nav.scrollLeft = Math.max(0, on.offsetLeft - 60); }
   const regions = regionsFor(state.page, PAGES[state.page]).map(r=>r[0]);
@@ -1160,6 +1236,8 @@ function renderStage(){
     COMPONENTS.map(c=>'<tr><td>' + c[0] + '</td><td>' + c[1] + '</td><td class="comps">' + c[2] + '</td><td class="secn">' + c[3] + '</td><td class="comps">' + c[4] + '</td></tr>').join('') + '</tbody></table>';
 }
 stage.addEventListener('click', e=>{
+  const pt = e.target.closest('[data-ptab]');
+  if(pt){ state.panelTab = pt.dataset.ptab; renderStage(); return; }
   const sw = e.target.closest('[data-sw]');
   if(sw){ const n = sw.dataset.sw; state.sw[n] = !sw.classList.contains('on'); renderStage(); return; }
   const act = e.target.closest('[data-act]');
@@ -1170,9 +1248,12 @@ stage.addEventListener('click', e=>{
     else if(a==='rename') state.ov={kind:'rename', title:'重命名 / 移动会话'};
     else if(a==='lang') state.ov={kind:'pick', title:'语言', items:['简体中文','繁體中文','English','日本語','Deutsch'], selected:'简体中文'};
     else if(a==='shortcut') state.ov={kind:'shortcut', title:'快速面板快捷键', key:'⌃ ⌘ Space'};
+    else if(a==='ctxtext') state.ov={kind:'ctxtext', title:'上下文 · 系统提示'};
+    else if(a==='updateProgress') state.ov={kind:'updateProgress', title:'正在下载 0.1.2401'};
     else if(a==='request') state.ov={kind:'request', title:'请求详情'};
     else if(a==='update') state.ov={kind:'update', title:'发现新版本 0.1.2401'};
     else if(a==='delKey') state.ov={kind:'confirm', title:'删除密钥？', body:'删除后无法恢复，使用它的请求会失败。', ok:'删除'};
+    else if(a==='editProvider'){ state.ov={kind:'providerEdit', title:'编辑供应商'}; state.editDirty=false; }
     else if(a==='editKey') state.ov={kind:'edit', title:'编辑密钥', fields:[['名称','openai-key'],['密钥','sk-••••••••'],['模型','全部']]};
     else if(a==='model') state.ov={kind:'pick', title:'选择模型', items:['gpt-5.6-sol','opus-4.6','gemini-3-pro','qwen-3-max'], selected:'gpt-5.6-sol'};
     else if(a==='font') state.ov={kind:'font', title:'界面字体'};
@@ -1182,10 +1263,11 @@ stage.addEventListener('click', e=>{
     renderStage(); return;
   }
   if(e.target.closest('[data-closesheet]')){ state.sheet = false; renderStage(); return; }
-  if(e.target.closest('[data-ovclose]')){ state.ov = null; renderStage(); return; }
+  if(e.target.closest('[data-ovclose]')){ closeOv(); return; }
+  if(e.target.closest('[data-ovsave]')){ state.ov = null; state.editDirty = false; renderStage(); return; }
   const ov = e.target.closest('.ov');
   if(ov){
-    if(!e.target.closest('.ov-sheet') && !e.target.closest('.ov-menu')){ state.ov = null; renderStage(); return; }
+    if(!e.target.closest('.ov-sheet') && !e.target.closest('.ov-menu')){ closeOv(); return; }
     return;
   }
   const h = e.target.closest('.spec-head');
@@ -1220,7 +1302,23 @@ stage.addEventListener('contextmenu', e=>{
   renderStage();
 });
 document.addEventListener('keydown', e=>{
-  if(e.key==='Escape' && (state.ov || state.sheet)){ state.ov = null; state.sheet = false; renderStage(); }
+  if(e.key==='Escape' && (state.ov || state.sheet)){ if(state.ov) closeOv(); else { state.sheet = false; renderStage(); } }
+});
+stage.addEventListener('input', e=>{ if(e.target.classList.contains('ov-input')) state.editDirty = true; });
+document.addEventListener('keydown', e=>{
+  if(e.key!=='ArrowDown' && e.key!=='ArrowUp') return;
+  const item = document.activeElement && document.activeElement.closest && document.activeElement.closest('.lib-item');
+  if(!item) return;
+  e.preventDefault();
+  const items = [...item.closest('.lib-list').querySelectorAll('.lib-item')];
+  const i = items.indexOf(item);
+  const next = items[e.key==='ArrowDown' ? Math.min(items.length-1, i+1) : Math.max(0, i-1)];
+  if(!next || next===item) return;
+  const isLib = next.hasAttribute('data-libsel');
+  if(isLib) state.libSel = +next.dataset.libsel; else state.mdSel = +next.dataset.mdsel;
+  renderStage();
+  const sel = document.querySelector(isLib ? `[data-libsel="${state.libSel}"]` : `[data-mdsel="${state.mdSel}"]`);
+  if(sel) sel.focus();
 });
 function renderAllIndex(){
   const rows = [];
@@ -1253,6 +1351,7 @@ document.getElementById('frameSeg').addEventListener('click', e=>{
   state.frame = b.dataset.f; renderStage();
 });
 document.getElementById('navBtn').addEventListener('click', ()=>{ state.compact = !state.compact; renderStage(); });
+document.getElementById('formBtn').addEventListener('click', ()=>{ const forms=['window','panel','phone']; state.form = forms[(forms.indexOf(state.form)+1)%forms.length]; renderStage(); });
 document.getElementById('stateBtn').addEventListener('click', ()=>{ const states=['normal','empty','loading','error']; state.listState = states[(states.indexOf(state.listState)+1)%states.length]; renderStage(); });
 document.getElementById('specBtn').addEventListener('click', ()=>{
   state.spec = !state.spec; state.sel = null; renderStage();
