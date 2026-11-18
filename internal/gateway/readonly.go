@@ -42,6 +42,9 @@ var readOnlyRoutes = map[string]bool{
 	"GET " + OwnMCPPath:               true,
 	"GET " + KeyPagePath:              true,
 	"GET " + keyPageData:              true,
+	// the probes (probes.go) read nothing and ask no vendor
+	"GET /healthz": true,
+	"GET /readyz":  true,
 }
 
 // ReadOnlyCode is the error code a read-only key is refused a route with.

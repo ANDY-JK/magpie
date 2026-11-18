@@ -937,6 +937,10 @@ func (s *Server) routes() *routeMux {
 	mux.HandleFunc("GET /api/hello", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"name": "magpie", "version": Version})
 	})
+	// the probes a script or a monitor reads (probes.go): the process is
+	// up, and it can serve
+	mux.HandleFunc("GET /healthz", s.healthz)
+	mux.HandleFunc("GET /readyz", s.readyz)
 	// the Ollama API's model routes, for a client that takes a custom
 	// endpoint only as an Ollama server (ollama.go)
 	mux.HandleFunc("GET /api/version", s.ollamaVersion)

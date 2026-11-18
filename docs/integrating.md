@@ -22,9 +22,13 @@ vendor.
 `port` of magpie's `settings.json` (`~/.config/magpie/settings.json`, the
 same path under the user's folder on Windows; `$XDG_CONFIG_HOME/magpie`
 when that is set). `GET /api/hello` answers
-`{"name":"magpie","version":"…"}` when it is magpie. Read that file, never
-write it. magpie must be running (the app or `magpie serve`). An app that
-finds nothing there should offer its own providers as usual.
+`{"name":"magpie","version":"…"}` when it is magpie. `GET /healthz` says the
+process answers; `GET /readyz` says it can serve — its `providers.json`
+reads and its models folder lists — and answers 503 with a `why` when it
+can't, so a monitor can tell a listening gateway from a broken one. Read
+that file, never write it. magpie must be running (the app or `magpie
+serve`). An app that finds nothing there should offer its own providers as
+usual.
 
 **Endpoints.** Requests go straight through when the vendor speaks your
 API, and are translated otherwise, streaming, tool calls, images and
