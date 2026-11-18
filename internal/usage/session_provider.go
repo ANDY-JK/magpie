@@ -27,7 +27,10 @@ type sessionResolver struct {
 	desktop    map[string]desktopSessionIdentity // absolute metadata file
 	bySession  map[string][]desktopSessionIdentity
 	emails     map[string]string // exact account/organization identity
-	roots      []string
+	// stated marks the pairs an address was stated for and then contradicted:
+	// a metadata file naming no address never blanks one that did (noteEmail).
+	stated map[string]bool
+	roots  []string
 }
 
 func newSessionResolver(logs []sessions.Call) *sessionResolver {
@@ -39,6 +42,7 @@ func newSessionResolver(logs []sessions.Call) *sessionResolver {
 	r.desktop = map[string]desktopSessionIdentity{}
 	r.bySession = map[string][]desktopSessionIdentity{}
 	r.emails = map[string]string{}
+	r.stated = map[string]bool{}
 	for _, id := range r.identities {
 		if id.Agent == "claude" {
 			r.noteEmail(id.AccountID, id.OrganizationID, id.User)
@@ -90,16 +94,43 @@ func uuidIdentity(s string) bool {
 	return true
 }
 
+// noteEmail remembers the address an account/organization pair is known by.
+//
+// Three rules, each from what the desktop's own metadata does (measured
+// 2026-11-19):
+//
+//   - A sign-in that names no organization does not share a pair with one
+//     that does. ~/.claude.json's oauthAccount may carry accountUuid alone,
+//     and "account/" is then a bucket of every organization-less login of
+//     that account.
+//   - A metadata file that states no address does not blank one that does.
+//     The Code tab writes local_*.json with the session id alone, so its
+//     identity shares the Cowork tab's account and organization and would
+//     otherwise read as a conflicting claim.
+//   - A recorded address that is already there is not a conflict at all.
+//     Only a second, different address is, and that blanks the pair: two
+//     signed-in accounts of one organization are never read as the one the
+//     other of them proves.
+//
+// An address stated by a session's own metadata is also remembered apart
+// (sessionEmails), so a session whose file is not on disk any more still
+// names its account: before that, only an answer that already had one worked.
 func (r *sessionResolver) noteEmail(account, org, email string) {
-	if account == "" || email == "" {
+	if account == "" || org == "" || email == "" {
 		return
 	}
 	key := account + "/" + org
-	if old, ok := r.emails[key]; ok && old != email {
-		r.emails[key] = "" // conflicting identities never pick an arbitrary email
-	} else {
+	if _, ok := r.emails[key]; !ok {
 		r.emails[key] = email
+		r.stated[key] = true
+		return
 	}
+	if r.emails[key] == email {
+		r.stated[key] = true
+		return
+	}
+	// a different address than the one held: the pair is not read as either
+	r.emails[key] = ""
 }
 
 func (r *sessionResolver) codexUser(c sessions.Call) string {
@@ -130,7 +161,37 @@ func (r *sessionResolver) resolve(c sessions.Call) string {
 	if id.email == "" {
 		id.email = r.emails[id.account+"/"+id.org]
 	}
+	if id.email == "" {
+		// The session's own file wrote no address and the pair holds none
+		// (a second address blanked it): read the desktop's own folder for
+		// one. The metadata beside each local_*.json is how a session names
+		// its account without being read as "whatever is signed in today".
+		id.email = r.sessionEmail(id)
+	}
 	return id.email
+}
+
+// sessionEmail is the address a desktop session's folder records, read from
+// the metadata files beside it when the call itself carries none: the Code
+// tab's calls name their session id alone, and their account is only in the
+// local_*.json under the same account and organization. A file that no
+// longer exists is no answer, and neither is one that names nobody: the
+// caller falls back to "" as it did before.
+func (r *sessionResolver) sessionEmail(id desktopSessionIdentity) string {
+	for _, root := range r.roots {
+		if strings.Contains(filepath.Base(root), "-3p") {
+			continue // a third-party Desktop's login is not this account's
+		}
+		for _, kind := range []string{desktopAgentSessions, desktopCodeSessions} {
+			files, _ := sessions.SessionGlob(filepath.Join(root, kind, id.account, id.org, "local_*.json"))
+			for _, path := range files {
+				if meta, ok := r.desktop[path]; ok && meta.email != "" {
+					return meta.email
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // officialLogin requires explicit login metadata for the exact session
@@ -165,19 +226,30 @@ func (r *sessionResolver) officialLogin(c sessions.Call, account string) bool {
 // account.
 const desktopAgentSessions = "local-agent-mode-sessions"
 
+// desktopCodeSessions is the folder beside it that holds the desktop's Code
+// tab (its Claude Code sessions): newSessionResolver reads the same
+// local_*.json under it, so a call recorded there names its account the same
+// way.
+const desktopCodeSessions = "claude-code-sessions"
+
 func (r *sessionResolver) desktopIdentity(c sessions.Call) (desktopSessionIdentity, bool) {
 	if c.Agent != "claude" && c.Agent != "claude-desktop" {
 		return desktopSessionIdentity{}, false
 	}
 	var id desktopSessionIdentity
 	found := false
-	// Only a file under a desktop root's local-agent-mode-sessions can
-	// name one: the rest (every Claude Code session, ~380k calls in a
-	// long history, asked twice each) skip the Rel and the Split, which
-	// were a fifth of what a started magpie's first Requests read
-	// allocated.
+	// Only a file under one of a desktop root's session folders can name
+	// one: the rest (every Claude Code session, ~380k calls in a long
+	// history, asked twice each) skip the Rel and the Split, which were a
+	// fifth of what a started magpie's first Requests read allocated.
+	//
+	// Both folders newSessionResolver reads are counted: the Cowork tab's
+	// local-agent-mode-sessions and the Code tab's claude-code-sessions. The
+	// guard named the first alone, so a call the Code tab recorded was
+	// resolved by its session id alone and its account and organization —
+	// the only place those are written — were never read.
 	roots := r.roots
-	if !strings.Contains(c.File, desktopAgentSessions) {
+	if !strings.Contains(c.File, desktopAgentSessions) && !strings.Contains(c.File, desktopCodeSessions) {
 		roots = nil
 	}
 	for _, root := range roots {
@@ -186,7 +258,7 @@ func (r *sessionResolver) desktopIdentity(c sessions.Call) (desktopSessionIdenti
 			continue
 		}
 		parts := strings.Split(rel, string(filepath.Separator))
-		if len(parts) > 4 && parts[0] == desktopAgentSessions && strings.HasPrefix(parts[3], "local_") && parts[4] == ".claude" {
+		if len(parts) > 4 && (parts[0] == desktopAgentSessions || parts[0] == desktopCodeSessions) && strings.HasPrefix(parts[3], "local_") && parts[4] == ".claude" {
 			path := filepath.Join(root, filepath.Join(parts[:4]...)) + ".json"
 			id, found = r.desktop[path]
 			break

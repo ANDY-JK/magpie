@@ -778,7 +778,7 @@ func statKey(path string) string {
 	return fmt.Sprintf("%s:%d:%d", path, s.Size(), s.ModTime().UnixNano())
 }
 func recordHash(path string, n int64) string {
-	f, e := os.Open(path)
+	f, e := openLogRead(path)
 	if e != nil {
 		return ""
 	}

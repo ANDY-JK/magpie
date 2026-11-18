@@ -9,13 +9,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"maps"
 	"math"
+	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"sort"
 	"strconv"
@@ -24,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yetone/magpie/internal/access"
 	"github.com/yetone/magpie/internal/catalog"
 	"github.com/yetone/magpie/internal/provider"
 )
@@ -280,22 +282,22 @@ func Path() string { return filepath.Join(filepath.Dir(provider.Path()), "usage.
 
 var mu sync.Mutex
 
-// openWriteMu serializes the log's open, stat and write across Append and
-// IngestReported. It is separate from mu, which LastSeen and Load take on a
-// read: a slow write no longer holds up a reader that needs the log's path or
-// a fresh view of the ledger. A record is still written before Append returns,
-// so nothing the ledger could not take is dropped.
+// openWriteMu serializes the writer's batches and IngestReported's direct
+// writes: they share the log's file states (noteLogAppend) and must not
+// interleave. It is separate from mu, which Load takes on a read. No request
+// goroutine takes it now: Append hands its record to the writer and waits for
+// that record alone.
 var openWriteMu sync.Mutex
 
 // loads counts Load's reads of the whole log, for the tests: the ledger
 // reads the gateway's calls from its index instead.
 var loads int
 
-// writesFailed counts every record Append has not been able to write since
-// start: a dropped record is a number the user would quote, not "maybe".
-// saidWhen, guarded by openWriteMu, is when a drop was last said, so a long
-// failure is spoken of once a minute, and sayEvery how often; a test shrinks
-// it. A success resets saidWhen, so the next drop is said at once.
+// writesFailed counts every record the writer has not been able to write
+// since start: a dropped record is a number the user would quote, not
+// "maybe". saidWhen, guarded by openWriteMu, is when a drop was last said,
+// so a long failure is spoken of once a minute, and sayEvery how often; a
+// success resets saidWhen, so the next drop is said at once.
 var (
 	writesFailed atomic.Int64
 	saidWhen     time.Time
@@ -309,7 +311,7 @@ func AppendsFailed() int64 { return writesFailed.Load() }
 // resetAppendsFailed is a test's seam back to nothing dropped.
 func resetAppendsFailed() { writesFailed.Store(0) }
 
-// sayFailed says, at most every sayEvery, of the records Append hasn't
+// sayFailed says, at most every sayEvery, of the records the writer hasn't
 // been able to write: a disk that fills or a folder that goes read-only is
 // not silent. The caller holds openWriteMu.
 func sayFailed(why error) {
@@ -320,10 +322,18 @@ func sayFailed(why error) {
 	log.Printf("usage.jsonl: %d record(s) not written since start, latest: %v; calls go on, the ledger keeps what it could open", writesFailed.Load(), why)
 }
 
-// Append writes one record. A write that can't land is not written, and the
-// call is never broken by it: the failure is counted (writesFailed) and
-// said once a minute (sayFailed), which a success quietens until the next
-// drop.
+// ---- appending --------------------------------------------------------------
+
+// Append writes one record. Records go to one background writer, which keeps
+// the log open between them and writes the records waiting together, so a
+// request's teardown is a queue hand-off rather than an open, two stats and a
+// close of usage.jsonl. Append returns once its own record is written or
+// counted as dropped, so nothing a later read should see is left in memory.
+//
+// appendQueueLen records may wait for the writer. When the queue is full — a
+// disk that has stopped taking writes — Append waits for room rather than
+// dropping the record; the calls go on once it drains. A record that still
+// can't be written is counted (writesFailed) and said (sayFailed), as before.
 func Append(r Record) {
 	if r.Time.IsZero() {
 		r.Time = Clock()
@@ -332,93 +342,531 @@ func Append(r Record) {
 		observeLedger(r)
 	}
 	defer codexUsedNew(r)
+	if !r.IsProbe() && !r.IsReported() && !r.IsRejected() && r.Status == http.StatusOK {
+		// F-11's denominator: every answered call, and those of them with no
+		// token count at all (the vendor said no usage), for the ledger's
+		// coverage to be a number rather than a sample. A local refusal
+		// (Rejected: a title, a loop ending) never reached a vendor and is
+		// no answered call.
+		answered200.Add(1)
+		if r.Input+r.Output+r.CacheRead+r.CacheWrite == 0 {
+			answered200NoUsage.Add(1)
+		}
+	}
 	b, err := json.Marshal(r)
 	if err != nil {
 		return
 	}
+	line := append(b, '\n')
+	done := make(chan error, 1)
+	startAppendWriter()
+	appendQueue <- appendItem{path: Path(), line: line, done: done}
+	<-done
+}
+
+// Flush waits until every record Append has returned for is on disk. Records
+// are written before Append returns, so this is for a process about to exit
+// and for tests that read the file directly; a read through Load, the index
+// or a summary sees them already.
+func Flush() {
+	startAppendWriter()
+	done := make(chan error, 1)
+	appendQueue <- appendItem{done: done}
+	<-done
+}
+
+// answered200 and answered200NoUsage count the answered calls Append has
+// offered the ledger since start, and those of them that recorded no token
+// count at all (input, output and cache reads and writes all zero: a 200
+// whose vendor said no usage). The second over the first is F-11's "200 but
+// no usage" share, said in the log once an hour and read by a test.
+var (
+	answered200        atomic.Int64
+	answered200NoUsage atomic.Int64
+)
+
+// Answered200 is how many answered (200) calls Append has offered the ledger
+// since start, and how many of them recorded no token usage at all. Reported
+// calls and probes are not answered calls of the gateway's own and are left
+// out.
+func Answered200() (total, withoutUsage int64) {
+	return answered200.Load(), answered200NoUsage.Load()
+}
+
+// resetAnswered200 is a test's seam back to no calls counted.
+func resetAnswered200() {
+	answered200.Store(0)
+	answered200NoUsage.Store(0)
+}
+
+// coverageSaid is when the no-usage share of the answered calls was last
+// said, and the numbers then; the writer goroutine owns both.
+var coverageSaid time.Time
+var coverageTotal, coverageNoUsage int64
+
+// maybeSayCoverage says, at most once an hour, how many of the answered calls
+// carried no token usage: F-11's number with the denominator it lacked, in
+// the log beside the calls it counts.
+func maybeSayCoverage() {
+	total, noUsage := Answered200()
+	if noUsage == 0 || total == coverageTotal && noUsage == coverageNoUsage || time.Since(coverageSaid) < time.Hour {
+		return
+	}
+	coverageSaid = time.Now()
+	coverageTotal, coverageNoUsage = total, noUsage
+	log.Printf("usage.jsonl: %d of %d answered call(s) (%.2f%%) recorded no token usage since start", noUsage, total, 100*float64(noUsage)/float64(total))
+}
+
+const (
+	// appendQueueLen is how many records may wait for the writer before
+	// Append waits for room; see Append.
+	appendQueueLen = 256
+	// appendBatchMax is the most records the writer takes in one write.
+	appendBatchMax = 256
+)
+
+// appendItem is one record for the writer, or a Flush (line nil) waiting for
+// the records before it.
+type appendItem struct {
+	path string
+	line []byte
+	done chan error
+}
+
+var (
+	appendQueue      = make(chan appendItem, appendQueueLen)
+	appendWriterOnce sync.Once
+)
+
+func startAppendWriter() {
+	appendWriterOnce.Do(func() { go appendWriterLoop() })
+}
+
+// appendWriterLoop writes what Append hands it, forever: a process that serves
+// the gateway appends for its life.
+func appendWriterLoop() {
+	for {
+		writeAppendBatch(takeAppendBatch(<-appendQueue))
+		maybeSayCoverage()
+	}
+}
+
+// takeAppendBatch is first and what already waits for the writer, up to one
+// write's worth: records arriving while the last batch was written go out
+// together.
+func takeAppendBatch(first appendItem) []appendItem {
+	batch := []appendItem{first}
+	for len(batch) < appendBatchMax {
+		select {
+		case it := <-appendQueue:
+			batch = append(batch, it)
+		default:
+			return batch
+		}
+	}
+	return batch
+}
+
+// writeAppendBatch writes a batch in order: the records of one path in one
+// write, and a Flush after everything before it.
+func writeAppendBatch(batch []appendItem) {
+	for i := 0; i < len(batch); {
+		if batch[i].line == nil { // a Flush
+			batch[i].done <- nil
+			i++
+			continue
+		}
+		j := i + 1
+		for j < len(batch) && batch[j].line != nil && batch[j].path == batch[i].path {
+			j++
+		}
+		err := writeAppendLines(batch[i].path, batch[i:j])
+		for _, it := range batch[i:j] {
+			it.done <- err
+		}
+		i = j
+	}
+}
+
+// writeAppendLines writes items' lines to the log at path, under
+// openWriteMu, and records the file's states around the write for the index.
+func writeAppendLines(path string, items []appendItem) error {
 	openWriteMu.Lock()
 	defer openWriteMu.Unlock()
-	path := Path()
-	f, before := openLog(path)
-	if f == nil {
-		writesFailed.Add(1)
-		sayFailed(errors.New("the log couldn't be opened"))
-		return
-	}
-	if !holdLog {
-		defer f.Close()
-	}
-	if _, err := f.Write(append(b, '\n')); err != nil {
-		if holdLog {
-			f.Close()
-			heldLog.f = nil
+	if openFail != nil {
+		if err := openFail(); err != nil {
+			writesFailed.Add(int64(len(items)))
+			sayFailed(err)
+			return err
 		}
-		writesFailed.Add(1)
+	}
+	f, before, err := heldLogFile(path)
+	if f == nil {
+		writesFailed.Add(int64(len(items)))
 		sayFailed(err)
-		return
+		return err
+	}
+	var buf []byte
+	for _, it := range items {
+		buf = append(buf, it.line...)
+	}
+	n, werr := f.Write(buf)
+	if werr != nil {
+		var failed int64
+		off := 0
+		for _, it := range items {
+			off += len(it.line)
+			if off > n {
+				failed++
+			}
+		}
+		writesFailed.Add(failed)
+		sayFailed(werr)
+		// Seal a line cut short, so the next record starts on a line of its
+		// own; best effort, a disk that took nothing takes this too.
+		f.Write([]byte{'\n'})
+		f.Close()
+		heldLog = logHandle{}
+		return werr
 	}
 	saidWhen = time.Time{} // a healed log is quiet: the next drop is said at once
 	after, _ := statLogHandle(f)
 	noteLogAppend(path, before, after)
+	if after != nil && logMaxBytes > 0 && after.Size() >= logMaxBytes && time.Now().After(rotateRetry) {
+		rotateLog(path)
+	}
+	if !holdLogBetweenBatches {
+		f.Close()
+		heldLog = logHandle{}
+	}
+	return nil
 }
 
-// heldLog is the log Append keeps open between calls, under openWriteMu: every
-// request appends, and an open and a close of usage.jsonl each time was
-// most of Append's time (#3725). It is written to only while Path still
-// names that same file, so a log moved, removed or replaced is opened
-// again. Windows closes it after each write, since a file open there
-// can't be removed or renamed.
-var heldLog struct {
+// logHandle is the log the writer keeps open between batches, under
+// openWriteMu: an open and a close of usage.jsonl for every request was most
+// of Append's time (#3725). It is written to only while Path still names the
+// same file, checked as each batch starts, so a log another program rotates,
+// removes or replaces is followed before the next record goes anywhere.
+// Windows closes it after each batch (holdLogBetweenBatches, log_open_windows.go):
+// a file open there cannot be replaced by a rename, and a batch's records
+// still share one open instead of one each.
+type logHandle struct {
 	path string
 	f    *os.File
+	info os.FileInfo
 }
 
-const holdLog = runtime.GOOS != "windows"
+var heldLog logHandle
 
-// openFail, when set, makes openLog fail its open: a test's seam, as
-// steady's stat and readFile are, so a write that can't land is read back
-// on every platform (a read-only folder's enforcement is not one).
+// openFail, when set, makes the writer fail a batch's open: a test's seam, as
+// steady's stat and readFile are, so a write that can't land is read back on
+// every platform (a read-only folder's enforcement is not one).
 var openFail func() error
 
-// openLog returns the log to append to and its state before the write,
-// or nil when it can't be opened.
-func openLog(path string) (*os.File, os.FileInfo) {
-	// openFail, when set (a test's seam, as steady's are), fails the open,
-	// so a failure of the log's write is what a test reads back on every
-	// platform: a read-only folder's enforcement is not one (a filesystem
-	// that doesn't enforce it would make the test a skip, and a skip is
-	// not the check)
-	if openFail != nil {
-		if openFail() != nil {
-			return nil, nil
+// heldLogFile returns the log at path to append to and its state before the
+// write, opening or reopening it when the path no longer names the file kept
+// from the last batch.
+func heldLogFile(path string) (*os.File, os.FileInfo, error) {
+	if heldLog.f != nil && heldLog.path == path {
+		at, err := statLogFile(path)
+		if err == nil && sameLogFile(heldLog.info, at) {
+			// the path still names the file kept open, and at is the state
+			// the batch writes onto: the boundary state noteLogAppend needs
+			return heldLog.f, at, nil
 		}
-	}
-	if f := heldLog.f; f != nil {
-		heldLog.f = nil
-		if heldLog.path == path {
-			before, err := statLogHandle(f)
-			now, nerr := statLogFile(path)
-			if err == nil && nerr == nil && sameLogFile(before, now) {
-				heldLog.f = f
-				return f, before
-			}
-		}
-		f.Close()
+		heldLog.f.Close()
+		heldLog = logHandle{}
 	}
 	// the folder is made only when it is missing: every request appends,
 	// and MkdirAll stat'ed it each time (#3725)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	f, err := openAppendLog(path)
 	if errors.Is(err, fs.ErrNotExist) && os.MkdirAll(filepath.Dir(path), 0o755) == nil {
-		f, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		f, err = openAppendLog(path)
 	}
 	if err != nil {
-		return nil, nil
+		return nil, nil, err
 	}
-	before, _ := statLogHandle(f)
-	if holdLog {
-		heldLog.path, heldLog.f = path, f
+	before, err := statLogHandle(f)
+	if err != nil {
+		f.Close()
+		return nil, nil, err
 	}
-	return f, before
+	heldLog = logHandle{path: path, f: f, info: before}
+	return f, before, nil
+}
+
+// closeHeldLog closes the handle the writer keeps, for a test to start from
+// none.
+func closeHeldLog() {
+	openWriteMu.Lock()
+	defer openWriteMu.Unlock()
+	if heldLog.f != nil {
+		heldLog.f.Close()
+	}
+	heldLog = logHandle{}
+}
+
+// ---- rotation ---------------------------------------------------------------
+
+// logMaxBytes is the size at which the writer tries to rotate usage.jsonl.
+// This machine's measured rate is 4.7 MB a day (2026-11-10 to 11-18: 37.8 MB,
+// 56,514 rows): 256 MiB is about 54 days of history, and because a rotation
+// keeps the last logRetainDays in the active log, it triggers about every
+// 19 days after the first. A rotation moves only the records older than the
+// windows the readers use (logRetainSince), so the active log keeps the
+// Usage page's 30 days, Codex's 30-day lead and every gateway key's window,
+// and starts again from that retained window rather than from zero. A test
+// sets it small.
+var logMaxBytes int64 = 256 << 20
+
+// logRetainDays is the least the active log keeps across a rotation: the
+// Usage page's longest period and Codex's 30-day lead, with a margin for the
+// day boundary and clock skew. A gateway key's window longer than it (up to
+// access.MaxDays) makes the retained part longer; when that part alone is
+// already over logMaxBytes there is nothing a rotation may move, and it is
+// skipped.
+const logRetainDays = 35
+
+// renameLog is a test's seam for a rotation that can't rename.
+var renameLog = os.Rename
+
+var (
+	rotations      atomic.Int64
+	rotatedRows    atomic.Int64
+	rotateFailures atomic.Int64
+	rotateSkips    atomic.Int64
+	rotateSaid     time.Time // guarded by openWriteMu
+	rotateRetry    time.Time // guarded by openWriteMu
+)
+
+// LogRotations is how many times the log has been rotated since start, and
+// how many records the rotated files hold; LogRotateFailures is how many
+// rotations could not rename or rewrite the log, kept then and nothing
+// dropped; LogRotationSkips is how many were skipped because nothing in the
+// log was older than the window the readers need (the log then keeps growing
+// and says so).
+func LogRotations() (files, rows int64) { return rotations.Load(), rotatedRows.Load() }
+
+// LogRotateFailures is how many rotations could not complete. The log is
+// then kept: a rotation never drops a record.
+func LogRotateFailures() int64 { return rotateFailures.Load() }
+
+// LogRotationSkips is how many rotation attempts found nothing older than
+// the retained window.
+func LogRotationSkips() int64 { return rotateSkips.Load() }
+
+// resetLogRotations is a test's seam back to no rotation counted.
+func resetLogRotations() {
+	openWriteMu.Lock()
+	defer openWriteMu.Unlock()
+	rotations.Store(0)
+	rotatedRows.Store(0)
+	rotateFailures.Store(0)
+	rotateSkips.Store(0)
+	rotateSaid, rotateRetry = time.Time{}, time.Time{}
+}
+
+// logRetainSince is the first time the active log must keep: the Usage page's
+// 30 days (and Codex's 30-day lead) back, or a gateway key's window start
+// when that is earlier, since a key's spending is summed from its window's
+// start in the log (budget's usage.Visit). It is only read for a rotation, so
+// the key file's read is rare.
+func logRetainSince(now time.Time) (time.Time, error) {
+	since := now.AddDate(0, 0, -logRetainDays)
+	keys, err := access.List()
+	if err != nil {
+		return time.Time{}, err
+	}
+	for _, k := range keys {
+		for _, l := range k.Limits() {
+			if l == nil {
+				continue
+			}
+			if start, _ := l.Window(now); start.Before(since) {
+				since = start
+			}
+		}
+	}
+	return since, nil
+}
+
+// rotateLog moves the log at path's records older than the windows the
+// readers use into a dated file beside it and keeps the rest in the active
+// log, under openWriteMu. If nothing is old enough — a key's window longer
+// than the log's history — it is skipped. A rename or rewrite that fails
+// leaves the whole log in place and counts the failure; no record is dropped
+// by a rotation.
+func rotateLog(path string) {
+	now := time.Now()
+	keepFrom, err := logRetainSince(now)
+	if err != nil {
+		rotateFailures.Add(1)
+		sayRotate(now, "rotation skipped: the gateway keys' windows could not be read (%v); the log is kept", err)
+		rotateRetry = now.Add(10 * time.Minute)
+		return
+	}
+	keepTmp, oldTmp, kept, moved, err := splitLog(path, keepFrom)
+	if err != nil {
+		rotateFailures.Add(1)
+		sayRotate(now, "rotation failed, the log is kept: %v", err)
+		rotateRetry = now.Add(10 * time.Minute)
+		return
+	}
+	if moved == 0 {
+		os.Remove(keepTmp)
+		os.Remove(oldTmp)
+		rotateSkips.Add(1)
+		limit := fmt.Sprintf("%d MiB", logMaxBytes>>20)
+		if logMaxBytes < 1<<20 {
+			limit = fmt.Sprintf("%d bytes", logMaxBytes)
+		}
+		sayRotate(now, "the log is over %s but none of its %d record(s) is older than %s, the window the pages and keys read; it is kept and goes on growing", limit, kept, keepFrom.Format("2006-01-02"))
+		rotateRetry = now.Add(time.Hour)
+		return
+	}
+	name := rotatedLogName(path, now)
+	if heldLog.f != nil { // the path is about to be replaced
+		heldLog.f.Close()
+		heldLog = logHandle{}
+	}
+	// The archive first: were the active log replaced before the old lines
+	// were safe, a crash would lose them. If the replace then fails, the
+	// active log still has every record and the archive is dropped.
+	if err := renameLog(oldTmp, name); err != nil {
+		os.Remove(keepTmp)
+		os.Remove(oldTmp)
+		rotateFailures.Add(1)
+		sayRotate(now, "rotation failed, the log is kept: %v", err)
+		rotateRetry = now.Add(10 * time.Minute)
+		return
+	}
+	if err := renameLog(keepTmp, path); err != nil {
+		os.Remove(name)
+		os.Remove(keepTmp)
+		rotateFailures.Add(1)
+		sayRotate(now, "rotation failed and the log was kept whole: %v", err)
+		rotateRetry = now.Add(10 * time.Minute)
+		return
+	}
+	rotations.Add(1)
+	rotatedRows.Add(moved)
+	rotateSaid = time.Time{}
+	log.Printf("usage.jsonl: rotated %d record(s) older than %s to %s; %d record(s) kept in the active log", moved, keepFrom.Format("2006-01-02"), name, kept)
+	rotateRetry = time.Time{}
+}
+
+// sayRotate says a rotation's outcome at most every sayEvery, as sayFailed
+// does for a write. The caller holds openWriteMu.
+func sayRotate(now time.Time, format string, args ...any) {
+	if time.Since(rotateSaid) < sayEvery {
+		return
+	}
+	rotateSaid = now
+	log.Printf("usage.jsonl: "+format, args...)
+}
+
+// splitLog copies path's lines into two temp files: those whose record time
+// is before keepFrom, and the rest (a line whose record time is unknown stays
+// with the rest). A last line without its newline is sealed where it lands.
+func splitLog(path string, keepFrom time.Time) (keepPath, oldPath string, kept, moved int64, err error) {
+	in, err := openLogRead(path)
+	if err != nil {
+		return "", "", 0, 0, err
+	}
+	defer in.Close()
+	dir := filepath.Dir(path)
+	keep, err := os.CreateTemp(dir, "usage-keep-*.tmp")
+	if err != nil {
+		return "", "", 0, 0, err
+	}
+	defer func() {
+		if err != nil {
+			keep.Close()
+			os.Remove(keep.Name())
+		}
+	}()
+	old, err := os.CreateTemp(dir, "usage-old-*.tmp")
+	if err != nil {
+		return "", "", 0, 0, err
+	}
+	defer func() {
+		if err != nil {
+			old.Close()
+			os.Remove(old.Name())
+		}
+	}()
+	kw := bufio.NewWriterSize(keep, 64<<10)
+	ow := bufio.NewWriterSize(old, 64<<10)
+	rd := bufio.NewReaderSize(in, 64<<10)
+	for {
+		line, rerr := rd.ReadBytes('\n')
+		if len(line) > 0 {
+			if rerr == nil && recordBefore(line, keepFrom) {
+				if _, err = ow.Write(line); err != nil {
+					return "", "", 0, 0, err
+				}
+				moved++
+			} else {
+				if _, err = kw.Write(line); err != nil {
+					return "", "", 0, 0, err
+				}
+				if rerr == io.EOF {
+					_, err = kw.WriteString("\n") // seal a line cut short
+				}
+				if err != nil {
+					return "", "", 0, 0, err
+				}
+				kept++
+			}
+		}
+		if rerr != nil {
+			if rerr == io.EOF {
+				break
+			}
+			return "", "", 0, 0, rerr
+		}
+	}
+	if err = kw.Flush(); err != nil {
+		return "", "", 0, 0, err
+	}
+	if err = ow.Flush(); err != nil {
+		return "", "", 0, 0, err
+	}
+	if err = keep.Close(); err != nil {
+		return "", "", 0, 0, err
+	}
+	if err = old.Close(); err != nil {
+		return "", "", 0, 0, err
+	}
+	return keep.Name(), old.Name(), kept, moved, nil
+}
+
+// recordBefore is whether line's record time is before at; a line that
+// doesn't parse, or names no time, is not known to be old and stays.
+func recordBefore(line []byte, at time.Time) bool {
+	var r struct {
+		T time.Time `json:"t"`
+	}
+	if json.Unmarshal(line, &r) != nil || r.T.IsZero() {
+		return false
+	}
+	return r.T.Before(at)
+}
+
+// rotatedLogName is path's dated name beside it, the day and time of the
+// rotation, with a count when two rotations land in the same second.
+func rotatedLogName(path string, at time.Time) string {
+	dir, base := filepath.Split(path)
+	ext := filepath.Ext(base)
+	stem := strings.TrimSuffix(base, ext)
+	stamp := at.Format("20060102-150405")
+	name := filepath.Join(dir, stem+"-"+stamp+ext)
+	for n := 2; ; n++ {
+		if _, err := os.Stat(name); err != nil {
+			return name
+		}
+		name = filepath.Join(dir, stem+"-"+stamp+"-"+strconv.Itoa(n)+ext)
+	}
 }
 
 // IsRejected also recognizes local rejections written before the explicit flag.
@@ -437,7 +885,7 @@ func (r Record) IsReported() bool { return r.Source == SourceReported }
 func Load(since time.Time) []Record {
 	mu.Lock()
 	loads++
-	f, err := os.Open(Path())
+	f, err := openLogRead(Path())
 	mu.Unlock()
 	if err != nil {
 		return nil
@@ -1186,7 +1634,7 @@ func LastSeen(agent string) time.Time {
 	// A tail boundary may land mid-line; the partial first line fails to
 	// unmarshal and is skipped, and that record is still read from the kept
 	// seen note or on the next call.
-	f, err := os.Open(Path())
+	f, err := openLogRead(Path())
 	if err != nil {
 		return last
 	}

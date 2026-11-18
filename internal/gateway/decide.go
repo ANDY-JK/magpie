@@ -435,6 +435,36 @@ func (s *Server) systemOne(ctx context.Context, p provider.Provider, model strin
 		}
 		archived = archiveOwn(c, d.sent, d.body, status, header, b)
 	}
+	var use struct {
+		Model string `json:"model"` // the one that answered, when the reply says
+		Usage struct {
+			Input  int `json:"input_tokens"`
+			Output int `json:"output_tokens"`
+		} `json:"usage"`
+	}
+	var callErr string
+	switch {
+	case err != nil:
+		callErr = err.Error()
+	case status >= 300:
+		callErr = provider.APIError(b, fmt.Sprintf("%d %s", status, http.StatusText(status)))
+	default:
+		_ = decodeJSON(b, &use)
+	}
+	var keyID, keyName string
+	if p.Account == nil && p.Key != "" {
+		keyID, keyName = provider.KeyID(p.Key), p.KeyName
+	}
+	// A decision call is recorded however it ended: a 429 or a broken
+	// connection is as much a call magpie made as an answer, and leaving
+	// those out made agnes's seven-hour 429 storm read as one failure (F-6).
+	// A call that never went out (a disabled model, a URL or sign error) is
+	// no call to record.
+	if d.sent != nil {
+		usage.Append(usage.Record{Time: start, Agent: usage.AgentOf(RouterAgent), Kind: "routing", Provider: p.ID, Host: p.Where(), Model: model, Requested: model, Served: use.Model,
+			ProviderKeyID: keyID, ProviderKeyName: keyName, ProviderAccount: accountOf(p),
+			Input: use.Usage.Input, Output: use.Usage.Output, Millis: time.Since(start).Milliseconds(), Status: status, Error: callErr, Archive: archived})
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, errNoAnswer
@@ -444,21 +474,6 @@ func (s *Server) systemOne(ctx context.Context, p provider.Provider, model strin
 	if status >= 300 {
 		return nil, decideRefused{fmt.Errorf("%s: %s", p.Name, provider.APIError(b, fmt.Sprintf("%d %s", status, http.StatusText(status)))), status, header, b}
 	}
-	var use struct {
-		Model string `json:"model"` // the one that answered, when the reply says
-		Usage struct {
-			Input  int `json:"input_tokens"`
-			Output int `json:"output_tokens"`
-		} `json:"usage"`
-	}
-	_ = decodeJSON(b, &use)
-	var keyID, keyName string
-	if p.Account == nil && p.Key != "" {
-		keyID, keyName = provider.KeyID(p.Key), p.KeyName
-	}
-	usage.Append(usage.Record{Time: start, Agent: usage.AgentOf(RouterAgent), Kind: "routing", Provider: p.ID, Host: p.Where(), Model: model, Requested: model, Served: use.Model,
-		ProviderKeyID: keyID, ProviderKeyName: keyName, ProviderAccount: accountOf(p),
-		Input: use.Usage.Input, Output: use.Usage.Output, Millis: time.Since(start).Milliseconds(), Status: status, Archive: archived})
 	return b, nil
 }
 

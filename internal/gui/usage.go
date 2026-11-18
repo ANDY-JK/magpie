@@ -133,8 +133,9 @@ func usageRoutes(mux *http.ServeMux, w Windows) {
 	})
 	// a clear of usage from the Usage page (CrazyMouse_TT on X): the calls up to
 	// now of one provider's model, or of everything with both "", stop
-	// being counted on the usage pages. usage.jsonl keeps them, and a key's
-	// spending limit and the allowances still count them
+	// being counted on the usage pages. usage.jsonl keeps them in the
+	// window the readers use (a rotation moves only what is older), and a
+	// key's spending limit and the allowances still count them
 	// (settings.UsageCleared).
 	mux.HandleFunc("POST /api/usage/clear", func(rw http.ResponseWriter, r *http.Request) {
 		var in struct{ Provider, Model string }

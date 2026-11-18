@@ -30,6 +30,7 @@ import (
 	"github.com/yetone/magpie/internal/shortcut"
 	"github.com/yetone/magpie/internal/stats"
 	"github.com/yetone/magpie/internal/update"
+	"github.com/yetone/magpie/internal/usage"
 	"github.com/yetone/magpie/internal/webview2env"
 )
 
@@ -429,6 +430,10 @@ func Run(version string, showMain bool, link string) error {
 		// leaves both to it: the failover goes on through the new one, and
 		// so do the threads.
 		OnShutdown: func() {
+			// The usage records already handed to the append writer are on
+			// disk before the process goes: quitting is not a place a written
+			// call disappears from the ledger.
+			usage.Flush()
 			proc.EndProbes()
 			if handedOver.Load() {
 				return

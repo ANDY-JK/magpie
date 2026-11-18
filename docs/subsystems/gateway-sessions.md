@@ -143,7 +143,8 @@ each call at or before a mark that matches it
 `Filter.keepsRow`; the request index keys its meta on the marks
 (`clearedKey`), so a cached page is read again. Gateway keys' spending
 limits, the allowances' window holds and Codex's reads go by `usage.Visit`
-and the raw log, so they still count every cleared call: a clear never
+and the active log (which keeps the window they count, see Rotation), so
+they still count every cleared call in that window: a clear never
 lifts a limit, and the confirmation says so. The marks ride the settings
 part of a sync, so a clear holds on the computers it syncs with, over
 their shared days and the agents' session-file rows too, and a later clear
@@ -660,7 +661,7 @@ however old, so a client's history can be backfilled.
 - **Writing:** `usage.IngestReported`
   ([`internal/usage/reported.go`](../../internal/usage/reported.go))
   appends under the same write lock (`openWriteMu`) and to the same file as
-  `usage.Append`, each row with `source: "reported"` and no caller key. A `rid` the log
+  the append writer, each row with `source: "reported"` and no caller key. A `rid` the log
   already has as reported, or one repeated in the post, is skipped. The
   set of reported rids is read from the log itself, so it survives a
   restart: the first post after one scans the log once, keeping only
@@ -674,10 +675,15 @@ however old, so a client's history can be backfilled.
   N record(s) not written since start, latest: …`), and quieted by a
   write that lands, so a log that heals stops being spoken of
   (`TestAppendFailureCounted`, through the `openFail` test seam).
-- **A slow write does not hold up a reader.** `usage.Append` and
-  `IngestReported` open, write and stat the log under `openWriteMu`; the
-  record is still on disk before the call returns, so no accounting is
-  dropped or deferred to a background worker. `usage.LastSeen`, asked on
+- **One writer, batched.** `usage.Append` hands its record to one
+  background writer (`internal/usage/usage.go`) and waits for that record
+  alone. The writer keeps the log open between batches (on Windows it
+  closes it after each batch, since a file open there cannot be replaced by
+  a rename), writes the records waiting together, and records the file's
+  states around each batch for the index (`noteLogAppend`). A record is
+  still on disk before `Append` returns, so no accounting is dropped; a
+  full queue waits for room rather than dropping a record, and a write
+  that can't land is counted and said as above. `usage.LastSeen`, asked on
   the agent-applied path, reads the log's last 256 KB under no lock, so
   a write an open holds open (a busy disk) does not queue that read behind
   it. A tail boundary may cut a line in two; the partial line fails to
@@ -685,6 +691,31 @@ however old, so a client's history can be backfilled.
   `usage.Saw`'s in-process note or the next scan. `TestLastSeenTailScanNotBlockedBySlowAppend`
   injects a held write through `openFail` and fails when the scan waits for
   it or any of the three records is lost.
+- **Decision calls are rows too.** The routing classifier's own System One
+  call (`internal/gateway/decide.go`, `systemOne`) is written whatever ended
+  it: an answer, a 429, or a transport error (status 0, with `err`). A call
+  that never went out — a disabled model, a URL or sign error — is no call
+  and leaves no row. Leaving the failures out made agnes's seven-hour 429
+  storm read as one failure (`TestSystemOneRecordsRefusedCall`,
+  `TestSystemOneRecordsBrokenConnection`, `TestSystemOneRecordsNoUnsentCall`).
+- **Rotation.** When `usage.jsonl` reaches 256 MiB, the writer moves the
+  records older than the windows the readers use — the Usage page's 30 days,
+  Codex's 30-day lead, and every gateway key's window (its current window's
+  start, read from `access.List`) — to a dated `usage-<date>.jsonl` beside
+  it, and keeps the rest in the active log. The active log therefore starts
+  each rotation from that retained window, not from zero: `Load`, `Visit`,
+  the index, a key's budget and Codex's raw-log reads still see every call
+  their window counts. A key window longer than the log's history leaves
+  nothing to move and the rotation is skipped (the log keeps growing and
+  says so); a rename that fails keeps the log. Rotations, moved records,
+  failures and skips are counted (`usage.LogRotations`,
+  `usage.LogRotateFailures`, `usage.LogRotationSkips`) and said in the log.
+  The Usage page's All period (and a picked range or rolling window reaching
+  further back) therefore covers the retained window, not the whole history;
+  the rotated files are the archive of what left it, and the app does not
+  read them. `TestLogRotationKeepsTheWindowsReadersUse`,
+  `TestLogRotationFailureKeepsEveryRecord`,
+  `TestLogRotationSkippedWithinRetention`.
 - **Pricing:** a record with `cost` keeps it (`Record.OwnCost`, the
   `rowOwnCost` flag on a packed row). Without one it is priced at magpie's
   own prices, like a gateway row.

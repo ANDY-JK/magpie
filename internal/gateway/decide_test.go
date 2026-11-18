@@ -289,6 +289,61 @@ func TestSystemOneDecideURLErrorOnce(t *testing.T) {
 	}
 }
 
+// A decision call that ends in a 429 is in the ledger, with the status and the
+// vendor's error: only answers were recorded, so agnes's seven-hour 429 storm
+// read as one failure (F-6).
+func TestSystemOneRecordsRefusedCall(t *testing.T) {
+	fresh(t)
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		io.WriteString(w, `{"error":{"message":"today's text quota is spent"}}`)
+	}))
+	defer up.Close()
+	p := provider.Provider{ID: "agnes", Name: "Agnes", Key: "k", Decide: up.URL + "/v1"}
+	if _, err := New().systemOne(context.Background(), p, "agnes-3.0-flash", []byte(`{"questions":{}}`)); err == nil {
+		t.Fatal("a 429 answered")
+	}
+	r := lastUsage(t)
+	if r.Status != http.StatusTooManyRequests || r.Provider != "agnes" || r.Model != "agnes-3.0-flash" || r.Kind != "routing" || r.Error == "" || r.Input != 0 || r.Output != 0 {
+		t.Fatalf("a refused decision call: %+v", r)
+	}
+}
+
+// A decision call that never reached the vendor is in the ledger too, with
+// status 0 and the transport error: it is a call magpie made and lost.
+func TestSystemOneRecordsBrokenConnection(t *testing.T) {
+	fresh(t)
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	url := up.URL
+	up.Close()
+	p := provider.Provider{ID: "agnes", Name: "Agnes", Key: "k", Decide: url + "/v1"}
+	if _, err := New().systemOne(context.Background(), p, "agnes-3.0-flash", []byte(`{"questions":{}}`)); err == nil {
+		t.Fatal("a closed connection answered")
+	}
+	r := lastUsage(t)
+	if r.Status != 0 || r.Provider != "agnes" || r.Kind != "routing" || r.Error == "" {
+		t.Fatalf("a broken decision call: %+v", r)
+	}
+}
+
+// A call that never went out (a disabled model) is no call to record: there
+// is no upstream to blame or bill.
+func TestSystemOneRecordsNoUnsentCall(t *testing.T) {
+	fresh(t)
+	if err := provider.SetDisabledModels([]string{"agnes/disabled-model"}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { provider.SetDisabledModels(nil) })
+	p := provider.Provider{ID: "agnes", Name: "Agnes", Key: "k", Decide: "http://127.0.0.1:1/v1"}
+	if _, err := New().systemOne(context.Background(), p, "disabled-model", []byte(`{"questions":{}}`)); err == nil {
+		t.Fatal("a disabled model answered")
+	}
+	if recs := usage.Load(time.Time{}); len(recs) != 0 {
+		t.Fatalf("%d records for a call that never went out: %+v", len(recs), recs)
+	}
+}
+
 func (u *jevUp) n() int {
 	u.mu.Lock()
 	defer u.mu.Unlock()

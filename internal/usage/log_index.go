@@ -171,7 +171,7 @@ func readLogSnapshot() *logSnapshot {
 		}
 	}
 	logIndex.reads++
-	f, err := os.Open(path)
+	f, err := openLogRead(path)
 	if err != nil {
 		return next
 	} // never publish an incomplete read as current
@@ -519,6 +519,12 @@ func sameLogInfo(a, b os.FileInfo) bool {
 // Append records the exact file states around its successful write. Contiguous
 // writes by this process need no historical prefix scan; external edits still
 // go through the fingerprint/rebuild path.
+//
+// It is called under openWriteMu by the log's only two writers, the append
+// writer's batch and IngestReported: base and last are two states of one
+// write and must be published together, so they keep a lock of their own that
+// the index's readers also take. The nesting stays for that atomicity; it is
+// no longer on a request's path, since Append itself never takes openWriteMu.
 func noteLogAppend(path string, before, after os.FileInfo) {
 	logAppends.Lock()
 	defer logAppends.Unlock()

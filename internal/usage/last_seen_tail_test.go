@@ -10,9 +10,9 @@ import (
 // A log scan waiting on the writer's lock is a request held up by a busy
 // disk: LastSeen reads the log's tail on the agent-applied path, and a write
 // an open holds open must not queue it. Inject a delay inside the write
-// (through openLog's existing seam, reached after Append takes the write
-// lock) and time a LastSeen whose in-process note is empty, so it must read
-// the tail. Every record still lands: the write is held, not dropped.
+// (through the writer's existing openFail seam, reached while it holds the
+// write lock) and time a LastSeen whose in-process note is empty, so it must
+// read the tail. Every record still lands: the write is held, not dropped.
 func TestLastSeenTailScanNotBlockedBySlowAppend(t *testing.T) {
 	pageHome(t)
 	resetAppendsFailed()

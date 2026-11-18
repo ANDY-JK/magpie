@@ -35,7 +35,7 @@ var reportedMark = []byte(`"source":"` + SourceReported + `"`)
 // is now another file, or shorter, is read again from the start. Called
 // with reported.ingest held.
 func catchUpReported(path string) error {
-	f, err := os.Open(path)
+	f, err := openLogRead(path)
 	if os.IsNotExist(err) {
 		reported.path, reported.info, reported.off, reported.rids = path, nil, 0, map[string]bool{}
 		return nil
