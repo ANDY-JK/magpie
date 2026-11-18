@@ -4774,6 +4774,15 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			// what its model searched with its provider's own tool
 			logNativeSearches(r.Context(), call.Usage.searches, start, call.Agent, call.Provider, where, model)
 		}
+	} else if call.Status == 499 {
+		// canceled while queued, before any vendor was asked: the ledger
+		// gets the row, 0 tokens, as a turn-away does (E-05, the review);
+		// a cancel after a vendor was asked already has its row above
+		rec := usage.Record{RouteID: tr.ID, Time: start, Agent: call.Agent, Via: call.Via, Provider: call.Provider, Model: model, Requested: call.Model,
+			Millis: call.Millis, Status: call.Status, Rejected: true, Session: sessionOf(r.Header), NativeSession: nativeSessionOf(r.Header), Kind: call.Kind, Archive: call.archiveName()}
+		failedWith(&rec, call.Status, call.Error, "")
+		withBodies(&rec, &call)
+		appendUsage(r, rec)
 	}
 }
 

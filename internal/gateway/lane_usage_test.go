@@ -105,3 +105,43 @@ func TestUnknownModelRefusalIsInTheUsageLedger(t *testing.T) {
 	}
 	t.Fatalf("an unknown model's refusal is in no usage record either (status %d): the contrast this test needs is gone", r.status)
 }
+
+// E-05 (the review): a request canceled while it waits in a lane was never
+// asked of any vendor, so its call.To stayed empty and the ledger's
+// `call.To != ""` guard dropped it: the agent went away and Usage said
+// nothing happened. It gets the same 0-token 499 row a turn-away gets.
+func TestQueueCancelIsInTheUsageLedger(t *testing.T) {
+	fresh(t)
+	v, up := slowUp(t)
+	one := 1
+	if err := provider.Save(provider.Provider{ID: "slow", Name: "Slow", Key: "k", Models: []string{"m"}, Chat: up + "/v1", Anthropic: up,
+		MaxConcurrency: &one, QueueLimit: 1, QueueWait: 30}); err != nil {
+		t.Fatal(err)
+	}
+	g := newLaneRig(t)
+	lane := func() Lane { return g.s.Lanes()["slow#"+provider.KeyID("k")] }
+
+	// a takes the only slot, b waits behind it
+	g.send(context.Background(), "/v1/chat/completions", "slow/m", "a")
+	within(t, "a at the vendor", func() bool { return len(v.seen()) == 1 })
+	ctx, cancel := context.WithCancel(context.Background())
+	g.send(ctx, "/v1/chat/completions", "slow/m", "b")
+	within(t, "b queued", func() bool { return lane().Waiting == 1 })
+
+	// b's agent goes away while it is queued
+	cancel()
+	g.reply() // b's request ends, canceled
+	time.Sleep(500 * time.Millisecond)
+
+	n := 0
+	for _, rec := range usage.Load(time.Time{}) {
+		if rec.Status == 499 {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("%d canceled-in-queue rows in the usage ledger, want 1", n)
+	}
+	close(v.gate("a"))
+	g.reply()
+}
