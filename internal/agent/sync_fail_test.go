@@ -31,18 +31,18 @@ func TestSyncFailureKeptAndSaid(t *testing.T) {
 	t.Cleanup(func() { syncFaultFor = nil })
 
 	SyncCatalog()
-	if got := syncFailures(); len(got["pi"]) != 1 || got["pi"][0] != fail {
+	if got := SyncFailures(); len(got["pi"]) != 1 || got["pi"][0] != fail {
 		t.Fatalf("the round kept %v, want pi's failure once", got)
 	}
 	// the same failure, said by another round: one kept error, not two
 	SyncCatalog()
-	if got := syncFailures(); len(got["pi"]) != 1 {
+	if got := SyncFailures(); len(got["pi"]) != 1 {
 		t.Fatalf("the same failure kept twice: %v", got)
 	}
 	// and a sync that writes again drops its failures
 	syncFaultFor = nil
 	SyncCatalog()
-	if got := syncFailures(); len(got) != 0 {
+	if got := SyncFailures(); len(got) != 0 {
 		t.Fatalf("an agent whose sync wrote is kept in the failures: %v", got)
 	}
 }
@@ -62,7 +62,7 @@ func TestRewireKeepsSyncFailure(t *testing.T) {
 	if len(moved) != 1 || len(errs) != 0 {
 		t.Fatalf("the rewire's reply: moved %v, errs %v", moved, errs)
 	}
-	if got := syncFailures(); len(got["pi"]) != 1 {
+	if got := SyncFailures(); len(got["pi"]) != 1 {
 		t.Fatalf("the rewire's sync failure kept: %v", got)
 	}
 }

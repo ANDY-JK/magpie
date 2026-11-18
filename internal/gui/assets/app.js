@@ -670,6 +670,9 @@ function renderAgents() {
     }
     // an app started before magpie's last change (the panel's row)
     else if (!kind && a.appRestart) who.append(appRestart(a));
+    // its model list magpie couldn't write (B-02): said on the name's line,
+    // the error on hover; the next change or a pick writes it again
+    if (mode !== "panel" && a.syncError) who.append(syncFailed(a));
     // the CLI's version and its update (#202)
     if (mode !== "panel") who.append(cliTag(a));
     if (mode !== "panel" && isHere(a)) who.append(Object.assign(el("span", "ag-missing ag-here", t(HERE_TAG)), { title: t(HERE_TIP, { agent: a.name }) }));
@@ -1072,6 +1075,16 @@ function driftFix(a, label = "Apply again") {
     else reapplyAgent(a, fix);
   };
   return fix;
+}
+
+// syncFailed: an amber pill after an agent's name whose model list magpie
+// couldn't write (B-02): the sync keeps the failure and the row says it,
+// the error on hover, so a list that never reached the agent is not a
+// mystery. The next change or a pick writes the list again.
+function syncFailed(a) {
+  const b = el("span", "badge ag-sync-failed", t("List not written"));
+  b.title = t("magpie couldn't write this agent's model list: {error}. It is written again on the next change or a pick", { error: a.syncError });
+  return b;
 }
 
 // explainDrift: what has to listen at an address an agent can't reach

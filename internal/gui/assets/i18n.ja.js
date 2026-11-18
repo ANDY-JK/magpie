@@ -624,6 +624,8 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "Move up": "上へ移動",
     "Move down": "下へ移動",
     "Apply again": "再適用",
+    "List not written": "リスト未書き込み",
+    "magpie couldn't write this agent's model list: {error}. It is written again on the next change or a pick": "magpie はこのエージェントのモデルリストを書き込めませんでした：{error}。次回の変更またはモデル選択時に再び書き込みます",
     "Keep current settings": "現在の設定を維持",
     "{agent} no longer goes through magpie — its config was changed": "{agent} は magpie を経由しなくなりました — 設定が変更されています",
     "{agent} was switched off {model} outside magpie": "{agent} は magpie の外で {model} から切り替えられました",

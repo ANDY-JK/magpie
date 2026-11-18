@@ -247,6 +247,11 @@ type agentJSON struct {
 	// another agent offers it again where magpie knows how
 	CLIMissing bool               `json:"cliMissing,omitempty"`
 	Native     *agent.NativeState `json:"native,omitempty"`
+	// SyncError: the model list magpie last failed to write for it (B-02),
+	// kept by the sync and said on its row: a list that never reached the
+	// agent is written again on the next change or pick, and until then the
+	// row says why it is behind
+	SyncError string `json:"syncError,omitempty"`
 	// Terminal: a Mac's row menu offers Open in terminal, a command
 	// starting it being here (agentCommand)
 	Terminal bool `json:"terminal,omitempty"`
@@ -2691,6 +2696,20 @@ func held(h http.Handler) http.Handler {
 	})
 }
 
+// syncErrorOf is the row's syncError for the failures the sync kept for one
+// agent (B-02): the first, with how many more distinct ones there are. ""
+// when the last write went through.
+func syncErrorOf(es []error) string {
+	if len(es) == 0 {
+		return ""
+	}
+	s := es[0].Error()
+	if len(es) > 1 {
+		s += fmt.Sprintf(" (+%d)", len(es)-1)
+	}
+	return s
+}
+
 func state() stateJSON {
 	s := stateJSON{Agents: []agentJSON{}, Profiles: []profileJSON{}, Catalog: catalog.Source(), Settings: settings.Load().ForUI()}
 	// state() is asked for after nearly every click, so the rate — a
@@ -2714,6 +2733,7 @@ func state() stateJSON {
 		s.Clients = append(s.Clients, clientJSON{ID: a.ID, Name: a.Name, Icon: a.Icon})
 	}
 	detected := agent.Detected()
+	syncFails := agent.SyncFailures()
 	now := make(map[string]map[string]string, len(detected))
 	for _, a := range detected {
 		if a.Follow != nil {
@@ -2722,6 +2742,7 @@ func state() stateJSON {
 		vals := a.Values()
 		now[a.ID] = vals
 		aj := agentJSON{ID: a.ID, Name: a.Name, Icon: a.Icon, Path: tilde(a.Path), Fields: agentFields(a, vals)}
+		aj.SyncError = syncErrorOf(syncFails[a.ID])
 		aj.Models = agentModelCount(a, aj.Fields)
 		aj.Menu = a.ListsModels
 		aj.NoNames = a.NoNames

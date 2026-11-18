@@ -38,13 +38,13 @@ var (
 	syncFailed   map[string][]error
 )
 
-// syncFailures are the sync failures a round of SyncCatalog swallowed
+// SyncFailures are the sync failures a round of SyncCatalog swallowed
 // (agent id, the error): one no caller carries is otherwise gone, and a
 // model list that didn't write reaches the agent on its next pick, not
 // now. A sync that wrote again drops its failures (clearSyncFailure); the
 // same failure, said by another round, is one kept error, not two
-// (noteSyncFailure).
-func syncFailures() map[string][]error {
+// (noteSyncFailure). The Agents page says them on its rows (B-02).
+func SyncFailures() map[string][]error {
 	syncFailedMu.Lock()
 	defer syncFailedMu.Unlock()
 	if syncFailed == nil {
