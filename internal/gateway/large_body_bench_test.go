@@ -1,5 +1,9 @@
 package gateway
 
+// Baseline (2026-11-18, Windows 10.0.26300 x64, 16 threads, -benchtime=20x):
+// BenchmarkLargeRequest anthropic 62.1 ms/op (31.93 MB/s),
+// anthropic-group 59.8 ms/op (33.16 MB/s).
+
 import (
 	"bytes"
 	"context"

@@ -1,5 +1,9 @@
 package gateway
 
+// Baseline (2026-11-18, Windows 10.0.26300 x64, 16 threads, -benchtime=20x):
+// BenchmarkDecodeReaders 64,580 ns/op, 3,098.76 MB/s, 266 B/op, 6 allocs/op.
+// A change far off it is the difference; re-record when the decode path changes.
+
 import (
 	"strings"
 	"testing"

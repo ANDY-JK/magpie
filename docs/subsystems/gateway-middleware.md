@@ -65,6 +65,8 @@ go test -tags nogui -run 'TestOnAccount|TestAccountRefKey' ./internal/middleware
 go test -tags nogui -run TestPluginListSaysMiddleware .
 go test -tags nogui -run "TestSetOptionsShortName|TestBuiltinMarket" ./internal/plugin
 go test -tags nogui -bench Event ./internal/middleware
+# and the gateway's own overhead baselines, recorded in each bench file's head:
+go test -tags production -run '^$' -bench 'GroupOverhead' -benchtime=10x ./internal/gateway
 node --test internal/gui/tests/plugin-middleware.test.cjs
 # in magpie-community/plugins: each package runs its cases.json through the hooks
 bun test packages/think-tags packages/model-map packages/param-override packages/system-prompt packages/word-guard packages/antigravity-cloak

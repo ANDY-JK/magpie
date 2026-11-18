@@ -1,5 +1,9 @@
 package gateway
 
+// Baseline (2026-11-18, Windows 10.0.26300 x64, 16 threads, -benchtime=20x):
+// BenchmarkImageRequest responses-to-chat 417.6 ms/op (48.33 MB/s),
+// chat-to-chat 317.6 ms/op (63.54 MB/s), 20.18 MB/req.
+
 import (
 	"bytes"
 	"context"

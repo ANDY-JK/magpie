@@ -1,5 +1,11 @@
 package gateway
 
+// Baseline (2026-11-18, Windows 10.0.26300 x64, 16 threads, -benchtime=10x,
+// catalog=12x20, 200KB, stream=false): BenchmarkGroupOverhead 28.2 ms/op
+// (p0/m1), 28.9 (group/g1), 22.1 (group/g4); BenchmarkGroupOverheadParallel
+// 5.0, 4.6, 4.5 ms/op. The group's overhead is what a pool adds to one
+// provider's own path; a change far off it is the difference.
+
 import (
 	"bytes"
 	"fmt"
