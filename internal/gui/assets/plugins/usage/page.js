@@ -260,6 +260,8 @@ function renderPeriod(loading) {
 
 function pickPeriod(id) {
   period = id; ledDay = ""; ledOffset = 0;
+  // remembered for the next visit (L-09): the page opens on it
+  try { localStorage.setItem("magpie.period", id); } catch { /* not kept */ }
   loadUsage().catch((e) => status(e.message, "err"));
 }
 

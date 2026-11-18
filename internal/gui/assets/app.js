@@ -85,7 +85,14 @@ let providers = null; // { providers, presets, gateway }
 let view = "agents";
 let showAllAgents = false; // the agents no one has set anything on, folded away
 let showHiddenAgents = false; // under them, the ones hidden by hand: a fold of their own, shut until asked
-let period = "today"; // usage window
+// the usage window, remembered as picked (L-09, the review): a reader who
+// works in 30 days found the page back on Today every time
+let period = (() => {
+  try {
+    const v = localStorage.getItem("magpie.period");
+    return ["today", "7d", "30d", "all"].includes(v) ? v : "today";
+  } catch { return "today"; }
+})();
 let usage = null;   // last usage summary
 let pick = null; // { agent, field, options, items, cursor, anchor }
 let editing = null; // provider id being edited; { preset } or { custom: true } for a new one
