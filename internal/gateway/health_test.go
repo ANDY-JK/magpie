@@ -194,6 +194,179 @@ func TestWeighedCarriesHealth(t *testing.T) {
 	}
 }
 
+// A pool routed by score weighs the health the gateway fills into its
+// seats: a steady model goes before one that failed twice, though the list
+// hands the failing one first and nothing else tells the two apart.
+func TestScoreWeighsTheHealthItReads(t *testing.T) {
+	fresh(t)
+	const model = "m"
+	cand := func(id string) candidate {
+		return candidate{p: provider.Provider{ID: id, Name: id, Key: "k"}, model: model, rest: id}
+	}
+	flaky, steady := cand("a"), cand("b")
+	noteUnstable(flaky)
+	noteUnstable(flaky)
+	if !unstable(flaky) {
+		t.Fatalf("the failing model isn't unstable: %v", healthOf(flaky.restID(), time.Now()))
+	}
+	p := provider.Provider{ID: "pool", Routing: provider.Score}
+	out, wg := weighRouted(p, []candidate{flaky, steady}, model, provider.Chat)
+	if len(out) != 2 || out[0].rest != "b" || out[1].rest != "a" {
+		t.Fatalf("order %q then %q, want the steady b first", out[0].rest, out[1].rest)
+	}
+	if h := wg.health[flaky.restID()]; h <= 0 || h >= 0.5 {
+		t.Fatalf("the failing model's health %v, want below 0.5", h)
+	}
+}
+
+// A pool routed by score tells the score its order was made by: the row
+// the trace keeps carries the same value the strategy weighed, and a pool
+// routed any other way carries none.
+func TestWeighedCarriesTheScoreItWasOrderedBy(t *testing.T) {
+	fresh(t)
+	const model = "m"
+	cand := func(id string) candidate {
+		return candidate{p: provider.Provider{ID: id, Name: id, Key: "k"}, model: model, rest: id}
+	}
+	flaky, steady := cand("a"), cand("b")
+	noteUnstable(flaky)
+	noteUnstable(flaky)
+
+	scored := provider.Provider{ID: "pool", Routing: provider.Score}
+	out, wg := weighRouted(scored, []candidate{flaky, steady}, model, provider.Chat)
+	if len(out) != 2 || out[0].rest != "b" {
+		t.Fatalf("order %d candidates, want the steady b first", len(out))
+	}
+	rows := map[string]Weighed{}
+	for _, c := range out {
+		w := weighed(c, scored, wg, false, provider.Chat)
+		if w.Score <= 0 || w.Score > 1 {
+			t.Fatalf("%s's score %v, want a share", c.rest, w.Score)
+		}
+		if w.Score != wg.scores[c.restID()] {
+			t.Fatalf("%s's row says %v, the weighing %v", c.rest, w.Score, wg.scores[c.restID()])
+		}
+		rows[c.rest] = w
+	}
+	if rows["b"].Score <= rows["a"].Score {
+		t.Fatalf("the steady score %v, the failing one %v", rows["b"].Score, rows["a"].Score)
+	}
+
+	// a pool routed any other way weighs no score
+	plain := provider.Provider{ID: "pool"}
+	_, pw := weighRouted(plain, []candidate{flaky, steady}, model, provider.Chat)
+	if pw.scores != nil {
+		t.Fatalf("a pool routed smart weighed scores: %v", pw.scores)
+	}
+	if w := weighed(steady, plain, pw, false, provider.Chat); w.Score != 0 {
+		t.Fatalf("a pool routed smart says score %v", w.Score)
+	}
+}
+
+// The relative line's demotion is not undone by one answer: a model whose
+// score has climbed back over the line is kept behind until it has
+// answered three times in a row.
+func TestRelativeDemotionWaitsForThreeAnswers(t *testing.T) {
+	fresh(t)
+	if !settings.Load().StabilityGuardOn() {
+		t.Fatal("the stability guard is off by default")
+	}
+	steady := candidate{p: provider.Provider{ID: "a", Name: "A", Key: "k1"}, model: "steady", rest: "a"}
+	flaky := candidate{p: provider.Provider{ID: "b", Name: "B", Key: "k2"}, model: "flaky", rest: "b"}
+	for i := 0; i < 40; i++ {
+		noteStable(steady)
+	}
+	// 5/7: under a perfect peer's 75% line, the last word a failure
+	for i := 0; i < 4; i++ {
+		noteStable(flaky)
+	}
+	for i := 0; i < 2; i++ {
+		noteUnstable(flaky)
+	}
+	// the flaky model comes first in the plan, so only a demotion moves it
+	cs := []candidate{flaky, steady}
+	pl := planned{order: []Weighed{{Model: "flaky"}, {Model: "steady"}}}
+
+	// one answer lifts the score over the line (6/8), but not the demotion:
+	// the model has answered once since it failed
+	noteStable(flaky)
+	out, _ := demoteUnstable(cs, pl)
+	if got := healthOrder(out); got[0] != "steady" {
+		t.Fatalf("one answer brought it back: %v", got)
+	}
+	noteStable(flaky)
+	out, _ = demoteUnstable(cs, pl)
+	if got := healthOrder(out); got[0] != "steady" {
+		t.Fatalf("two answers brought it back: %v", got)
+	}
+	noteStable(flaky)
+	out, _ = demoteUnstable(cs, pl)
+	if got := healthOrder(out); got[0] != "flaky" {
+		t.Fatalf("three answers did not bring it back: %v", got)
+	}
+}
+
+// The absolute line is untouched by the wait: a model under it stays behind
+// its steady peers however many times it has answered.
+func TestAbsoluteDemotionKeepsItsPace(t *testing.T) {
+	fresh(t)
+	steady := candidate{p: provider.Provider{ID: "a", Name: "A", Key: "k1"}, model: "steady", rest: "a"}
+	flaky := candidate{p: provider.Provider{ID: "b", Name: "B", Key: "k2"}, model: "flaky", rest: "b"}
+	for i := 0; i < 40; i++ {
+		noteStable(steady)
+	}
+	for i := 0; i < 8; i++ {
+		noteUnstable(flaky)
+	}
+	cs := []candidate{flaky, steady}
+	pl := planned{order: []Weighed{{Model: "flaky"}, {Model: "steady"}}}
+	for i := 0; i < 3; i++ {
+		noteStable(flaky)
+	}
+	out, _ := demoteUnstable(cs, pl)
+	if got := healthOrder(out); got[0] != "steady" {
+		t.Fatalf("three answers brought a model under the absolute line back: %v", got)
+	}
+}
+
+// With the stability guard off the relative line alone decides, as before
+// it existed: an answer that lifts the score over the line brings the model
+// back at once.
+func TestStabilityGuardOffRestoresTheRelativeLine(t *testing.T) {
+	fresh(t)
+	steady := candidate{p: provider.Provider{ID: "a", Name: "A", Key: "k1"}, model: "steady", rest: "a"}
+	flaky := candidate{p: provider.Provider{ID: "b", Name: "B", Key: "k2"}, model: "flaky", rest: "b"}
+	for i := 0; i < 40; i++ {
+		noteStable(steady)
+	}
+	for i := 0; i < 4; i++ {
+		noteStable(flaky)
+	}
+	for i := 0; i < 2; i++ {
+		noteUnstable(flaky)
+	}
+	cs := []candidate{flaky, steady}
+	pl := planned{order: []Weighed{{Model: "flaky"}, {Model: "steady"}}}
+	// the answer that takes the score over the line: the guard still holds
+	// it behind
+	noteStable(flaky)
+	out, _ := demoteUnstable(cs, pl)
+	if got := healthOrder(out); got[0] != "steady" {
+		t.Fatalf("fixture: the guard on did not hold it back: %v", got)
+	}
+
+	off := false
+	st := settings.Load()
+	st.StabilityGuard = &off
+	if err := settings.Save(st); err != nil {
+		t.Fatal(err)
+	}
+	out, _ = demoteUnstable(cs, pl)
+	if got := healthOrder(out); got[0] != "flaky" {
+		t.Fatalf("with the guard off the line alone did not bring it back: %v", got)
+	}
+}
+
 // A provider's row says how its models are answering: ProviderHealth
 // finds the entries by the provider they rest by — a key's id#key, an
 // account's id@user, its one key's bare id — and never by a prefix, so

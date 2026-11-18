@@ -30,7 +30,10 @@ import (
 // record is long enough to be believable is judged by what it actually
 // did. Below healthDemote the model is moved behind the others of its
 // plan, keeping the relative order of both sides — the user's routing
-// order still decides within the healthy ones.
+// order still decides within the healthy ones. A model whose score has
+// climbed back over the relative line waits for healthRebound answers in
+// a row before it is tried among the steady ones again
+// (settings.StabilityGuard).
 const (
 	// healthHalfLife is how long an observation takes to lose half its
 	// weight: what a model did an hour ago counts for less than now.
@@ -51,6 +54,11 @@ const (
 	// before it speaks: two or three calls are not a record, and the
 	// absolute rule already leaves a single blip in place.
 	healthEnough = 4.0
+	// healthRebound is how many answers in a row a model that failed
+	// since it last answered gives before the relative line lets it
+	// forward again: one answer used to, and a model failing every other
+	// call went forward to fail again and back (settings.StabilityGuard).
+	healthRebound = 3
 	// healthForget is how long an untouched score is kept.
 	healthForget = 24 * time.Hour
 )
@@ -61,6 +69,11 @@ type healthPoint struct {
 	wins float64
 	loss float64
 	at   time.Time
+	// run is how many answers in a row the model has given since its last
+	// intermittent failure: once its score is back over the relative line,
+	// the demotion waits for healthRebound of them before it puts the
+	// model back among the steady ones.
+	run int
 }
 
 // restIDIn carries the candidate a request is being served for, so a
@@ -231,8 +244,10 @@ func noteID(id string, ok bool) {
 	h := modelHealth.m[id].decayed(now)
 	if ok {
 		h.wins++
+		h.run++
 	} else {
 		h.loss++
+		h.run = 0
 	}
 	h.at = now
 	if len(modelHealth.m) > 4096 {
@@ -363,8 +378,11 @@ func scoreOf(h healthPoint) float64 {
 }
 
 // demoted says whether c is tried after its peers under m: below the
-// absolute line, or far enough below the plan's best one.
-func demoted(c candidate, m healthMark) bool {
+// absolute line, or far enough below the plan's best one. guard is the
+// user's settings.StabilityGuard: with it on, a model the relative line
+// puts behind stays there until it has answered healthRebound times in a
+// row, so one good answer doesn't send it forward to fail again.
+func demoted(c candidate, m healthMark, guard bool) bool {
 	if c.model == "" {
 		return false
 	}
@@ -385,7 +403,15 @@ func demoted(c candidate, m healthMark) bool {
 	if h.wins+h.loss < healthEnough {
 		return false
 	}
-	return s < m.best*healthShare
+	if s < m.best*healthShare {
+		return true
+	}
+	// the score is good enough again, but a model that has failed since it
+	// last answered is kept behind until it has answered healthRebound
+	// times in a row: one answer used to bring it forward to fail again
+	// (settings.StabilityGuard off is the order the line alone gives, as
+	// before). The absolute line above keeps its own pace, untouched.
+	return guard && h.run < healthRebound
 }
 
 // demoteUnstable moves the plans's unstable models behind the rest,
@@ -398,15 +424,17 @@ func demoteUnstable(cs []candidate, pl planned) ([]candidate, planned) {
 	if len(cs) < 2 || len(pl.order) != len(cs) {
 		return cs, pl
 	}
-	if settings.Load().NoHealthDemotion {
+	set := settings.Load()
+	if set.NoHealthDemotion {
 		return cs, pl // the user asked for routing's own order throughout
 	}
+	guard := set.StabilityGuardOn()
 	m := markOf(cs, time.Now())
 	rank := func(i int) int {
 		if pl.order[i].Rest != nil {
 			return 2
 		}
-		if demoted(cs[i], m) {
+		if demoted(cs[i], m, guard) {
 			return 1
 		}
 		return 0

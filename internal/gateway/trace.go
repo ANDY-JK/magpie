@@ -402,6 +402,10 @@ type Weighed struct {
 	// answering badly now and then; below 0.5 the order tries it after
 	// the steady ones
 	Health float64 `json:"health,omitempty"`
+	// Score: the routing's own score of it (routes.ScoreOf), 0–1, when
+	// its pool is routed by score: the value the order was made by,
+	// absent for any other routing
+	Score float64 `json:"score,omitempty"`
 }
 
 // Try is one candidate trying the request.
@@ -591,6 +595,11 @@ func weighed(c candidate, p provider.Provider, wg weighing, fallback bool, from 
 	// healthOf would
 	if h, ok := wg.health[c.restID()]; ok && h < 0.999 {
 		w.Health = h
+	}
+	// the score its pool was ordered by, when it is routed by score: the
+	// strategy's own calculation, absent for every other routing
+	if s, ok := wg.scores[c.restID()]; ok {
+		w.Score = s
 	}
 	if sinks(p.Sink, p.Routing) {
 		markSunk(&w, c)

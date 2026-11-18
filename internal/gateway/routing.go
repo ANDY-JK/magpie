@@ -2270,6 +2270,12 @@ type weighing struct {
 	// plan of many members would otherwise take the health lock once per
 	// row it builds. Absent when nothing has a record.
 	health map[string]float64
+
+	// scores is each candidate's score, by restID, when its pool is routed
+	// by score (routes.Score): the same calculation the strategy ordered
+	// by (routes.ScoreOf), kept for the trace's rows (Weighed.Score). Nil
+	// for any other routing.
+	scores map[string]float64
 }
 
 // seatPrice is a seat's price at the request's time, as Cheapest weighed
@@ -2474,6 +2480,14 @@ func weighRouted(p provider.Provider, cs []candidate, model string, from provide
 			wg.speed[c.restID()] = [2]float64{seats[i].TTFT, seats[i].TPS}
 		}
 	}
+	if st.ByHealth {
+		// one map lookup each: the scores the snapshot above read under one
+		// lock (healthSeats, health.go); a seat with no record stays 0, which
+		// the strategy reads as the prior
+		for i, c := range cs {
+			seats[i].Health = wg.health[c.restID()]
+		}
+	}
 	if st.ByPrice {
 		// priced as Usage would count a call made now: the hour decides
 		// a peak-billed vendor's price and a rate window's (provider.PriceAt)
@@ -2488,6 +2502,15 @@ func weighRouted(p provider.Provider, cs []candidate, model string, from provide
 			pr = pr.In(at)
 			seats[i].Priced, seats[i].Cost, seats[i].CacheCost = true, pr.Input+pr.Output, pr.CacheRead
 			wg.price[c.restID()] = seatPrice{in: pr.Input, out: pr.Output, cache: pr.CacheRead, peak: peak}
+		}
+	}
+	if p.Routing == provider.Score {
+		// the score the routing ordered them by, kept for the trace's
+		// rows: the same calculation the strategy used (routes.ScoreOf),
+		// never a second one
+		wg.scores = make(map[string]float64, len(cs))
+		for i, c := range cs {
+			wg.scores[c.restID()] = routes.ScoreOf(seats[i])
 		}
 	}
 	order := routes.Apply(st, p.ID, seats)

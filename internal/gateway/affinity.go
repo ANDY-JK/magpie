@@ -931,9 +931,9 @@ func withLead(key string, cs []candidate, pl planned) ([]candidate, planned) {
 // A group's members are different models, and its order is the user's
 // preference among them, so under Auto a new conversation takes routing's
 // first; Session or Strict spread over them, as the user asked. In order,
-// By weight, Free first, Speed first, Cheapest, Manual and a plugin's
-// routing pick for their own reasons, and keep their order; In turn
-// spreads on its own.
+// By weight, Free first, Speed first, Cheapest, By score, Manual and a
+// plugin's routing pick for their own reasons, and keep their order; In
+// turn spreads on its own.
 func spreadsNew(mode, routing string, group bool) bool {
 	switch mode {
 	case "":
