@@ -63,14 +63,30 @@ func TestAutoVisionDoesNotBuildListsAgain(t *testing.T) {
 	if many > few+50 {
 		t.Fatalf("AutoVision made %.0f allocations with 400 models, %.0f with 4: the lists are built again", many, few)
 	}
-	// and the searcher's pick, built the same way
+	// and the searcher's pick, built the same way: asked with 400 models it
+	// costs what it costs with 4 (the absolute count differs by platform —
+	// Windows' paths and stats — so the assertion is the difference)
 	p, err := provider.Find("eyes")
 	if err != nil {
 		t.Fatal(err)
 	}
+	searcherFew := func() float64 {
+		manyEyes(t, 4, false)
+		q, err := provider.Find("eyes")
+		if err != nil {
+			t.Fatal(err)
+		}
+		searcherModel(*q)
+		return testing.AllocsPerRun(20, func() { searcherModel(*q) })
+	}()
+	manyEyes(t, 400, false)
+	p, err = provider.Find("eyes")
+	if err != nil {
+		t.Fatal(err)
+	}
 	searcherModel(*p)
-	if a := testing.AllocsPerRun(20, func() { searcherModel(*p) }); a > 50 {
-		t.Fatalf("searcherModel made %.0f allocations with 400 models", a)
+	if a := testing.AllocsPerRun(20, func() { searcherModel(*p) }); a > searcherFew+50 {
+		t.Fatalf("searcherModel made %.0f allocations with 400 models, %.0f with 4: the lists are built again", a, searcherFew)
 	}
 }
 

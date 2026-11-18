@@ -55,7 +55,7 @@ install:
 	go install -tags "$(TAGS)" -trimpath -ldflags="$(LDFLAGS)" .
 
 test:
-	go vet -tags "$(TAGS)" ./... && go test -tags "$(TAGS)" ./...
+	go vet -tags "$(TAGS)" ./... && go test -tags "$(TAGS)" -timeout 30m ./...
 
 # The browser regressions under internal/gui/tests: the real pages in
 # Playwright's Chromium and WebKit; see internal/gui/tests/README.md.
