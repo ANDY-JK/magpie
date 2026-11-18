@@ -6243,6 +6243,28 @@ function healthBadge(p) {
 // Everything else lives in the editor, a dialog over the page.
 let keptEditing = null; // the editor opened on a kept row, filled in by the fresh one
 let providersBehind = false;
+// listChangeWords: the amber line a provider's row and editor show when the
+// vendor's list last changed and dropped models from it: up to five names
+// and how long ago. The title carries every name and the exact time, so a
+// truncated line is readable in full. Models added are not warned about:
+// they are served, and the amber is for what stopped being served unasked.
+const listChangeShown = 5;
+function droppedModels(c) { return (c?.removed || []).filter((x) => typeof x === "string" && x); }
+function listChangeWords(c) {
+  const names = droppedModels(c), shown = names.slice(0, listChangeShown);
+  return t("Last change to the vendor's list: dropped {models} · {when}", { models: shown.join(", ") + (shown.length < names.length ? " …" : ""), when: ago(c.at) });
+}
+function listChangeTitle(c) {
+  const at = c?.at ? new Date(c.at).toLocaleString(intlLang()) : "";
+  return t("Last change to the vendor's list: dropped {models} · {when}", { models: droppedModels(c).join(", "), when: ago(c.at) + (at ? ` (${at})` : "") });
+}
+function listChangeLine(c, cls) {
+  if (!droppedModels(c).length) return null;
+  const line = el("div", cls);
+  line.append(el("span", "", listChangeWords(c)));
+  line.title = listChangeTitle(c);
+  return line;
+}
 function renderProviders(quiet) {
   if (accountArranging || providerArranging) { accountRenderPending = true; return; }
   providersBehind = false;
@@ -6303,6 +6325,8 @@ function renderProviders(quiet) {
     const inUse = (p.account?.logins || []).filter((l) => l.on || l.active);
     const lapsed = inUse.length > 0 && inUse.every((l) => l.lapsed);
     who.append(name, el("div", "sub", (p.account ? t(lapsed ? "{user} is signed out" : "signed in as {user}", { user: p.account.user }) : p.host) + " · " + models));
+    const listChange = listChangeLine(p.listChange, "sub list-change");
+    if (listChange) who.append(listChange);
     const using = p.agents.filter((a) => a.current);
     const uses = el("div", "uses");
     for (const a of using) {
@@ -7842,13 +7866,16 @@ function concurrencyField(p) {
   // requests a minute (coeo91: OpenRouter's free models take 20)
   const rpm = input(draft.maxRPM ?? "", t("No limit"), "number");
   rpm.classList.add("rpm");
+  // requests a day, all keys and accounts together (the provider's DayCalls)
+  const day = input(draft.dayCalls ?? "", t("No limit"), "number");
+  day.classList.add("day-calls");
   // the rest wait in reserve (01huadalang: ZCode bans 3 per IP)
   const accounts = input(draft.maxAccounts ?? "", p?.pluginAccounts ? t("{n}, as its plugin says", { n: p.pluginAccounts }) : t("No limit"), "number");
   accounts.classList.add("max-accounts");
   // how long a slow vendor is given to begin answering (F-02), minutes
   const headerWait = input(draft.headerWait ?? "", t("10, as magpie gives it"), "number");
   headerWait.classList.add("header-wait");
-  for (const [b, max, k] of [[box, 1000, "concurrency"], [queue, 10000, "queueLimit"], [wait, 3600, "queueWait"], [rpm, 10000, "maxRPM"], [accounts, 1000, "maxAccounts"], [headerWait, 1440, "headerWait"]]) {
+  for (const [b, max, k] of [[box, 1000, "concurrency"], [queue, 10000, "queueLimit"], [wait, 3600, "queueWait"], [rpm, 10000, "maxRPM"], [day, 100000, "dayCalls"], [accounts, 1000, "maxAccounts"], [headerWait, 1440, "headerWait"]]) {
     b.min = "0";
     b.max = String(max);
     b.step = "1";
@@ -7860,6 +7887,7 @@ function concurrencyField(p) {
     ...field(t("Concurrency"), box, (plugin ? t("Over it, requests queue and go out in order; empty takes the plugin's {n}, 0 is no limit", { n: plugin }) : t("Over it, requests queue and go out in order; 0 or empty is no limit"))),
     ...field(t("Accounts at once"), accounts, t("How many of its accounts or keys take requests at once, the first in the list; the next takes over when one runs out or fails. 0 is no limit")),
     ...field(t("Requests per minute"), rpm, t("How many requests each key or account sends in any minute, retries included; one more waits for room, up to 2 minutes. 0 or empty is no limit")),
+    ...field(t("Daily calls"), day, t("How many requests the provider as a whole may take in one day, on this computer's clock; one more is turned away until the next midnight. 0 or empty is no limit")),
     ...field(t("Queue size"), queue, t("How many requests may wait for each key or account; one more is turned away at once. 0 or empty is no bound")),
     ...field(t("Queue wait"), wait, t("Seconds a request waits for a free slot before it is turned away. 0 or empty waits as long as it takes")),
     ...field(t("First byte wait"), headerWait, t("Minutes a vendor is given to begin answering, before the request is given up on; empty is 10")),
@@ -8018,7 +8046,7 @@ document.addEventListener("click", (e) => {
 function advancedSet(d, p) {
   return (d.headers || []).some(([k]) => (k || "").trim()) || !!(d.extraBody || "").trim() || !!(d.replyHeaders || "").trim() ||
     !!d.proxyMode || Object.values(d.accountProxies || {}).some((x) => x?.mode) ||
-    [d.concurrency, d.maxAccounts, d.queueLimit, d.queueWait, d.maxRPM, d.headerWait, d.priceRate, d.contexts, d.outputs, d.compacts].some((v) => String(v ?? "").trim()) ||
+    [d.concurrency, d.maxAccounts, d.queueLimit, d.queueWait, d.maxRPM, d.dayCalls, d.headerWait, d.priceRate, d.contexts, d.outputs, d.compacts].some((v) => String(v ?? "").trim()) ||
     !!d.rateWindows?.length ||
     !!(d.searches || d.authHeader || d.passUserAgent || d.unredacted || d.countFree || d.pinUpstream || d.nativeCompaction || d.balanceToken || d.limitRestOff) ||
     !!d.fallback?.length || !!p?.balanceToken?.set;
@@ -8031,12 +8059,13 @@ function concurrencyDraft(p) {
   return { concurrency: p?.maxConcurrency == null ? "" : String(p.maxConcurrency), priceRate: p?.priceRate ? String(p.priceRate) : "",
     queueLimit: p?.queueLimit ? String(p.queueLimit) : "", queueWait: p?.queueWait ? String(p.queueWait) : "",
     maxRPM: p?.maxRPM ? String(p.maxRPM) : "", maxAccounts: p?.maxAccounts == null ? "" : String(p.maxAccounts),
+    dayCalls: p?.dayCalls ? String(p.dayCalls) : "",
     headerWait: p?.headerWait == null ? "" : String(p.headerWait) };
 }
-// queueOfDraft: { queueLimit, queueWait, maxRPM } as saved, 0 for none, or { bad }
+// queueOfDraft: { queueLimit, queueWait, maxRPM, dayCalls } as saved, 0 for none, or { bad }
 function queueOfDraft() {
   const out = {};
-  for (const [k, max] of [["queueLimit", 10000], ["queueWait", 3600], ["maxRPM", 10000]]) {
+  for (const [k, max] of [["queueLimit", 10000], ["queueWait", 3600], ["maxRPM", 10000], ["dayCalls", 100000]]) {
     const v = String(draft[k] ?? "").trim();
     if (!v) { out[k] = 0; continue; }
     if (!/^\d+$/.test(v) || +v > max) return { bad: k };
@@ -8048,6 +8077,10 @@ function queueError(ed, bad) {
   if (bad === "maxRPM") {
     shown(ed.querySelector("input.rpm"))?.focus(NO_SCROLL);
     return editorError(t("Requests per minute: a whole number from 0 to 10000"), "warn");
+  }
+  if (bad === "dayCalls") {
+    shown(ed.querySelector("input.day-calls"))?.focus(NO_SCROLL);
+    return editorError(t("Daily calls: a whole number from 0 to 100000"), "warn");
   }
   shown(ed.querySelector(bad === "queueLimit" ? "input.queue-limit" : "input.queue-wait"))?.focus(NO_SCROLL);
   return editorError(bad === "queueLimit" ? t("Queue size: a whole number from 0 to 10000") : t("Queue wait: a whole number of seconds from 0 to 3600"), "warn");
@@ -9318,6 +9351,10 @@ function drawEditor(p, presetID) {
     if (p) h.append(providerSwitch(p));
     ed.append(h);
     if (p?.off) ed.append(el("div", "hint off-note", t("Switched off: agents aren't given its models and no request goes to it. Its keys and settings are kept; switch it on to use it again.")));
+    // the models the vendor's list last dropped, in its own line: the
+    // refresh's status line says only how many it has now
+    const listChange = listChangeLine(p?.listChange, "hint model-hint warn list-change");
+    if (listChange) ed.append(listChange);
   }
 
   // The editor's fields, in three groups a tab can show alone (the owner,
@@ -12224,8 +12261,7 @@ function renderModels(p) {
   // a tiny request to each model agents see (a vendor that answers can have one that doesn't),
   // with the first ticked key that serves it (keySeeing, water5433)
   const byKey = p.keyList?.filter((k) => k.on)[1] ? "\n" + t("Each model is tested with the first ticked key that can serve it") : "";
-  const testAll = testButton(p, t("Test models"), t("Send a tiny request to each model agents see, to find the ones that don't answer") + "
-" + t("Each one is a real, billable call on a metered provider: the smallest this model takes") + byKey + "\n" + t("Right-click a model to test just it"), async () => {
+  const testAll = testButton(p, t("Test models"), t("Send a tiny request to each model agents see, to find the ones that don't answer") + "\n" + t("Each one is a real, billable call on a metered provider: the smallest this model takes") + byKey + "\n" + t("Right-click a model to test just it"), async () => {
     const ids = servedIds(p).filter((id) => p.decideTest || !decidesModel(p, id));
     if (!ids.length) { status(t("Pick a model first."), "err"); return; }
     // merge, not reset: the caps letters a Test capabilities run earned
@@ -21850,9 +21886,9 @@ function renderAlerts(s, keep) {
   const turnOpts = [["0", t("Off")], ...mins.map((m) => [String(m * 60), t("{n} min", { n: m })])];
   if (d && !mins.some((m) => m * 60 === d)) turnOpts.push([String(d), d % 60 ? t("{n} s", { n: d }) : t("{n} min", { n: d / 60 })]);
   $("#turnDoneSegs").replaceChildren(segs(turnOpts, String(d), (v) => savePrefs({ ...keep, turnDoneAlert: Number(v) })));
-  // every channel of a model resting (the review's D-01, 11-16): Off, or
+  // no channel of a model can answer (the review's D-01, 11-16): Off, or
   // on — a notification on the way into the outage, at most one a minute
-  sub("#allDownAlertSub", t("A notification when every key or account of a model rests after a failure, so none can answer: on the way into the outage, at most one a minute while it holds"));
+  sub("#allDownAlertSub", t("A notification when no channel of a model can answer (every key or account resting, or the proxy or network down): on the way into the outage, at most one a minute while it holds"));
   $("#allDownAlertSegs").replaceChildren(segs([["off", t("Off")], ["on", t("On")]], s.allDownAlert ? "on" : "off",
     (v) => savePrefs({ ...keep, allDownAlert: v === "on" })));
 }

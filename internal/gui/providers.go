@@ -301,6 +301,9 @@ type providerJSON struct {
 	// how many requests each key or account sends the vendor in any
 	// minute, 0 for no limit (coeo91 on Discord)
 	MaxRPM int `json:"maxRPM,omitempty"`
+	// how many requests the provider as a whole may take in one calendar
+	// day on this computer's clock, 0 for no limit (provider.DayCalls)
+	DayCalls int `json:"dayCalls,omitempty"`
 	// RateWindows are the time-of-day windows it bills at its own rate
 	// (#2463), as the editor opens on them
 	RateWindows []provider.RateWindow `json:"rateWindows,omitempty"`
@@ -338,6 +341,12 @@ type providerJSON struct {
 	Outputs  map[string]int                `json:"outputs,omitempty"`  // the reply limits the user set (provider.OutputsOf)
 	Compacts map[string]int                `json:"compacts,omitempty"` // where Codex and Claude Code compact on its models (provider.CompactsOf)
 	Fetched  *time.Time                    `json:"fetched,omitempty"`  // when the list came from the vendor; the page says how long ago in its language
+	// ListChange is the vendor's list as the last fetch that changed it
+	// left it: the ids it gained and those it stopped listing, and when
+	// (provider.ModelChange). Left out when no fetch changed the list
+	// since magpie kept one; the row and the editor say the models gone
+	// from it in amber.
+	ListChange *provider.ModelChange `json:"listChange,omitempty"`
 	// ListError is why a plugin's account has only the plugin's defaults
 	// (provider.ListError): the editor says so under its models
 	ListError string             `json:"listError,omitempty"`
@@ -731,7 +740,7 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 		Fallback: p.Fallback, Routing: p.Routing, Sink: p.Sink, Affinity: p.Affinity, KeepLogin: p.KeepLogin, KeepLoginAs: p.KeepLoginAs, SwitchOnly: p.SwitchOnly, CapStop: p.CapStop, CapCareful: p.CapCareful, Unlisted: p.Unlisted, NoModels: p.ServesNone(), BestInFamily: p.BestInFamily && len(p.Models) == 0 && !p.NoModels, Off: p.Off, Contexts: p.Contexts, Caps: p.Caps,
 		MaxConcurrency: p.MaxConcurrency, PluginConcurrency: p.PluginConcurrency(), MaxAccounts: p.MaxAccounts, PluginAccounts: p.PluginAtOnce(), HeaderWait: p.HeaderWait, PriceRate: p.PriceRate,
 		RateWindows: p.RateWindows, RateNow: rateNowOf(p, time.Now()),
-		AccountConcurrency: p.AccountConcurrency, AccountWeights: p.AccountWeights, QueueLimit: p.QueueLimit, QueueWait: p.QueueWait, MaxRPM: p.MaxRPM,
+		AccountConcurrency: p.AccountConcurrency, AccountWeights: p.AccountWeights, QueueLimit: p.QueueLimit, QueueWait: p.QueueWait, MaxRPM: p.MaxRPM, DayCalls: p.DayCalls,
 		Outputs: provider.OutputsOf(p.ID), Compacts: provider.CompactsOf(p.ID),
 	}
 	if p.Account != nil {
@@ -1053,6 +1062,10 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 	}
 	if t, ok := p.Listed(); ok {
 		out.Fetched = &t
+	}
+	if p.ListChange != nil {
+		c := *p.ListChange
+		out.ListChange = &c
 	}
 	out.ListError = p.ListError()
 	for _, a := range agents {
@@ -1540,6 +1553,10 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 			// vendor in any minute: a number, 0 or null for no limit; a
 			// save that leaves it out keeps it
 			MaxRPM json.RawMessage `json:"maxRPM"`
+			// DayCalls is how many requests the provider as a whole may
+			// take in one calendar day: a number, 0 or null for no limit; a
+			// save that leaves it out keeps it
+			DayCalls json.RawMessage `json:"dayCalls"`
 			// Limit, for accountconcurrency: the account's or key's own
 			// limit, 0 for none, null for the provider's (#892)
 			Limit *int `json:"limit"`
@@ -1866,6 +1883,16 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 				return
 			}
 			in.MaxRPM = rpm
+			dc, keepDC, err := queueOf(req.DayCalls, "daily calls")
+			if err != nil {
+				fail(rw, err)
+				return
+			}
+			if err := provider.CheckDayCalls(dc); err != nil {
+				fail(rw, err)
+				return
+			}
+			in.DayCalls = dc
 			rate, keepRate, err := priceRateOf(req.PriceRate)
 			if err != nil {
 				fail(rw, err)
@@ -1968,6 +1995,9 @@ func providerRoutes(mux *http.ServeMux, w Windows) {
 				}
 				if keepRPM && old != nil {
 					in.MaxRPM = old.MaxRPM
+				}
+				if keepDC && old != nil {
+					in.DayCalls = old.DayCalls
 				}
 				if keepRate && old != nil {
 					in.PriceRate = old.PriceRate

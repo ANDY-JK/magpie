@@ -1172,7 +1172,7 @@ I18N.de = Object.assign(I18N.de || {}, {
     "{n} h before": "{n} Std. vorher",
     "Task done alert": "Benachrichtigung bei fertiger Aufgabe",
     "All-down alert": "Benachrichtigung bei allen Kanälen gestoppt",
-    "A notification when every key or account of a model rests after a failure, so none can answer: on the way into the outage, at most one a minute while it holds": "Eine Benachrichtigung, wenn jeder Schlüssel und jedes Konto eines Modells nach einer Störung ruht und keiner antworten kann: einmal zu Beginn der Störung, während sie hält höchstens eine pro Minute",
+    "A notification when no channel of a model can answer (every key or account resting, or the proxy or network down): on the way into the outage, at most one a minute while it holds": "Eine Benachrichtigung, wenn kein Kanal eines Modells antworten kann (alle Schlüssel und Konten ruhen oder Proxy/Netzwerk ist nicht erreichbar): einmal zu Beginn der Störung, während sie hält höchstens eine pro Minute",
     "Masking alert": "Benachrichtigung beim Maskieren",
     "A notification when masking swaps a value for the first time: its kind and how many, never the value itself": "Eine Benachrichtigung, wenn ein Wert zum ersten Mal maskiert wird: Art und Anzahl, nie der Wert selbst",
     "A notification when Claude Code, Codex, OpenCode or another agent going through magpie finishes a task that ran at least this long": "Eine Benachrichtigung, wenn Claude Code, Codex, OpenCode oder ein anderer Agent über magpie eine Aufgabe beendet, die mindestens so lange lief",
@@ -2419,6 +2419,9 @@ I18N.de = Object.assign(I18N.de || {}, {
     "Requests per minute": "Anfragen pro Minute",
     "How many requests each key or account sends in any minute, retries included; one more waits for room, up to 2 minutes. 0 or empty is no limit": "Wie viele Anfragen jeder Schlüssel oder jedes Konto in einer beliebigen Minute sendet, Wiederholungen eingeschlossen; eine weitere wartet bis zu 2 Minuten auf Platz. 0 oder leer heißt kein Limit",
     "Requests per minute: a whole number from 0 to 10000": "Anfragen pro Minute: eine ganze Zahl von 0 bis 10000",
+    "Daily calls": "Aufrufe pro Tag",
+    "How many requests the provider as a whole may take in one day, on this computer's clock; one more is turned away until the next midnight. 0 or empty is no limit": "Wie viele Anfragen der Anbieter insgesamt (alle Schlüssel und Konten zusammen) an einem Kalendertag nach der Uhr dieses Computers annehmen darf; eine weitere wird bis zum nächsten Mitternacht abgewiesen. 0 oder leer heißt kein Limit",
+    "Daily calls: a whole number from 0 to 100000": "Aufrufe pro Tag: eine ganze Zahl von 0 bis 100000",
     "{n}/{max} running · {q} queued": "{n}/{max} laufen · {q} warten",
     "{n}/{max} running": "{n}/{max} laufen",
     "{n} running": "{n} laufen",
@@ -4598,5 +4601,7 @@ I18N.de = Object.assign(I18N.de || {}, {
     "A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply — on Anthropic's API and on Chat upstreams that take a prefill (DeepSeek, Kimi, most relays), not on OpenAI's own API, Responses or Gemini; off ends it as before, its stop saying it was cut": "Wird eine Antwort vom Anbieter an dessen Ausgabelimit abgeschnitten, geht sie von dem weiter, was sie schon gesagt hat, höchstens zwei weitere Abschnitte, die wieder zu der ganzen Antwort zusammengefügt werden — auf Anthropics API und auf Chat-Upstreams, die ein Prefill annehmen (DeepSeek, Kimi, die meisten Relays), nicht auf OpenAIs eigener API, Responses oder Gemini; aus endet sie wie bisher, ihr Stoppsignal sagt es",
     "Extra body fields of {id}'s own, over the provider's Extra body: a field both give goes out as the model's says it, \"!name\" replacing one the request has; ${sessionId} is the conversation's id. Empty: none of its own": "Extra-Body-Felder des Modells selbst, über dem Extra Body des Anbieters: ein Feld, das beide nennen, geht so heraus, wie das Modell es sagt; \"!name\" ersetzt ein Feld, das der Request schon hat. ${sessionId} ist die ID der Unterhaltung. Leer: keines des Modells",
     "Extra body of {id}: {why}": "Extra Body von {id}: {why}",
+    "Last change to the vendor's list: dropped {models} · {when}": "Letzte Änderung der Anbieterliste: entfernt {models} · {when}",
+    "Member {member} is no longer in the list": "Mitglied {member} ist nicht mehr in der Liste",
 });
 localeWordsHere.add("de");

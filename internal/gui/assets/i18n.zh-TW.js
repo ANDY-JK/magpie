@@ -1185,7 +1185,7 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "{n} h before": "提前 {n} 小時",
     "Task done alert": "任務完成提醒",
     "All-down alert": "渠道全停提醒",
-    "A notification when every key or account of a model rests after a failure, so none can answer: on the way into the outage, at most one a minute while it holds": "某個模型的每個金鑰或帳號故障後都在休眠、暫無渠道可應答時通知：故障開始時一次，持續期間每分鐘至多一次",
+    "A notification when no channel of a model can answer (every key or account resting, or the proxy or network down): on the way into the outage, at most one a minute while it holds": "某個模型暫無渠道可應答（每個金鑰或帳號都在休眠，或代理／網路不可用）時通知：故障開始時一次，持續期間每分鐘至多一次",
     "Masking alert": "脫敏提醒",
     "A notification when masking swaps a value for the first time: its kind and how many, never the value itself": "首次脫敏某個值時通知：只說類型和個數，從不顯示值本身",
     "A notification when Claude Code, Codex, OpenCode or another agent going through magpie finishes a task that ran at least this long": "Claude Code、Codex、OpenCode 等經由 magpie 的智慧體完成一個至少跑了這麼久的任務時通知",
@@ -2428,6 +2428,9 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "Requests per minute": "每分鐘請求數",
     "How many requests each key or account sends in any minute, retries included; one more waits for room, up to 2 minutes. 0 or empty is no limit": "每個金鑰或帳號在任意一分鐘內最多發出的請求數，重試也計入；超出的請求等待空位，最多等 2 分鐘。0 或留空為不限制",
     "Requests per minute: a whole number from 0 to 10000": "每分鐘請求數：0 到 10000 的整數",
+    "Daily calls": "每日呼叫上限",
+    "How many requests the provider as a whole may take in one day, on this computer's clock; one more is turned away until the next midnight. 0 or empty is no limit": "這個渠道每天最多可以接多少次請求（依本機時鐘的自然日，所有金鑰和帳號合計）；超出的請求會被拒絕，直到次日 00:00。0 或留空為不限制",
+    "Daily calls: a whole number from 0 to 100000": "每日呼叫上限：0 到 100000 的整數",
     "{n}/{max} running · {q} queued": "{n}/{max} 執行中 · {q} 排隊",
     "{n}/{max} running": "{n}/{max} 執行中",
     "{n} running": "{n} 執行中",
@@ -4596,5 +4599,7 @@ I18N["zh-TW"] = Object.assign(I18N["zh-TW"] || {}, {
     "A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply — on Anthropic's API and on Chat upstreams that take a prefill (DeepSeek, Kimi, most relays), not on OpenAI's own API, Responses or Gemini; off ends it as before, its stop saying it was cut": "回覆被廠商在輸出上限掐斷時，接著已說的內容再續寫最多兩段、拼回完整回覆——只在 Anthropic 的介面與接受 prefill 的 Chat 上游（DeepSeek、Kimi、多數中轉）上如此，OpenAI 官方介面、Responses、Gemini 不續寫；關閉則照現狀收尾，停止原因會說明回覆被掐斷",
     "Extra body fields of {id}'s own, over the provider's Extra body: a field both give goes out as the model's says it, \"!name\" replacing one the request has; ${sessionId} is the conversation's id. Empty: none of its own": "模型自己的額外請求體欄位，疊在供應商的額外請求體之上：兩邊都寫的欄位按模型這邊發送，\"!name\" 則取代請求裡已有的；${sessionId} 是對話的 ID。留空即模型自己不設定",
     "Extra body of {id}: {why}": "{id} 的額外請求體：{why}",
+    "Last change to the vendor's list: dropped {models} · {when}": "供應商列表最近一次變更下線：{models} · {when}",
+    "Member {member} is no longer in the list": "成員 {member} 已不在列表",
 });
 localeWordsHere.add("zh-TW");

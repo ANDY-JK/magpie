@@ -37,3 +37,25 @@ func TestPluginRoutingKept(t *testing.T) {
 		}
 	}
 }
+
+// Score is magpie's own routing, so a provider or a group saved with it
+// keeps it: without keptRouting's case a save would read it as an unknown
+// routing and clear it, and the user's pick would be gone.
+func TestScoreRoutingKept(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	if err := Save(Provider{ID: "a", Name: "A", Chat: "http://127.0.0.1:1/v1", Key: "k", Routing: Score}); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := Find("a"); err != nil || p.Routing != Score {
+		t.Fatalf("provider routed score: kept %q, want %q (%v)", p.Routing, Score, err)
+	}
+	if err := SaveGroup(Group{ID: "g", Name: "g", Members: []string{"a/m1", "a/m2"}, Routing: Score}); err != nil {
+		t.Fatal(err)
+	}
+	if g, _, ok := FindGroup(GroupPrefix + "g"); !ok || g.Routing != Score {
+		t.Fatalf("group routed score: kept %+v, %v", g, ok)
+	}
+}

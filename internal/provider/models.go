@@ -297,7 +297,8 @@ func (p Provider) refetch(ctx context.Context) ([]catalog.Model, []string, map[s
 		if err != nil {
 			return ms, nil, nil, err
 		}
-		return ms, dropGonePluginPicks(before, plugin.Cached())[p.ID], nil, nil
+		now := plugin.Cached()
+		return ms, dropGonePluginPicks(before, now)[p.ID], nil, nil
 	}
 	if p.Account != nil || p.DecideOnly() {
 		ms, err := p.fetch(ctx)
@@ -331,7 +332,72 @@ func (p Provider) refetch(ctx context.Context) ([]catalog.Model, []string, map[s
 	if derr != nil {
 		log.Println(p.ID + ": " + derr.Error())
 	}
+	// the list it gained and lost, kept with the provider: the row and the
+	// editor say a model gone from the vendor's list, not only the log
+	recordListChange(p.ID, before, now)
 	return ms, dropped, before, nil
+}
+
+// ModelChange is a provider's vendor list as the last fetch that changed it
+// left it: the ids the list gained and those it stopped listing, and when.
+// A fetch that changes nothing leaves the last one as it is; nil says no
+// fetch has changed the list since magpie kept one. It is saved with the
+// provider, so the row and the editor still say it after a restart.
+type ModelChange struct {
+	Added   []string  `json:"added,omitempty"`
+	Removed []string  `json:"removed,omitempty"`
+	At      time.Time `json:"at"`
+}
+
+// ListChanges is the provider's last list change, as its row and editor say
+// it: one change, or none when no fetch has changed its list since magpie
+// kept one. It reads the saved providers.json, not the vendor.
+func ListChanges(providerID string) []ModelChange {
+	for _, p := range load().Providers {
+		if p.ID != providerID || p.ListChange == nil {
+			continue
+		}
+		c := *p.ListChange
+		c.Added, c.Removed = slices.Clone(c.Added), slices.Clone(c.Removed)
+		return []ModelChange{c}
+	}
+	return nil
+}
+
+// recordListChange saves the change a fetch made to the provider's vendor
+// list: the ids before had and now doesn't (removed) and those now has and
+// before didn't (added). Both lists must be known — a first fetch has no
+// earlier one to compare, and a failed or empty answer is unknown, not "all
+// gone" — and a fetch that changed nothing writes nothing. Sorted, so the
+// page says them in the same order each time.
+func recordListChange(id string, before, now map[string]bool) {
+	var added, removed []string
+	for m := range now {
+		if !before[m] {
+			added = append(added, m)
+		}
+	}
+	for m := range before {
+		if !now[m] {
+			removed = append(removed, m)
+		}
+	}
+	if len(added) == 0 && len(removed) == 0 {
+		return
+	}
+	slices.Sort(added)
+	slices.Sort(removed)
+	at := time.Now()
+	if err := mutate(func(f *file) (bool, error) {
+		i := slices.IndexFunc(f.Providers, func(q Provider) bool { return q.ID == id })
+		if i < 0 {
+			return false, nil
+		}
+		f.Providers[i].ListChange = &ModelChange{Added: added, Removed: removed, At: at}
+		return true, nil
+	}); err != nil {
+		log.Println(id + ": " + err.Error())
+	}
 }
 
 // liveIDs are the ids of every model in the provider's fetched list.

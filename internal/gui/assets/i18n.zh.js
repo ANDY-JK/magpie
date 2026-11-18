@@ -1184,7 +1184,7 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "{n} h before": "提前 {n} 小时",
     "Task done alert": "任务完成提醒",
     "All-down alert": "渠道全停提醒",
-    "A notification when every key or account of a model rests after a failure, so none can answer: on the way into the outage, at most one a minute while it holds": "某个模型的每个密钥或账号故障后都在休眠、暂无渠道可应答时通知：故障开始时一次，持续期间每分钟至多一次",
+    "A notification when no channel of a model can answer (every key or account resting, or the proxy or network down): on the way into the outage, at most one a minute while it holds": "某个模型暂无渠道可应答（每个密钥或账号都在休眠，或代理/网络不可用）时通知：故障开始时一次，持续期间每分钟至多一次",
     "Masking alert": "脱敏提醒",
     "A notification when masking swaps a value for the first time: its kind and how many, never the value itself": "首次脱敏某个值时通知：只说类型和个数，从不显示值本身",
     "A notification when Claude Code, Codex, OpenCode or another agent going through magpie finishes a task that ran at least this long": "Claude Code、Codex、OpenCode 等经由 magpie 的智能体完成一个至少跑了这么久的任务时通知",
@@ -2440,6 +2440,9 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "Requests per minute": "每分钟请求数",
     "How many requests each key or account sends in any minute, retries included; one more waits for room, up to 2 minutes. 0 or empty is no limit": "每个密钥或账号在任意一分钟内最多发出的请求数，重试也计入；超出的请求等待空位，最多等 2 分钟。0 或留空为不限制",
     "Requests per minute: a whole number from 0 to 10000": "每分钟请求数：0 到 10000 的整数",
+    "Daily calls": "每日调用上限",
+    "How many requests the provider as a whole may take in one day, on this computer's clock; one more is turned away until the next midnight. 0 or empty is no limit": "这个渠道每天最多可以接多少次请求（按本机时钟的自然日，所有密钥和账号合计）；超出的请求会被拒绝，直到次日 00:00。0 或留空为不限制",
+    "Daily calls: a whole number from 0 to 100000": "每日调用上限：0 到 100000 的整数",
     "{n}/{max} running · {q} queued": "{n}/{max} 运行中 · {q} 排队",
     "{n}/{max} running": "{n}/{max} 运行中",
     "{n} running": "{n} 运行中",
@@ -4611,5 +4614,7 @@ I18N.zh = Object.assign(I18N.zh || {}, {
     "A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply — on Anthropic's API and on Chat upstreams that take a prefill (DeepSeek, Kimi, most relays), not on OpenAI's own API, Responses or Gemini; off ends it as before, its stop saying it was cut": "回复被厂商在输出上限掐断时，接着已说的内容再续写最多两段、拼回完整回复——只在 Anthropic 的接口与接受 prefill 的 Chat 上游（DeepSeek、Kimi、多数中转）上如此，OpenAI 官方接口、Responses、Gemini 不续写；关闭则照现状收尾，停止原因会说明回复被掐断",
     "Extra body fields of {id}'s own, over the provider's Extra body: a field both give goes out as the model's says it, \"!name\" replacing one the request has; ${sessionId} is the conversation's id. Empty: none of its own": "模型自己的额外请求体字段，叠加在供应商的额外请求体之上：两边都写的字段按模型这边发送，\"!name\" 则替换请求里已有的；${sessionId} 是会话的 ID。留空即模型自己不设",
     "Extra body of {id}: {why}": "{id} 的额外请求体：{why}",
+    "Last change to the vendor's list: dropped {models} · {when}": "供应商列表最近一次变更下线：{models} · {when}",
+    "Member {member} is no longer in the list": "成员 {member} 已不在列表",
 });
 localeWordsHere.add("zh");

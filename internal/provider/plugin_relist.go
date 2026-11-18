@@ -108,6 +108,12 @@ func dropGonePluginPicks(before, now []plugin.Provider) map[string][]string {
 		if err != nil {
 			log.Println(id + ": " + err.Error())
 		}
+		// the list it gained and lost, kept with the provider as one of the
+		// user's own is (recordListChange); a provider the plugin lists for
+		// the first time has no earlier list, so no change
+		if was[id] != nil {
+			recordListChange(id, was[id], n)
+		}
 		if len(dropped) > 0 {
 			out[id] = dropped
 		}

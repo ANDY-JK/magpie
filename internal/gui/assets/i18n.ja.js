@@ -1162,7 +1162,7 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "{n} h before": "{n} 時間前",
     "Task done alert": "タスク完了通知",
     "All-down alert": "全チャネル停止通知",
-    "A notification when every key or account of a model rests after a failure, so none can answer: on the way into the outage, at most one a minute while it holds": "モデルの全キー・アカウントが失敗後の休止中で応答できないときに通知：停止の始まりで一度、停止中は最大1分間に1度",
+    "A notification when no channel of a model can answer (every key or account resting, or the proxy or network down): on the way into the outage, at most one a minute while it holds": "モデルに応答できるチャネルがないとき（全キー・アカウントが休止中、またはプロキシ／ネットワークが利用不可）に通知：停止の始まりで一度、停止中は最大1分間に1度",
     "Masking alert": "マスク通知",
     "A notification when masking swaps a value for the first time: its kind and how many, never the value itself": "値を初めてマスクしたときに通知：種類と件数だけで、値そのものは表示しません",
     "A notification when Claude Code, Codex, OpenCode or another agent going through magpie finishes a task that ran at least this long": "Claude Code、Codex、OpenCode など magpie を通るエージェントが、少なくともこの時間かかったタスクを終えたときに通知",
@@ -2409,6 +2409,9 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "Requests per minute": "1 分間のリクエスト数",
     "How many requests each key or account sends in any minute, retries included; one more waits for room, up to 2 minutes. 0 or empty is no limit": "各キーまたはアカウントが任意の 1 分間に送るリクエストの上限（リトライも含む）。超えたものは空きを最大 2 分待ちます。0 または空欄で上限なし",
     "Requests per minute: a whole number from 0 to 10000": "1 分間のリクエスト数：0〜10000 の整数",
+    "Daily calls": "1 日の呼び出し上限",
+    "How many requests the provider as a whole may take in one day, on this computer's clock; one more is turned away until the next midnight. 0 or empty is no limit": "このプロバイダー全体（すべてのキーとアカウントの合計）が 1 日に受けられるリクエスト数（このコンピューターの時計の暦日）。超えた分は翌日 0:00 まで拒否されます。0 または空欄は無制限",
+    "Daily calls: a whole number from 0 to 100000": "1 日の呼び出し上限：0〜100000 の整数",
     "{n}/{max} running · {q} queued": "{n}/{max} 実行中 · {q} 待ち",
     "{n}/{max} running": "{n}/{max} 実行中",
     "{n} running": "{n} 実行中",
@@ -4598,5 +4601,7 @@ I18N.ja = Object.assign(I18N.ja || {}, {
     "A reply the vendor stopped at its output limit is asked to go on from what it has said, at most two more segments joined back into the whole reply — on Anthropic's API and on Chat upstreams that take a prefill (DeepSeek, Kimi, most relays), not on OpenAI's own API, Responses or Gemini; off ends it as before, its stop saying it was cut": "ベンダーが出力上限で打ち切った返答は、それまでに述べた内容から最大 2 区間だけ続けて書き、1 つの返答に戻します。これができるのは Anthropic の API と prefill を受け付ける Chat 上流（DeepSeek、Kimi、多くの中継）だけです。OpenAI 公式 API、Responses、Gemini では続けません。オフでは従来どおり、停止理由が打ち切りを告げます",
     "Extra body fields of {id}'s own, over the provider's Extra body: a field both give goes out as the model's says it, \"!name\" replacing one the request has; ${sessionId} is the conversation's id. Empty: none of its own": "モデル固有の追加ボディのフィールドで、プロバイダーの追加ボディに重ねて送ります。両方に書かれたフィールドはモデル側のとおりが送られ、\"!name\" はリクエストにすでにある値を置き換えます。${sessionId} は会話の ID。空欄ならモデル固有の設定はなし",
     "Extra body of {id}: {why}": "{id} の追加ボディ: {why}",
+    "Last change to the vendor's list: dropped {models} · {when}": "ベンダーの一覧の最新の変更で外れたモデル: {models} · {when}",
+    "Member {member} is no longer in the list": "メンバー {member} は一覧にありません",
 });
 localeWordsHere.add("ja");
