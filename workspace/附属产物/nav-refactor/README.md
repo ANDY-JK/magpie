@@ -95,6 +95,7 @@
 - `all-pages.html`：用这些组件拼出的 32 个视图（11 个页面 + 24 个页内视图）
 - `overlays.html`：30 个弹窗/浮层 + 全界面清单
 - `AUDIT.md`：检查与遗漏清单 + 布局方案 A–E
+- `COMPARE.md`：与现行版逐个对照（30 个界面，外观/行为/状态）
 - `framework-layers.html`：四层导航框架图（外壳定义）
 - `grouping-options.html`：导航分组方案
 - `layout-detail.html`：真实页内标签的细节版

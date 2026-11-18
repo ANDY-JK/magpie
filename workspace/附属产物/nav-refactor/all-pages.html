@@ -212,6 +212,21 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:default;appear
 .spec-hint{font-size:10px;color:var(--muted);line-height:1.5;max-width:900px;text-align:center}
 .foldrow{display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:10.5px;color:var(--muted)}
 .foldrow .note{font-size:9.5px;color:var(--faint)}
+.ov{position:absolute;inset:0;z-index:30;background:rgba(20,22,30,.18);display:flex;align-items:center;justify-content:center}
+.ov-sheet{width:min(430px,92%);background:var(--card);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;display:flex;flex-direction:column;gap:7px}
+.ov-h{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600}
+.ov-h .grow{flex:1}
+.ov-close{width:24px;height:24px;border-radius:6px;color:var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:16px}
+.ov-close:hover{background:var(--pill);color:var(--fg)}
+.ov-search{height:28px;border-radius:7px;background:var(--bg);box-shadow:0 0 0 .5px var(--line);display:flex;align-items:center;padding:0 9px;font-size:11px;color:var(--muted)}
+.ov-tiles{display:flex;flex-wrap:wrap;gap:5px}
+.ov-tile{height:28px;padding:0 10px;border-radius:7px;background:var(--bg);box-shadow:0 0 0 .5px var(--line);font-size:11px;color:var(--fg-2)}
+.ov-tile:hover{background:var(--pill)}
+.ov-menu{position:absolute;width:152px;background:var(--pop);border-radius:9px;box-shadow:var(--shadow);padding:4px;display:flex;flex-direction:column;gap:1px}
+.mi{height:26px;padding:0 8px;border-radius:5px;font-size:11px;color:var(--fg-2);display:flex;align-items:center;width:100%}
+.mi:hover{background:var(--pill);color:var(--fg)}
+.mi.danger{color:var(--red)}
+.msep{height:1px;background:var(--line-2);margin:3px 0}
 .caption{font-size:10.5px;color:var(--muted);line-height:1.5;max-width:900px;text-align:center}
 </style>
 </head>
@@ -395,11 +410,13 @@ const COMPONENTS = [
 const state = {
   frame:'narrow', section:'model', page:'providers', theme:'light',
   tabs:{usage:'概览',library:'指令',plugins:'内置',settings:'额度'}, l3:'全部',
-  spec:false, sel:null, libSel:0, mdSel:0, compact:false,
+  spec:false, sel:null, libSel:0, mdSel:0, compact:false, ov:null, menuAt:null, sw:{},
 };
 const qs = new URLSearchParams(location.search);
 if(qs.get('f')==='wide' || qs.get('f')==='narrow') state.frame = qs.get('f');
 if(qs.get('nav')==='one') state.compact = true;
+if(qs.get('ov')==='add') state.ov = 'add';
+if(qs.get('ov')==='menu'){ state.ov = 'menu'; state.menuAt = {x:120,y:150}; }
 if(qs.get('p') && PAGES[qs.get('p')]) state.page = qs.get('p');
 if(qs.get('spec')==='1') state.spec = true;
 if(PAGES[state.page]){ const s=SECTIONS.find(x=>x.pages.includes(state.page)); if(s) state.section=s.id; }
@@ -801,9 +818,9 @@ function mdSplit(items, detailFn){
       const lead = x.c ? `<span class="logo2" style="background:${x.c}">${x.n[0]}</span>`
         : (x.dot ? `<span class="dot ${x.dot==='warn'?'amber':''}"></span>`
         : `<span class="logo2" style="background:var(--pill);color:var(--muted)">${x.n[0]}</span>`);
-      const tail = x.on !== undefined ? `<span class="switch${x.on?' on':''}"></span>`
+      const tail = x.on !== undefined ? `<span class="switch${x.on?' on':''}" data-sw="${x.n}"></span>`
         : (x.meta ? `<span class="meta">${x.meta}</span>` : '');
-      return `<button class="lib-item${i===sel?' on':''}" data-mdsel="${i}">${lead}<span class="who"><span class="nm">${x.n}</span><span class="sub">${x.s||''}</span></span>${tail}</button>`;
+      return `<button class="lib-item${i===sel?' on':''}" data-mdsel="${i}" data-mdrow="${x.n}">${lead}<span class="who"><span class="nm">${x.n}</span><span class="sub">${x.s||''}</span></span>${tail}</button>`;
     }).join('')}</div>
     <div class="lib-detail">${detailFn(items[sel])}</div>
   </div>`;
@@ -849,7 +866,7 @@ function mdMasking(){
   })];
 }
 function mdPlugins(){
-  const items = PLUGINS.map(([n,d,on])=>({n,s:d,on}));
+  const items = PLUGINS.map(([n,d,on])=>({n,s:d,on: state.sw[n]!==undefined ? state.sw[n] : on}));
   return [mdSplit(items, x=>det(x.n, [
     ['说明', x.s],
     ['状态', x.on ? '已启用' : '已停用'],
@@ -858,7 +875,7 @@ function mdPlugins(){
 }
 function mdInstalled(){
   const data = [['filesystem','v1.2.0',true],['github','v0.9.4',true],['web-search','v0.3.1',false]];
-  const items = data.map(([n,v,on])=>({n,s:v,on}));
+  const items = data.map(([n,v,on])=>({n,s:v,on: state.sw[n]!==undefined ? state.sw[n] : on}));
   return [mdSplit(items, x=>det(x.n, [
     ['版本', x.s],
     ['状态', x.on ? '已启用' : '已停用'],
@@ -919,7 +936,7 @@ function toolbarHtml(p){
   let h = '<div class="toolbar">';
   if(p.search) h += `<div class="field">${ic('search')}<span>${p.search}</span></div>`;
   if(p.period) h += `<div class="segline">${p.period.map((x,i)=>`<button class="segbtn${i===0?' on':''}">${x}</button>`).join('')}</div>`;
-  (p.buttons||[]).forEach(b=>{ h += `<button class="btn${b.startsWith('＋')?' primary':''}">${b}</button>`; });
+  (p.buttons||[]).forEach(b=>{ h += `<button class="btn${b.startsWith('＋')?' primary':''}"${b.startsWith('＋')?' data-act="add"':''}>${b}</button>`; });
   h += '</div>';
   return h;
 }
@@ -995,10 +1012,29 @@ function compactNav(){
   out += `<button class="tab${state.page==='settings'?' on':''}" data-page="settings">设置</button>`;
   return `<nav class="tabstrip">${out}</nav>`;
 }
+function overlayHtml(){
+  if(!state.ov) return '';
+  if(state.ov==='add'){
+    return `<div class="ov"><div class="ov-sheet">
+      <div class="ov-h"><span>添加供应商</span><span class="grow"></span><button class="ov-close" data-ovclose>×</button></div>
+      <div class="ov-search">搜索厂商…</div>
+      <div class="ov-tiles">${['Codex','Claude','Gemini','Qwen','Kimi','自定义…'].map(x=>`<button class="ov-tile">${x}</button>`).join('')}</div>
+      <div class="rowbtns"><button class="btn" data-ovclose>取消</button><button class="btn">导入…</button></div>
+    </div></div>`;
+  }
+  if(state.ov==='menu'){
+    const p = state.menuAt || {x:40,y:40};
+    return `<div class="ov"><div class="ov-menu" style="left:min(${p.x}px, calc(100% - 160px));top:min(${p.y}px, calc(100% - 210px))">
+      <button class="mi" data-ovclose>移至顶部</button><button class="mi" data-ovclose>上移</button><button class="mi" data-ovclose>下移</button><button class="mi" data-ovclose>移至底部</button>
+      <div class="msep"></div><button class="mi" data-ovclose>编辑</button><button class="mi danger" data-ovclose>删除</button>
+    </div></div>`;
+  }
+  return '';
+}
 function renderStage(){
   stage.innerHTML = state.frame==='wide'
-    ? `<div class="win wide">${topbar(false)}<div class="main">${navSide()}${mainView()}</div>${footerbar()}</div>`
-    : `<div class="win narrow">${topbar(true)}${state.compact ? compactNav() : secStrip()+pageStrip()}${mainView()}${footerbar()}</div>`;
+    ? `<div class="win wide">${topbar(false)}<div class="main">${navSide()}${mainView()}</div>${footerbar()}${overlayHtml()}</div>`
+    : `<div class="win narrow">${topbar(true)}${state.compact ? compactNav() : secStrip()+pageStrip()}${mainView()}${footerbar()}${overlayHtml()}</div>`;
   const sec = SECTIONS.find(s=>s.id===state.section);
   const where = state.page==='settings' ? '设置' : ((sec ? sec.name + ' › ' : '') + PAGES[state.page].name);
   document.getElementById('where').textContent = where;
@@ -1021,6 +1057,16 @@ function renderStage(){
     COMPONENTS.map(c=>'<tr><td>' + c[0] + '</td><td>' + c[1] + '</td><td class="comps">' + c[2] + '</td><td class="secn">' + c[3] + '</td><td class="comps">' + c[4] + '</td></tr>').join('') + '</tbody></table>';
 }
 stage.addEventListener('click', e=>{
+  const sw = e.target.closest('[data-sw]');
+  if(sw){ const n = sw.dataset.sw; state.sw[n] = !sw.classList.contains('on'); renderStage(); return; }
+  const act = e.target.closest('[data-act="add"]');
+  if(act){ state.ov = 'add'; renderStage(); return; }
+  const ov = e.target.closest('.ov');
+  if(ov){
+    if(e.target.closest('[data-ovclose]')){ state.ov = null; renderStage(); return; }
+    if(!e.target.closest('.ov-sheet') && !e.target.closest('.ov-menu')){ state.ov = null; renderStage(); return; }
+    return;
+  }
   const h = e.target.closest('.spec-head');
   if(h){ state.sel = {n:+h.dataset.rn, name:h.dataset.rname}; renderStage(); return; }
   const md = e.target.closest('[data-mdsel]');
@@ -1043,6 +1089,17 @@ stage.addEventListener('click', e=>{
   if(v){ state.tabs[state.page] = v.dataset.vtab; state.sel = null; state.libSel = 0; state.mdSel = 0; renderStage(); return; }
   const l = e.target.closest('[data-l3]');
   if(l){ state.l3 = l.dataset.l3; state.sel = null; state.libSel = 0; state.mdSel = 0; renderStage(); }
+});
+stage.addEventListener('contextmenu', e=>{
+  const row = e.target.closest('[data-mdrow]');
+  if(!row || state.page!=='providers') return;
+  e.preventDefault();
+  const wr = row.closest('.win').getBoundingClientRect();
+  state.ov = 'menu'; state.menuAt = {x:e.clientX-wr.left, y:e.clientY-wr.top};
+  renderStage();
+});
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && state.ov){ state.ov = null; renderStage(); }
 });
 function renderAllIndex(){
   const rows = [];
