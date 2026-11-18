@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>magpie 完整原型</title>
+<style>
+:root{
+  --bg:#f4f4f6; --card:#fff; --pill:#f1f1f4; --line:#e3e3e8; --line-2:#ececf0;
+  --fg:#1c1c21; --fg-2:#4b4b53; --muted:#85858d; --accent:#4f46e5; --accent-soft:#eeedfd; --accent-fg:#fff;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 0 0 .5px rgba(0,0,0,.07);
+}
+[data-theme="dark"]{
+  --bg:#1a1a1e; --card:#232327; --pill:#2d2d33; --line:#333339; --line-2:#2c2c32;
+  --fg:#ededf1; --fg-2:#b9b9c1; --muted:#8b8b94; --accent:#a5b4fc; --accent-soft:#2b2c47; --accent-fg:#14142a;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.09);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--fg);display:flex;flex-direction:column;overflow:hidden}
+header{flex:none;height:44px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:.5px solid var(--line-2);background:var(--card);box-shadow:var(--shadow-sm);z-index:2}
+.brand{font-size:12.5px;font-weight:600;white-space:nowrap}
+.brand span{font-size:9.5px;color:var(--muted);font-weight:400;margin-left:6px}
+nav{display:inline-flex;gap:2px;padding:2px;border-radius:8px;background:var(--pill);margin-left:8px}
+nav button{height:26px;padding:0 10px;border-radius:6px;font-size:11.5px;color:var(--fg-2);white-space:nowrap}
+nav button.on{background:var(--card);color:var(--fg);box-shadow:var(--shadow-sm);font-weight:500}
+.grow{flex:1}
+.hint{font-size:10px;color:var(--muted);white-space:nowrap}
+.tbtn{height:25px;padding:0 8px;border-radius:6px;font-size:10.5px;color:var(--fg-2);background:var(--card);box-shadow:0 0 0 .5px var(--line)}
+.tbtn:hover{color:var(--fg)}
+iframe{flex:1;width:100%;border:0;display:block;background:var(--bg)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">magpie 完整原型 <span>一个入口 · 四个标签</span></div>
+  <nav id="tabs">
+    <button data-tab="app" class="on">应用（32 视图）</button>
+    <button data-tab="overlays">浮层（30 个）</button>
+    <button data-tab="skeleton">骨架组件</button>
+    <button data-tab="layers">四层框架</button>
+  </nav>
+  <span class="grow"></span>
+  <span class="hint">零件与历史文件不用打开</span>
+  <button class="tbtn" id="open">新标签打开</button>
+</header>
+<iframe id="frame" src="all-pages.html"></iframe>
+<script>
+const MAP = {
+  app:'all-pages.html',
+  overlays:'overlays.html',
+  skeleton:'skeleton-components.html',
+  layers:'framework-layers.html',
+};
+const state = { tab:'app' };
+try { const t=localStorage.getItem('magpie.proto.tab'); if(MAP[t]) state.tab=t; } catch {}
+const frame = document.getElementById('frame');
+function render(){
+  frame.src = MAP[state.tab];
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===state.tab));
+  try { localStorage.setItem('magpie.proto.tab', state.tab); } catch {}
+}
+document.getElementById('tabs').addEventListener('click', e=>{
+  const b=e.target.closest('button[data-tab]'); if(!b) return;
+  state.tab=b.dataset.tab; render();
+});
+document.getElementById('open').addEventListener('click', ()=>{
+  window.open(MAP[state.tab], '_blank');
+});
+render();
+</script>
+</body>
+</html>
