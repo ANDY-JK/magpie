@@ -1764,7 +1764,7 @@ func (s *Server) countOn(w http.ResponseWriter, r *http.Request, p provider.Prov
 			}
 			keepRetryOut(w.Header(), res.Header, b)
 			passReplyHeaders(w.Header(), c.p, res)
-			writeError(w, provider.Anthropic, res.StatusCode, c.p.Explain(c.p.Name+": "+provider.APIError(b, res.Status), res.StatusCode, b))
+			writeError(w, provider.Anthropic, res.StatusCode, c.p.RedactError(c.p.Explain(c.p.Name+": "+provider.APIError(b, res.Status), res.StatusCode, b)))
 			return
 		}
 		defer res.Body.Close()
@@ -6225,7 +6225,7 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 	u.RequestID = requestID(res.Header)
 	if res.StatusCode >= 400 {
 		b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
-		msg := p.Explain(p.Name+": "+provider.APIError(b, res.Status), res.StatusCode, b)
+		msg := p.RedactError(p.Explain(p.Name+": "+provider.APIError(b, res.Status), res.StatusCode, b))
 		if wrongEndpoint(res.StatusCode, b) {
 			s.markUnfit(p.ID, model, proto)
 			if len(s.usable(p, model)) > 0 {
@@ -6239,7 +6239,7 @@ func (s *Server) passthrough(w http.ResponseWriter, r *http.Request, p provider.
 		}
 		keepRetry(w.Header(), res.Header, b)
 		u.ErrType = provider.ErrorType(b)
-		return writeVendorError(w, proto, res.StatusCode, msg, b), msg, true
+		return writeVendorError(w, proto, res.StatusCode, msg, b, p), msg, true
 	}
 	rd, sse := eventStream(res)
 	client := w
@@ -7883,7 +7883,7 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request, p provider.Pr
 	u.RequestID = requestID(res.Header)
 	if res.StatusCode >= 400 {
 		b, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
-		msg := p.Explain(p.Name+": "+provider.APIError(b, res.Status), res.StatusCode, b)
+		msg := p.RedactError(p.Explain(p.Name+": "+provider.APIError(b, res.Status), res.StatusCode, b))
 		if wrongEndpoint(res.StatusCode, b) {
 			msg += wrongAPINote(p, model, res, b)
 		}
@@ -7900,7 +7900,7 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request, p provider.Pr
 		if turnedAway {
 			u.ErrType = turnedAwayErrType
 		}
-		return writeVendorError(w, from, res.StatusCode, msg, b), msg
+		return writeVendorError(w, from, res.StatusCode, msg, b, p), msg
 	}
 	// a Gemini reply that says nothing is a failure, not a turn's end
 	// (#667)
@@ -7980,7 +7980,7 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request, p provider.Pr
 		return s.translate(w, r, p, from, to, model, body, u)
 	}
 	if col.err != "" && (!saidAnything(col.res.Parts) || col.errSaid != nil) {
-		said := col.err
+		said := p.RedactError(col.err)
 		if markAntigravityRefused(w, p, request.System, said) {
 			said += " — " + antigravityHint(request.System)
 			u.ErrType = turnedAwayErrType
@@ -7999,7 +7999,7 @@ func (s *Server) translate(w http.ResponseWriter, r *http.Request, p provider.Pr
 		// refused, with its code (magpie-releases#18); anything else is
 		// the vendor failing, with the status its words would have come
 		// with: a minute limit in a 200 stream is a 429, not a 502
-		return writeVendorError(w, from, cmp.Or(col.errStatus, streamStatus(said)), p.Name+": "+said, col.errSaid), said
+		return writeVendorError(w, from, cmp.Or(col.errStatus, streamStatus(said)), p.Name+": "+said, col.errSaid, p), said
 	}
 	if col.err == "" && !ended && saysItsEnd(p, actual, model) && r.Context().Err() == nil {
 		// an Anthropic stream that just stopped — no stop_reason, no
@@ -9272,15 +9272,17 @@ func writeError(w http.ResponseWriter, proto provider.Protocol, status int, msg 
 // shape, as writeError does, keeping the code and param the vendor named
 // (an OpenAI-shaped error's strings) for a client of OpenAI's shape: the
 // ChatGPT backend's invalid_access_program on access_programs.cyber
-// (magpie-releases#18) reaches the agent as the backend said it.
-func writeVendorError(w http.ResponseWriter, proto provider.Protocol, status int, msg string, body []byte) int {
+// (magpie-releases#18) reaches the agent as the backend said it. A vendor
+// that echoes p's own key in its code or param hands on the key's masked
+// form alone; another channel's key is left as it came.
+func writeVendorError(w http.ResponseWriter, proto provider.Protocol, status int, msg string, body []byte, p provider.Provider) int {
 	var code, param any
 	if e := gjson.GetBytes(body, "error"); e.IsObject() {
 		if c := e.Get("code"); c.Type == gjson.String && c.String() != "" {
-			code = c.String()
+			code = p.RedactError(c.String())
 		}
-		if p := e.Get("param"); p.Type == gjson.String && p.String() != "" {
-			param = p.String()
+		if pa := e.Get("param"); pa.Type == gjson.String && pa.String() != "" {
+			param = p.RedactError(pa.String())
 		}
 	}
 	return writeErrorSaid(w, proto, status, msg, code, param)

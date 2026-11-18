@@ -3566,7 +3566,9 @@ func (s *Server) codexCompact(w http.ResponseWriter, r *http.Request, body []byt
 				w.Header()[k] = vs
 			}
 		}
-		writeVendorError(w, provider.Responses, rec.status, compactFailed(who, rec.status, msg), rec.body.Bytes())
+		// the body was written through writeVendorError by the try that
+		// failed, which masked the provider's own key in it already
+		writeVendorError(w, provider.Responses, rec.status, compactFailed(who, rec.status, msg), rec.body.Bytes(), provider.Provider{})
 		return
 	}
 	if err == nil && local == "" && res.Status == "incomplete" {
