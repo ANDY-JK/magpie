@@ -232,6 +232,9 @@ func normalAccountConcurrency(m map[string]int) map[string]int {
 // MaxRPMLimit bounds a limit on requests a minute.
 const MaxRPMLimit = 10000
 
+// MaxDayCalls bounds a limit on requests a day.
+const MaxDayCalls = 100000
+
 // RPMLimit is how many requests a minute each of p's keys or accounts may
 // send the vendor, 0 for no limit: the provider's MaxRPM. An account not
 // had from All or AlsoOn (made afresh by its sign-in) carries none of the
@@ -260,6 +263,30 @@ func (p Provider) ModelRPMLimit(model string) int {
 		}
 	}
 	return min(max(n, 0), MaxRPMLimit)
+}
+
+// DayCallLimit is how many requests the provider as a whole — all of its
+// keys or accounts together — may take in one calendar day on this
+// computer's clock, 0 for no limit: the provider's DayCalls. An account not
+// had from All or AlsoOn (made afresh by its sign-in) carries none of the
+// provider's settings: it is read from providers.json then.
+func (p Provider) DayCallLimit() int {
+	n := p.DayCalls
+	if n == 0 && p.Account != nil {
+		if s, ok := storedPicks(p.ID); ok {
+			n = s.DayCalls
+		}
+	}
+	return min(max(n, 0), MaxDayCalls)
+}
+
+// CheckDayCalls says what is wrong with a limit on requests a day, nil when
+// nothing is.
+func CheckDayCalls(n int) error {
+	if n < 0 || n > MaxDayCalls {
+		return fmt.Errorf("a limit on requests a day is from 0 (none) to %d, not %d", MaxDayCalls, n)
+	}
+	return nil
 }
 
 // CheckRPM says what is wrong with a limit on requests a minute, nil when
@@ -459,5 +486,19 @@ func SetRPM(id string, n int) error {
 		return err
 	}
 	p.MaxRPM = n
+	return Save(*p)
+}
+
+// SetDayCalls sets how many requests the provider as a whole may take in
+// one calendar day, 0 for no limit.
+func SetDayCalls(id string, n int) error {
+	if err := CheckDayCalls(n); err != nil {
+		return err
+	}
+	p, err := Find(id)
+	if err != nil {
+		return err
+	}
+	p.DayCalls = n
 	return Save(*p)
 }

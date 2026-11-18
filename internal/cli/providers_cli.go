@@ -42,11 +42,13 @@ const providerUsage = `usage:
                                           compaction=native asks the provider Codex's own compaction and hands
                                           Codex its sealed item as it came (a Responses API, a ChatGPT account,
                                           Copilot), compaction=magpie, the default, has magpie summarise
-                                          routing=smart|order|rotate|usage|pace|balance|weight|free|fast|drain spreads requests
+                                          routing=smart|order|rotate|usage|pace|balance|weight|free|fast|drain|score spreads requests
                                           over its keys or accounts (balance: what each would lose at its reset, how
                                           each has answered lately and how its provider's others have, and what was
                                           sent each, so none is used up while the others idle; fast: the one that
                                           answered fastest lately first;
+                                          score: the one that has answered steadily and fast lately with room left
+                                          first, a seat near its limit behind those with room whatever its score;
                                           drain: one until it is used up, then the next, never back to an earlier one);
                                           prompt=as-written sends Antigravity the system prompt exactly as written;
                                           prompt=default, the default, breaks up the lines Google answers with a
@@ -98,6 +100,7 @@ const providerUsage = `usage:
                                           past either a request is turned away with a 429 (0: no bound)
   magpie provider rpm <id> [n|off]        how many requests each account or key sends the vendor in any minute;
                                           one more waits for room, up to 2 minutes, then is turned away with a 429
+  magpie provider day-calls <id> [n|off]  how many requests the provider takes in one calendar day; one more is turned away with a 429 until the next midnight
   magpie provider at-once <id> [n|off|default]
                                           how many of its accounts or keys take requests at the same time, the first
                                           in the list; the next takes over when one runs out or fails (off: no limit,
@@ -644,6 +647,8 @@ func providerCmd(args []string) error {
 		return queueCmd(rest)
 	case "rpm":
 		return rpmCmd(rest)
+	case "day-calls", "daycalls":
+		return dayCallsCmd(rest)
 	case "at-once", "accounts-at-once":
 		return atOnceCmd(rest)
 	case "header-wait", "first-byte-wait":
@@ -1257,7 +1262,7 @@ func applyPairs(p *provider.Provider, pairs []string) error {
 			if r == provider.Manual || r == provider.Cheapest {
 				// cheap: its keys and accounts all bill the provider's one
 				// price, so there is nothing to weigh
-				return fmt.Errorf("routing=%s is a group's: a provider's keys or accounts are routed smart, order, rotate, usage, pace, balance, weight, free, fast or drain", r)
+				return fmt.Errorf("routing=%s is a group's: a provider's keys or accounts are routed smart, order, rotate, usage, pace, balance, weight, free, fast, drain or score", r)
 			}
 			p.Routing = r
 		case "icon":
@@ -1861,6 +1866,41 @@ func rpmCmd(rest []string) error {
 		fmt.Printf("%s · each account or key: at most %d requests a minute\n", p.Name, n)
 	} else {
 		fmt.Printf("%s · each account or key: no limit on requests a minute\n", p.Name)
+	}
+	return nil
+}
+
+// dayCallsCmd shows, or sets, how many requests a provider as a whole takes
+// in one calendar day on this computer's clock; one more is turned away by
+// the gateway with a 429 until the next midnight.
+func dayCallsCmd(rest []string) error {
+	if len(rest) < 1 || len(rest) > 2 {
+		return fmt.Errorf("magpie provider day-calls <id> [n|off]")
+	}
+	p, err := provider.Find(rest[0])
+	if err != nil {
+		return err
+	}
+	if len(rest) > 1 {
+		n := 0
+		switch s := strings.ToLower(strings.TrimSpace(rest[1])); s {
+		case "off", "none", "no", "-":
+		default:
+			if n, err = strconv.Atoi(s); err != nil {
+				return fmt.Errorf("requests a day is a whole number, or off, not %q", rest[1])
+			}
+		}
+		if err := provider.SetDayCalls(p.ID, n); err != nil {
+			return err
+		}
+		if p, err = provider.Find(p.ID); err != nil {
+			return err
+		}
+	}
+	if n := p.DayCallLimit(); n > 0 {
+		fmt.Printf("%s · at most %d requests a day\n", p.Name, n)
+	} else {
+		fmt.Printf("%s · no limit on requests a day\n", p.Name)
 	}
 	return nil
 }

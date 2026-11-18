@@ -209,6 +209,12 @@ type Provider struct {
 	// can't keep to); one more waits for room (see RPMLimit). 0 is no
 	// limit.
 	MaxRPM int `json:"maxRPM,omitempty"`
+	// DayCalls is how many requests the provider as a whole — every key
+	// and account together — may take in one calendar day on this
+	// computer's clock (see DayCallLimit); 0 is no limit. The count is
+	// kept by the gateway in daycalls.json, so a restart keeps it, and one
+	// more is turned away with a 429 until the next midnight.
+	DayCalls int `json:"dayCalls,omitempty"`
 	// HeaderWait is how long, in minutes (1 to 1440), one of its vendors is
 	// given to begin answering a request that isn't a drawing, before
 	// magpie gives up on it: a slow reasoning channel can be given more
@@ -508,6 +514,13 @@ type Provider struct {
 	// (maxleebeta on Discord). Zero, while some pick is still in Models, or
 	// for picks set aside before it was kept.
 	DelistedAt time.Time `json:"delistedAt,omitzero"`
+	// ListChange is the vendor's list as the last fetch that changed it
+	// left it: the ids it gained and those it stopped listing, and when
+	// (recordListChange). A fetch that changes nothing keeps it; nil before
+	// the first change magpie saw. The Providers row and the editor say the
+	// models gone from the list with it, and so does a routing group's card
+	// for a member no provider lists now.
+	ListChange *ModelChange `json:"listChange,omitempty"`
 	// RefreshEvery, for a provider of the user's own, is how often the
 	// gateway fetches its model list by itself ("6h", "1d"; none, only when
 	// asked), as Fetch models does (#2135). See autolist.go.
@@ -887,6 +900,11 @@ func (p Provider) clone() Provider {
 	p.Models = slices.Clone(p.Models)
 	p.PickedFrom = slices.Clone(p.PickedFrom)
 	p.Delisted = slices.Clone(p.Delisted)
+	if p.ListChange != nil {
+		c := *p.ListChange
+		c.Added, c.Removed = slices.Clone(c.Added), slices.Clone(c.Removed)
+		p.ListChange = &c
+	}
 	p.AutoInclude = slices.Clone(p.AutoInclude)
 	p.Headers = maps.Clone(p.Headers)
 	p.ExtraBody = maps.Clone(p.ExtraBody)
@@ -1015,6 +1033,7 @@ func accountSettings(a, pk Provider) Provider {
 	a.AccountConcurrency, a.QueueLimit, a.QueueWait = pk.AccountConcurrency, pk.QueueLimit, pk.QueueWait
 	a.AccountWeights = pk.AccountWeights
 	a.MaxRPM = pk.MaxRPM
+	a.DayCalls = pk.DayCalls
 	// how long a request to it alone is kept while it is busy
 	a.Patience = pk.Patience
 	// how long its accounts rest out of quota, and the most they rest
@@ -1205,6 +1224,7 @@ func Save(p Provider) error {
 		p.PickedFrom = listedWith(p, was)
 		p.Delisted = delistedWith(p, was)
 		p.DelistedAt = delistedAtWith(p, was)
+		p.ListChange = listChangeWith(p, was)
 		p.Caps = capsWith(p, was)
 		if was != nil {
 			if p.Was == nil {
@@ -1266,6 +1286,20 @@ func delistedWith(p Provider, was *Provider) []string {
 		return nil
 	}
 	return d
+}
+
+// listChangeWith is what p.ListChange is saved as: the change a fetch
+// recorded, or the one kept before when the caller sends none — the
+// editor's Save and a preset's copy never carry it, and only a fetch that
+// changes the list writes a new one (recordListChange).
+func listChangeWith(p Provider, was *Provider) *ModelChange {
+	if p.ListChange != nil {
+		return p.ListChange
+	}
+	if was != nil {
+		return was.ListChange
+	}
+	return nil
 }
 
 // delistedAtWith is what p.DelistedAt is saved as: zero while some pick is
@@ -1784,6 +1818,7 @@ func normalize(p Provider) Provider {
 	p.AccountWeights = normalAccountWeights(p.AccountWeights)
 	p.QueueLimit, p.QueueWait = min(max(p.QueueLimit, 0), MaxQueueLimit), min(max(p.QueueWait, 0), MaxQueueWait)
 	p.MaxRPM = min(max(p.MaxRPM, 0), MaxRPMLimit)
+	p.DayCalls = min(max(p.DayCalls, 0), MaxDayCalls)
 	p.QuotaRest = min(max(p.QuotaRest, 0), MaxQuotaRest)
 	if p.RestCap != RestCapOff {
 		p.RestCap = min(max(p.RestCap, 0), MaxQuotaRest)
