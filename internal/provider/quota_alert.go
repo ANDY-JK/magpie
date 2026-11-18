@@ -234,10 +234,25 @@ func quotaAlertPath() string { return filepath.Join(filepath.Dir(Path()), "usage
 // quotaAlertMu keeps the file to one writer in this magpie.
 var quotaAlertMu sync.Mutex
 
+// readAlertMarks is the marks at path. A file that can't be read is none,
+// as a first run's; one that doesn't parse is kept aside as
+// path.bad-<stamp> and said, so a corrupted file doesn't silently re-say
+// every window already said (D-06, the review): read as nothing, each
+// window past its share would notify again, and nothing said so.
 func readAlertMarks(path string) map[string]alertMark {
 	m := map[string]alertMark{}
-	if b, err := os.ReadFile(path); err == nil {
-		json.Unmarshal(b, &m)
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return m
+	}
+	if err := json.Unmarshal(b, &m); err != nil {
+		m = map[string]alertMark{}
+		bad := path + ".bad-" + time.Now().Format("20060102-150405")
+		if os.Rename(path, bad) == nil {
+			log.Printf("usage alerts: %s couldn't be read (%v); kept as %s and started afresh", path, err, bad)
+		} else {
+			log.Printf("usage alerts: %s couldn't be read (%v); started afresh", path, err)
+		}
 	}
 	return m
 }

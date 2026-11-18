@@ -3583,7 +3583,9 @@ The gateway and usage:
 - `quota-history.json`, `balance-history.json` — allowance and balance
   readings over time, for the Usage page's charts
 - `usage-alerts.json` — the usage alerts already shown, so a restart
-  doesn't show them again
+  doesn't show them again. A file that doesn't parse is kept beside it as
+  `usage-alerts.json.bad-<stamp>` and replaced, said in the log: read as
+  nothing, every window past its share would be shown again silently
 - `client-shapes.json` — the headers the gateway last let through for each
   client, for a test from the CLI
 - `gateway-sessions-hidden.json` — gateway sessions you deleted

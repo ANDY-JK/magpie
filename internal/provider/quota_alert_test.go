@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -264,5 +265,35 @@ func TestDueReminders(t *testing.T) {
 	failed := []SubscriptionQuota{{Provider: "codex", User: "x", Error: "429", Windows: qs[0].Windows}}
 	if got := dueReminders(failed, map[string]alertMark{}, 24*time.Hour, now); len(got) != 0 {
 		t.Fatalf("failed reading: %+v", got)
+	}
+}
+
+// D-06: a marks file that doesn't parse is kept aside and said, not read as
+// nothing: read as nothing, every window past its share would be told again,
+// silently.
+func TestAlertMarksUnreadableKeptAside(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "usage-alerts.json")
+	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	reset := now.Add(time.Hour)
+	qs := []SubscriptionQuota{{Provider: "claude", User: "x", Windows: []QuotaWindow{{Name: "5 hours", Used: 90, ResetsAt: &reset}}}}
+	// a corrupted file is no marks: the window due is said once...
+	if got := checkAlerts(path, qs, 80, 0, 0, now); len(got) != 1 {
+		t.Fatalf("after a corrupted file: %+v", got)
+	}
+	// ...and the file is kept aside, so it is no longer the marks read
+	bad, err := filepath.Glob(path + ".bad-*")
+	if err != nil || len(bad) != 1 {
+		t.Fatalf("the corrupted file was not kept aside: %v %v", bad, err)
+	}
+	if b, err := os.ReadFile(bad[0]); err != nil || string(b) != "{not json" {
+		t.Fatalf("the kept-aside file: %q %v", b, err)
+	}
+	// the marks written now are the new file's, so it isn't said again
+	if got := checkAlerts(path, qs, 80, 0, 0, now.Add(time.Minute)); len(got) != 0 {
+		t.Fatalf("told again after the corrupted file was replaced: %+v", got)
 	}
 }
