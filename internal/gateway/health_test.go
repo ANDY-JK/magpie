@@ -227,6 +227,14 @@ func TestProviderHealthByProvider(t *testing.T) {
 // NoHealthDemotion leaves the order requests are tried in alone: what the
 // records say of a provider reads the same with it on — the scores are
 // what answering did, not how the order was set.
+//
+// A read decays a record in place as a side effect (a lazy refresh whose
+// score is unchanged for the same instant), so the two reads below are
+// moments apart and the worst score drifts a little toward the prior. The
+// gap is injected rather than left to the machine: how long two reads really
+// take depends on the runner. The allowed drift is derived from the elapsed
+// time actually measured, with room for a little more, so a slow machine
+// passes while a real change to the score (a demotion, a fresh note) fails.
 func TestProviderHealthReadsTheSameWithNoDemotion(t *testing.T) {
 	fresh(t)
 	noteID("a#k/m1", false)
@@ -241,19 +249,35 @@ func TestProviderHealthReadsTheSameWithNoDemotion(t *testing.T) {
 		st.NoHealthDemotion = was
 		settings.Save(st)
 	})
+	first := time.Now()
 	h := ProviderHealth([]string{"a"})
+	// Force a gap larger than the old 1e-6 gate could tolerate: with m1's
+	// loss of 4 the score rises ~6e-5 per second, so 100ms is ~6e-6 of drift
+	// on even the fastest machine. The old assertion went red at ~17ms of
+	// wall time, i.e. on any moderately loaded runner, hiding real changes.
+	time.Sleep(100 * time.Millisecond)
 	st.NoHealthDemotion = true
 	if err := settings.Save(st); err != nil {
 		t.Fatal(err)
 	}
 	after := ProviderHealth([]string{"a"})
-	// the two reads are moments apart, so the records decayed a little
+	last := time.Now()
+	// the two reads are a gap apart, so the records decayed a little
 	// between them; the counts and the named model are exact
 	if after.Recorded != h.Recorded || after.Below != h.Below || after.WorstModel != h.WorstModel {
 		t.Fatalf("NoHealthDemotion changed the reading: %+v → %+v", h, after)
 	}
-	if math.Abs(after.Worst-h.Worst) > 1e-6 {
-		t.Fatalf("worst %v → %v over a read's decay", h.Worst, after.Worst)
+	// m1 is the worst: wins 0 and the four failures above, so
+	// Worst = prior/(loss + prior) = 1/(loss+1). The slowest legitimate
+	// reading is one where all the elapsed time went into decaying m1's
+	// loss from 4; that bounds the drift regardless of runner load. A fixed
+	// 1e-6 let wall-clock jitter decide the test, going red at ~17ms.
+	w := math.Exp2(-last.Sub(first).Seconds() / healthHalfLife.Seconds())
+	maxWorst := 1 / (4*w + 1)
+	tolerance := (maxWorst - 1.0/5) + 1e-6
+	if d := math.Abs(after.Worst - h.Worst); d > tolerance {
+		t.Fatalf("worst %v → %v drifted %v over a %v gap, more than the decay bound %v",
+			h.Worst, after.Worst, d, last.Sub(first), tolerance)
 	}
 }
 
