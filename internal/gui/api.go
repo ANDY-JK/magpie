@@ -1312,7 +1312,15 @@ func Handler(w Windows, gw *gateway.Server) http.Handler {
 		case "use":
 			var ps map[string]profile.Profile
 			if ps, err = profile.Load(); err == nil {
-				applied, err = profile.Apply(ps[in.Name])
+				// a name no profile has is refused, not applied as nothing
+				// (B-05, the review): Applied{} of a missing name reads as
+				// "applied, 0 changed"
+				p, ok := ps[in.Name]
+				if !ok || in.Name == "" {
+					err = fmt.Errorf("no profile named %q: save one first", in.Name)
+					break
+				}
+				applied, err = profile.Apply(p)
 			}
 			if applied.Library != nil {
 				lastProblems.Lock()
