@@ -1,0 +1,577 @@
+{
+ "rescue_depth_hist": {
+  "2": 317,
+  "3": 135,
+  "4": 58,
+  "5": 32,
+  "6": 18,
+  "7": 8,
+  "8": 7,
+  "9": 7,
+  "11": 4,
+  "12": 5,
+  "13": 2,
+  "14": 1,
+  "16": 1,
+  "23": 1,
+  "24": 1,
+  "26": 1
+ },
+ "rescue_by_day": {
+  "2026-11-16": 331,
+  "2026-11-17": 247,
+  "2026-11-18": 20
+ },
+ "prov_top_errors": {
+  "sensenova-token-plan": [
+   {
+    "err": "429|rate|SenseNova Token Plan: tp",
+    "n": 73
+   },
+   {
+    "err": "429|rate|SenseNova Token Plan: in",
+    "n": 23
+   },
+   {
+    "err": "429|rate|SenseNova Token Plan: rp",
+    "n": 16
+   }
+  ],
+  "nova": [
+   {
+    "err": "429|rate|商汤nova: inference exceed",
+    "n": 12
+   },
+   {
+    "err": "429|rate|商汤nova: tpm exhausted",
+    "n": 9
+   },
+   {
+    "err": "429|rate|商汤nova: rps exhausted",
+    "n": 8
+   }
+  ],
+  "77625": [
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 21
+   },
+   {
+    "err": "429|rate|77625: 本账号请求超过每分钟 5 次的上限",
+    "n": 19
+   },
+   {
+    "err": "502|other|77625: {\"message\":{\"mess",
+    "n": 17
+   }
+  ],
+  "ygxnhzy": [
+   {
+    "err": "502|other|小力孩: {\"message\":\"对话内容异常请",
+    "n": 3
+   },
+   {
+    "err": "429|quota|小力孩: {\"message\":\"免费模型个人每",
+    "n": 3
+   },
+   {
+    "err": "429|quota|小力孩: {\"message\":\"免费模型奖励额",
+    "n": 3
+   }
+  ],
+  "sta1n": [
+   {
+    "err": "503|other|sta1n: No available chan",
+    "n": 34
+   },
+   {
+    "err": "502|proxy|Post \"https://sta1n.ai/v",
+    "n": 5
+   },
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 1
+   }
+  ],
+  "gemai-huchan": [
+   {
+    "err": "502|other|Post \"https://api.gemai.",
+    "n": 14
+   },
+   {
+    "err": "502|proxy|Post \"https://api.gemai.",
+    "n": 1
+   },
+   {
+    "err": "403|credit|哈基米: 预扣费额度失败，用户剩余额度: ¥10",
+    "n": 1
+   }
+  ],
+  "cloudflare-workers-ai": [
+   {
+    "err": "404|other|Cloudflare Workers AI: C",
+    "n": 35
+   },
+   {
+    "err": "502|proxy|proxyconnect tcp: dial t",
+    "n": 4
+   }
+  ],
+  "amd": [
+   {
+    "err": "429|rate|AMD: 429 Too Many Reques",
+    "n": 404
+   },
+   {
+    "err": "403|other|AMD: 403 Forbidden: a we",
+    "n": 24
+   },
+   {
+    "err": "502|proxy|Post \"https://developer.",
+    "n": 19
+   }
+  ],
+  "nvidia": [
+   {
+    "err": "499|canceled|magpie stopped waiting: ",
+    "n": 37
+   },
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 33
+   },
+   {
+    "err": "504|other|NVIDIA NIM: 504 Gateway ",
+    "n": 31
+   }
+  ],
+  "workbuddy-ai": [
+   {
+    "err": "403|restricted|WorkBuddy AI: request il",
+    "n": 12
+   },
+   {
+    "err": "429|quota|WorkBuddy AI: usage exce",
+    "n": 4
+   },
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 1
+   }
+  ],
+  "zcode": [
+   {
+    "err": "429|rate|ZCode: ZCode's free Star",
+    "n": 16
+   },
+   {
+    "err": "429|quota|ZCode: exceed quota limi",
+    "n": 16
+   },
+   {
+    "err": "502|other|ECONNRESET: The socket c",
+    "n": 2
+   }
+  ],
+  "autoclaw-cn": [
+   {
+    "err": "402|credit|AutoClaw 国内 (Zhipu): 积分不",
+    "n": 5
+   },
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 2
+   },
+   {
+    "err": "502|proxy|proxyconnect tcp: dial t",
+    "n": 2
+   }
+  ],
+  "opencode-zen-free": [
+   {
+    "err": "429|quota|OpenCode Zen Free: Free ",
+    "n": 9
+   },
+   {
+    "err": "502|proxy|proxyconnect tcp: dial t",
+    "n": 3
+   }
+  ],
+  "sensetime": [
+   {
+    "err": "400|credit|商汤senseTime: 已达到使用限制或余额不",
+    "n": 2
+   }
+  ],
+  "sophnet": [
+   {
+    "err": "429|rate|云算力: Model tpm limit exc",
+    "n": 97
+   },
+   {
+    "err": "502|proxy|Post \"https://www.sophne",
+    "n": 4
+   },
+   {
+    "err": "502|other|Post \"https://www.sophne",
+    "n": 2
+   }
+  ],
+  "groq": [
+   {
+    "err": "403|other|Groq: Forbidden",
+    "n": 98
+   }
+  ],
+  "qoder": [
+   {
+    "err": "429|quota|Qoder: usage limit reach",
+    "n": 26
+   },
+   {
+    "err": "502|other|Qoder: Qoder models: HTT",
+    "n": 20
+   }
+  ],
+  "qoder-cn": [
+   {
+    "err": "503|other|Qoder CN: Qoder queued t",
+    "n": 51
+   },
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 25
+   },
+   {
+    "err": "502|proxy|Qoder CN: proxyconnect t",
+    "n": 8
+   }
+  ],
+  "zed": [
+   {
+    "err": "403|other|Zed: Access to Zed-hoste",
+    "n": 40
+   }
+  ],
+  "gemini": [
+   {
+    "err": "502|other|Gemini CLI is signed out",
+    "n": 237
+   },
+   {
+    "err": "502|other|Post \"https://cloudcode-",
+    "n": 54
+   },
+   {
+    "err": "502|other|This client is no longer",
+    "n": 3
+   }
+  ],
+  "qwenwork": [
+   {
+    "err": "502|other|QwenWork: Error in upstr",
+    "n": 30
+   },
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 3
+   },
+   {
+    "err": "502|proxy|QwenWork: proxyconnect t",
+    "n": 2
+   }
+  ],
+  "fox-kkqwq": [
+   {
+    "err": "502|other|狐狸: The origin web serve",
+    "n": 17
+   },
+   {
+    "err": "403|other|狐狸: User has been banned",
+    "n": 13
+   },
+   {
+    "err": "502|proxy|Post \"https://fox.kkqwq.",
+    "n": 10
+   }
+  ],
+  "ai": [
+   {
+    "err": "502|other|简单AI: {\"message\": \"出现此提示",
+    "n": 4
+   },
+   {
+    "err": "429|quota|简单AI: {\"message\": \"免费模型今",
+    "n": 2
+   },
+   {
+    "err": "502|proxy|Post \"https://duxinapi.c",
+    "n": 1
+   }
+  ],
+  "raccoon": [
+   {
+    "err": "429|rate|商汤小浣熊: 您的模型请求频率超限，请稍后重试",
+    "n": 12
+   },
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 11
+   },
+   {
+    "err": "502|proxy|proxyconnect tcp: dial t",
+    "n": 6
+   }
+  ],
+  "teleagent": [
+   {
+    "err": "402|credit|TeleAgent: 402 Payment R",
+    "n": 2
+   },
+   {
+    "err": "502|other|TeleAgent 凭据不可用：Windows ",
+    "n": 1
+   },
+   {
+    "err": "400|other|TeleAgent: messages.cont",
+    "n": 1
+   }
+  ],
+  "qnaigc": [
+   {
+    "err": "429|rate|七牛云: Too many requests f",
+    "n": 10
+   },
+   {
+    "err": "429|rate|七牛云: Too many concurrent",
+    "n": 2
+   },
+   {
+    "err": "502|proxy|Post \"https://api.qnaigc",
+    "n": 1
+   }
+  ],
+  "tokenrhythm": [
+   {
+    "err": "402|credit|基元律动: 账户余额不足，请充值后重试。充值地址",
+    "n": 1
+   }
+  ],
+  "tokenharbor": [
+   {
+    "err": "403|other|tokenharbor: API access ",
+    "n": 31
+   },
+   {
+    "err": "502|proxy|Post \"https://tokenharbo",
+    "n": 5
+   },
+   {
+    "err": "429|rate|tokenharbor: You've used",
+    "n": 4
+   }
+  ],
+  "scnet": [
+   {
+    "err": "502|proxy|Post \"https://api.scnet.",
+    "n": 2
+   },
+   {
+    "err": "431|other|超算互联网: Account Suspensio",
+    "n": 2
+   },
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 1
+   }
+  ],
+  "cursor": [
+   {
+    "err": "429|quota|Cursor: usage limit reac",
+    "n": 2
+   }
+  ],
+  "intern-inkstone": [
+   {
+    "err": "429|quota|书生·端砚: quota exceeded",
+    "n": 2
+   }
+  ],
+  "minimax-code": [
+   {
+    "err": "429|credit|MiniMax Code: MiniMax Co",
+    "n": 32
+   },
+   {
+    "err": "502|proxy|proxyconnect tcp: dial t",
+    "n": 5
+   },
+   {
+    "err": "429|credit|MiniMax Code: usage limi",
+    "n": 3
+   }
+  ],
+  "modelscope": [
+   {
+    "err": "429|credit|ModelScope: insufficient",
+    "n": 2
+   },
+   {
+    "err": "502|proxy|Post \"https://api-infere",
+    "n": 1
+   }
+  ],
+  "workbuddy": [
+   {
+    "err": "502|proxy|proxyconnect tcp: dial t",
+    "n": 6
+   },
+   {
+    "err": "499|canceled|the agent canceled the r",
+    "n": 2
+   },
+   {
+    "err": "429|quota|WorkBuddy: 您的使用量已超出频率限制，",
+    "n": 2
+   }
+  ],
+  "lightvela-plus": [
+   {
+    "err": "429|rate|LightVela（国内+国际）: Token ",
+    "n": 30
+   },
+   {
+    "err": "429|rate|LightVela（国内+国际）: The re",
+    "n": 16
+   }
+  ],
+  "nova-ai": [
+   {
+    "err": "429|rate|Nova ai: Rate limit: 60 ",
+    "n": 49
+   },
+   {
+    "err": "504|other|Nova ai: 504 Gateway Tim",
+    "n": 14
+   },
+   {
+    "err": "502|proxy|Post \"https://once.novai",
+    "n": 4
+   }
+  ],
+  "coarena": [
+   {
+    "err": "429|rate|coarena: Rate limit reac",
+    "n": 6
+   },
+   {
+    "err": "400|overflow|coarena: This model's ma",
+    "n": 4
+   },
+   {
+    "err": "429|quota|coarena: Today's free us",
+    "n": 2
+   }
+  ],
+  "dumate": [
+   {
+    "err": "502|proxy|百度搭子 DuMate: proxyconnec",
+    "n": 5
+   }
+  ],
+  "meoo": [
+   {
+    "err": "502|proxy|proxyconnect tcp: dial t",
+    "n": 4
+   }
+  ],
+  "codar": [
+   {
+    "err": "413|other|科搭 Codar: Request Entity",
+    "n": 118
+   },
+   {
+    "err": "405|other|科搭 Codar: 405 Method Not",
+    "n": 14
+   }
+  ],
+  "baishuixin": [
+   {
+    "err": "503|other|白水心: 服务暂时繁忙，请稍后重试。",
+    "n": 13
+   },
+   {
+    "err": "402|quota|白水心: 上游订阅额度暂时用尽，正在补量。稍后再",
+    "n": 2
+   },
+   {
+    "err": "403|quota|白水心: 这次的额度用完了，0 点 / 12 点",
+    "n": 2
+   }
+  ],
+  "opencode-go": [
+   {
+    "err": "403|credit|OpenCode Go: Your OpenCo",
+    "n": 2
+   },
+   {
+    "err": "429|quota|OpenCode Go: OpenCode Go",
+    "n": 1
+   }
+  ],
+  "agnes": [
+   {
+    "err": "429|quota|Agnes: 今日文本额度已用完，当前处于限速模",
+    "n": 269
+   },
+   {
+    "err": "429|quota|Agnes: Agnes: 今日文本额度已用完，",
+    "n": 260
+   },
+   {
+    "err": "429|rate|Agnes: 您已达到免费用户的 API 速率限",
+    "n": 6
+   }
+  ],
+  "jet-hub-baizhi": [
+   {
+    "err": "502|other|百智云 (Baizhi): {\"message\"",
+    "n": 5
+   }
+  ],
+  "jet-hub-monkeycode": [
+   {
+    "err": "502|other|MonkeyCode: {\"message\":\"",
+    "n": 5
+   }
+  ],
+  "jet-hub-monkeycodeintl": [
+   {
+    "err": "502|other|MonkeyCode (国际站): {\"mess",
+    "n": 5
+   }
+  ],
+  "jet-hub-qoder": [
+   {
+    "err": "502|other|Qoder (国际版): {\"message\":",
+    "n": 4
+   }
+  ],
+  "jet-hub-qodercn": [
+   {
+    "err": "502|other|Qoder (中国版): {\"message\":",
+    "n": 4
+   }
+  ]
+ },
+ "agnes_storm_sessions": [
+  [
+   "1988e7e3-49da-4f91-a175-a82f91585c41",
+   267
+  ]
+ ],
+ "agnes_storm_req_status": {
+  "429": 260,
+  "200": 7
+ }
+}
