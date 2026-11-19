@@ -1888,10 +1888,22 @@ each of these groups ordered by the share used.
   it unspent goes first. Within that, one that failed since it last
   answered goes behind those that answered since, and one resting behind
   every one awake (as in any routing), then the score decides: how
-  steadily it has answered, its first token, its tokens a second and its
-  allowance left, in the shares 40:18:12:20 — about 44%, 20%, 13% and 22%
-  of the score — with nothing measured counting neither way.
-  Those alike keep their order. The weights are not settable.
+  steadily it has answered, its first token, its tokens a second, its
+  allowance left and what it can do of what the request needs — the
+  request's tools, its pictures and its stream, by what the provider's
+  capabilities test settled of each — in the shares 40:18:12:20:10, that
+  is 40% how steadily, 18% the first token, 12% the tokens a second, 20%
+  the allowance and 10% the abilities, with nothing measured counting
+  neither way: a tag of the request nothing has settled counts half, and a
+  tag the test settled no for holds the model out of the plan unless every
+  candidate of the plan lacks one.
+  Those alike keep their order. The weights are not settable. The models
+  the score weighs that no capabilities test has settled, or whose letters
+  are older than seven days, are asked in the background, never on a
+  request's path, and a probe that fails changes no route
+  (settings.json's `autoCapProbe`, on by default: a model at most once a
+  day, two at once, six starting in ten minutes, two hundred in a day, a
+  failure asked again at an hour, then six, then a day).
   settings.json's `scoreRouting` (on by default) turns the routing off: a
   group or provider saved with it is then tried in its listed order, as
   with the plugin `rotation` off.
