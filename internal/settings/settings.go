@@ -759,6 +759,18 @@ type Settings struct {
 	// forward to fail again. On by default: nil is a file that never chose
 	// (StabilityGuardOn). Off, one answer brings it back, as before.
 	StabilityGuard *bool `json:"stabilityGuard,omitempty"`
+	// AutoCapProbe has the gateway ask what a model can do besides answer
+	// (tools, vision, stream, the capabilities a Test capabilities run
+	// settles) for the models a pool routed by score weighs that no test
+	// settled, or whose letters are older than the probe re-asks for
+	// (gateway capprobe.go). The asking is in the background, never on a
+	// request's path, under its own guardrails: a model at most once a
+	// day and seven days since its letters were settled, two at once, six
+	// starting in ten minutes, two hundred in a day, and a failure asked
+	// again at an hour, then six, then a day. On by default: nil is a file
+	// that never chose (AutoCapProbeOn). Off, nothing is asked: a model
+	// untested stays untested, scoring half of what a request needs of it.
+	AutoCapProbe *bool `json:"autoCapProbe,omitempty"`
 	// DesktopLongest has Claude Desktop list a model of 1M tokens or more
 	// once, as its 1M entry (its id with Claude Code's "[1m]"), instead of
 	// twice (#1272): Desktop adds a "1M context window" entry beside any
@@ -1409,6 +1421,12 @@ func (s Settings) ScoreRoutingOn() bool { return s.ScoreRouting == nil || *s.Sco
 // chose has no value, and a new install and one written before the guard
 // was there both read as on.
 func (s Settings) StabilityGuardOn() bool { return s.StabilityGuard == nil || *s.StabilityGuard }
+
+// AutoCapProbeOn says whether the gateway asks in the background what a
+// model a pool routed by score weighs can do: on unless the user turned it
+// off. A file that never chose has no value, and a new install and one
+// written before the probes were there both read as on.
+func (s Settings) AutoCapProbeOn() bool { return s.AutoCapProbe == nil || *s.AutoCapProbe }
 
 // Working is the context window an agent is told for a model with one of
 // n tokens (see FullContext).

@@ -2514,11 +2514,21 @@ func weighRouted(p provider.Provider, cs []candidate, model string, from provide
 	}
 	if p.Routing == provider.Score {
 		// the score the routing ordered them by, kept for the trace's
-		// rows: the same calculation the strategy used (routes.ScoreOf),
-		// never a second one
+		// rows: the same calculation the strategy ordered by
+		// (routes.ScoreOf), never a second one
 		wg.scores = make(map[string]float64, len(cs))
 		for i, c := range cs {
 			wg.scores[c.restID()] = routes.ScoreOf(seats[i])
+		}
+		// a model of the pool the score is weighing that no capabilities
+		// test settled, or whose letters went stale, is probed in the
+		// background: offering it takes nothing from this request, the
+		// asking is capprobe.go's own
+		now := time.Now()
+		for _, c := range cs {
+			if needsProbing(c.p, c.model, now) {
+				capProbeOffer(c.p.ID, c.model)
+			}
 		}
 	}
 	order := routes.Apply(st, p.ID, seats)

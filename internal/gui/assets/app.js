@@ -5367,6 +5367,11 @@ function modelFacts(p, m) {
   out.push(t(m.images ? "Accepts images" : "Text only"));
   const levels = m.efforts || [];
   out.push(levels.length ? t("Reasoning: {levels}", { levels: levels.map((l) => t(l)).join(", ") }) : t("Reasoning levels: none known"));
+  // what the background capability probes (gateway capprobe.go) made of it,
+  // when one ran: when, and the letters it settled — T tools, V vision,
+  // S streaming — or the words it failed with
+  const probed = p.capProbe?.models?.[m.id];
+  if (probed) out.push(probed.said ? t("Probed {when}: {said}", { when: ago(probed.at), said: probed.said }) : t("Probed {when}"));
   return out;
 }
 
@@ -12344,6 +12349,11 @@ function renderModels(p) {
   if (p.listError) box.append(el("div", "hint model-hint warn list-error", t("{p} couldn't list its models: {error}", { p: p.name, error: p.listError })));
   const why = el("div", "hint");
   const capsLegend = el("div", "hint cap-legend", t("T tools · V vision · S streaming — ✓ it answered, ✗ it refused"));
+  // what the background probes (gateway capprobe.go) wait to ask of this
+  // provider: offered when a pool routed by score weighs a model no test
+  // settled, or whose letters went stale — each probe's word lands on the
+  // model's chip and in the log
+  if (p.capProbe?.queued) box.append(el("div", "hint cap-legend", t("Capability probes: {n} waiting", { n: p.capProbe.queued })));
   const [tk, cb] = tick(t("Only through routing groups"), !!draft.unlisted);
   cb.onchange = () => { draft.unlisted = cb.checked; draw(); };
   tk.title = t("Its models leave the list agents pick from; the routing groups they are in still use them");

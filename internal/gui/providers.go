@@ -337,10 +337,16 @@ type providerJSON struct {
 	// Caps is what a Test capabilities run settled of its models
 	// (provider.Provider.Caps), by model id: what the editor keeps beside a
 	// re-test, and what the pickers' rows and the Routing page read
-	Caps     map[string]provider.ModelCaps `json:"caps,omitempty"`
-	Outputs  map[string]int                `json:"outputs,omitempty"`  // the reply limits the user set (provider.OutputsOf)
-	Compacts map[string]int                `json:"compacts,omitempty"` // where Codex and Claude Code compact on its models (provider.CompactsOf)
-	Fetched  *time.Time                    `json:"fetched,omitempty"`  // when the list came from the vendor; the page says how long ago in its language
+	Caps map[string]provider.ModelCaps `json:"caps,omitempty"`
+	// CapProbe is what the background capability probes (gateway
+	// capprobe.go) have of it: how many of its models wait in the queue,
+	// and each one's last probe — when, and what it settled. The editor
+	// says it beside Caps, for the models a pool routed by score asked
+	// about.
+	CapProbe gateway.CapProbeState `json:"capProbe,omitempty"`
+	Outputs  map[string]int        `json:"outputs,omitempty"`  // the reply limits the user set (provider.OutputsOf)
+	Compacts map[string]int        `json:"compacts,omitempty"` // where Codex and Claude Code compact on its models (provider.CompactsOf)
+	Fetched  *time.Time            `json:"fetched,omitempty"`  // when the list came from the vendor; the page says how long ago in its language
 	// ListChange is the vendor's list as the last fetch that changed it
 	// left it: the ids it gained and those it stopped listing, and when
 	// (provider.ModelChange). Left out when no fetch changed the list
@@ -737,7 +743,7 @@ func providerInfoWith(p provider.Provider, ls provider.Listing, agents []agentUs
 		Catalog: p.Catalog, Website: p.Website, KeysURL: p.KeysURL,
 		Proxy: p.Proxy, AccountProxies: p.AccountProxies, AccountModels: p.AccountModels, AccountCaps: p.AccountCaps, AccountWindowCaps: p.AccountWindowCaps, AccountNames: p.AccountNames, Headers: p.Headers, ExtraBody: p.ExtraBody, ReplyHeaders: p.ReplyHeaders, Searches: p.Searches, Cline: p.ClinePinnable(), PinUpstream: p.PinUpstream, Unredacted: p.Unredacted, CountFree: p.CountFree, InsecureTLS: p.InsecureTLS, TakesInsecureTLS: p.TakesInsecureTLS(), LimitRestOff: p.LimitRestOff, NativeCompaction: p.NativeCompaction, CarriesCompaction: p.CarriesCompaction(), PassUserAgent: p.PassUserAgent, OwnClient: p.OwnClient(), AuthHeader: p.AuthHeader, BothAuth: p.BothAuth(), BalanceURL: p.BalanceURL, BalancePath: p.BalancePath, BalanceMethod: p.BalanceMethod, ModelsURL: p.ModelsURL,
 		Ready: p.Ready(), Chosen: p.PicksOf(avail), Agents: make([]providerAgent, 0, len(agents)),
-		Fallback: p.Fallback, Routing: p.Routing, Sink: p.Sink, Affinity: p.Affinity, KeepLogin: p.KeepLogin, KeepLoginAs: p.KeepLoginAs, SwitchOnly: p.SwitchOnly, CapStop: p.CapStop, CapCareful: p.CapCareful, Unlisted: p.Unlisted, NoModels: p.ServesNone(), BestInFamily: p.BestInFamily && len(p.Models) == 0 && !p.NoModels, Off: p.Off, Contexts: p.Contexts, Caps: p.Caps,
+		Fallback: p.Fallback, Routing: p.Routing, Sink: p.Sink, Affinity: p.Affinity, KeepLogin: p.KeepLogin, KeepLoginAs: p.KeepLoginAs, SwitchOnly: p.SwitchOnly, CapStop: p.CapStop, CapCareful: p.CapCareful, Unlisted: p.Unlisted, NoModels: p.ServesNone(), BestInFamily: p.BestInFamily && len(p.Models) == 0 && !p.NoModels, Off: p.Off, Contexts: p.Contexts, Caps: p.Caps, CapProbe: gateway.CapProbeOf(p.ID),
 		MaxConcurrency: p.MaxConcurrency, PluginConcurrency: p.PluginConcurrency(), MaxAccounts: p.MaxAccounts, PluginAccounts: p.PluginAtOnce(), HeaderWait: p.HeaderWait, PriceRate: p.PriceRate,
 		RateWindows: p.RateWindows, RateNow: rateNowOf(p, time.Now()),
 		AccountConcurrency: p.AccountConcurrency, AccountWeights: p.AccountWeights, QueueLimit: p.QueueLimit, QueueWait: p.QueueWait, MaxRPM: p.MaxRPM, DayCalls: p.DayCalls,
