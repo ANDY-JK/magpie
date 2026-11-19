@@ -1,0 +1,75 @@
+{
+  "name": "magpie-plugin-codar",
+  "version": "0.3.0",
+  "description": "Codar (科搭) for magpie — its models as a provider, the daily check-in, and the account's points on the card",
+  "author": "MisonL",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MisonL/magpie-plugin-codar.git"
+  },
+  "homepage": "https://github.com/MisonL/magpie-plugin-codar",
+  "bugs": {
+    "url": "https://github.com/MisonL/magpie-plugin-codar/issues"
+  },
+  "main": "./index.mjs",
+  "exports": "./index.mjs",
+  "files": [
+    "index.mjs",
+    "lib/internal.mjs",
+    "lib/signinpage.mjs",
+    "lib/native.mjs",
+    "lib/catalog.mjs",
+    "native/binary-name.mjs",
+    "scripts/catalog.mjs",
+    "scripts/tarball.mjs",
+    "scripts/build-native.mjs",
+    "native/go.mod",
+    "native/cmd/codar-proxy/main.go",
+    "native/cmd/codar-proxy/main_test.go",
+    "test/plugin.test.mjs",
+    "test/style.test.mjs",
+    "test/native.test.mjs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "scripts/native-packages.mjs"
+  ],
+  "keywords": [
+    "magpie",
+    "magpie-plugin",
+    "opencode-plugin",
+    "codar",
+    "speedai",
+    "checkin"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "magpie": {
+    "icon": "https://codar.speedai.com/assets/codar-icon.png",
+    "maxConcurrency": 3
+  },
+  "scripts": {
+    "test": "node --test",
+    "catalog": "node scripts/catalog.mjs",
+    "catalog:check": "node scripts/catalog.mjs --check",
+    "test:tarball": "node scripts/tarball.mjs",
+    "native": "node scripts/build-native.mjs",
+    "native:all": "node scripts/build-native.mjs --all",
+    "native:test": "cd native && go test ./...",
+    "prepublishOnly": "node scripts/build-native.mjs --check --strict && node scripts/tarball.mjs && node scripts/native-packages.mjs --check",
+    "native:pack": "node scripts/native-packages.mjs"
+  },
+  "optionalDependencies": {
+    "magpie-plugin-codar-darwin-arm64": "0.3.0",
+    "magpie-plugin-codar-darwin-x64": "0.3.0",
+    "magpie-plugin-codar-linux-arm64": "0.3.0",
+    "magpie-plugin-codar-linux-x64": "0.3.0",
+    "magpie-plugin-codar-win32-x64": "0.3.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

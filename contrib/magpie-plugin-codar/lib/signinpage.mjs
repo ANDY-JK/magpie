@@ -1,0 +1,784 @@
+// signinpage.mjs is the browser page the 「科搭OAuth登录」 sign-in runs on.
+//
+// One entry point, two ways to sign in, the same two the vendor's own login
+// dialog offers as tabs (扫码登录 / 手机号登录, measured on the web app
+// 2026-11-13): the person switches between them on the page instead of
+// choosing between buttons in magpie's list.
+//
+//   - SMS. The vendor's SMS code cannot be asked for by a program: POST
+//     /v1/verification-code refuses a request without a solved Aliyun captcha
+//     (measured 2026-11-11: {"code":400,"message":"请完成人机验证"}), and that
+//     captcha is a challenge a person completes in a browser. The vendor's own
+//     web app renders it with its own captchaId, loaded from its own ct4.js —
+//     and that widget also runs on a page of ours (verified: a 127.0.0.1 page
+//     inits it, shows the box, and getValidate() answers lot_number,
+//     captcha_output, pass_token and gen_time).
+//   - QR. POST /v1/wechat/login/qrcode answers {scene, qr_url} (no credential),
+//     and the page polls POST /v1/wechat/login/status {scene} every two to three seconds
+//     until the vendor says the sign-in is done, the code expired, the code was
+//     scanned, or the account needs something first.
+//
+// Either way this module serves the page on 127.0.0.1, keeps the token it gets
+// in memory, and hands it back to the caller. Every vendor call is made here,
+// not by the page, so the sign-in leaves through the plugin's own transport and
+// the token never reaches the page at all.
+//
+// The page can also be the vendor's IP-check step: when a password sign-in was
+// stopped by the IP risk check, the plugin opens this page with `verify.ip`
+// instead of the tabs' sign-in, and it completes that check through
+// /v1/user/verify_ip (see index.mjs's pendingVerify).
+//
+// The listener is bound to 127.0.0.1 and every request must carry the random
+// path token, so another process on the machine cannot read the state, and a
+// page elsewhere cannot post to it. It answers for ttlMs at most and is closed
+// by the caller when the sign-in ends either way.
+
+import { randomBytes } from "node:crypto"
+import { createServer } from "node:http"
+
+// MAX_BODY bounds one request from the page: the four captcha fields and a
+// phone or code, or a scene, nothing more. A body past it is refused before it
+// is read.
+const MAX_BODY = 16 * 1024
+
+// POLL_MS is how often the page asks this listener about a QR code, which is
+// the vendor web app's own cadence (2000–3000 ms between status calls).
+const POLL_MS = 2500
+
+// DEFAULT_CAPTCHA_ID is the captchaId the vendor's own web app uses for its
+// login page (index-iVWJypgu.js: `gS="bb7f810ecc9f6d21dcf72bcae120c8c5"`).
+// It is the vendor's, not ours: the page asks the vendor's own widget.
+export const DEFAULT_CAPTCHA_ID = "bb7f810ecc9f6d21dcf72bcae120c8c5"
+
+const readJson = (req) =>
+  new Promise((resolve, reject) => {
+    let size = 0
+    const chunks = []
+    req.on("data", (c) => {
+      size += c.length
+      if (size > MAX_BODY) {
+        reject(Object.assign(new Error("too large"), { code: "too_large" }))
+        req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"))
+      } catch (e) {
+        reject(Object.assign(new Error("not json"), { code: "bad_json" }))
+      }
+    })
+    req.on("error", reject)
+  })
+
+const send = (res, status, body, type = "application/json; charset=utf-8") => {
+  res.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" })
+  res.end(body)
+}
+
+// sameOrigin and isJson are the listener's own origin check. The path token is
+// the real secret; these stop a browser that knows it from being pointed here
+// from somewhere else. DNS rebinding is the concrete case: evil.com resolves to
+// 127.0.0.1 and the request arrives with Host: evil.com. A text/plain POST is
+// the other: a simple request no preflight stands before, so the JSON content
+// type is required too.
+const isJson = (req) => /^application\/json\b/i.test(String(req.headers["content-type"] ?? ""))
+
+const sameOrigin = (req, bound) => {
+  if (bound && req.headers.host !== bound) return false
+  const origin = req.headers.origin
+  return !origin || !bound || origin === `http://${bound}`
+}
+
+// esc is copy interpolated into the page, as text or into an attribute. Most of
+// it is this plugin's own words, but the IP-check step's hint names the
+// account, and that name comes from the vendor's refusal body (or from what the
+// person typed into the password prompt). Pasted in as HTML, a vendor echo
+// would run as markup on an origin that holds this sign-in's path token — the
+// page carries no CSP, and every POST to the listener names that path.
+const esc = (s) =>
+  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c])
+
+// SIGN, FINISH and MISFIT are the three marks the page shows in place of an
+// image: strokes drawn in the page's own colours, not the vendor's logo, which
+// is not this page's to use.
+const STROKE = `fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"`
+
+const SIGN = `<svg viewBox="0 0 32 32" width="15" height="15" aria-hidden="true">
+  <circle cx="16" cy="16" r="4.6" ${STROKE} stroke-width="2.4"/>
+  <path d="M9.2 22.8a9.6 9.6 0 0 1 0-13.6M22.8 9.2a9.6 9.6 0 0 1 0 13.6" ${STROKE}/>
+  <circle cx="16" cy="16" r="1.6" fill="currentColor"/>
+</svg>`
+
+const FINISH = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+  <path d="M5.5 12.5l4.3 4.3 8.7-9.1" ${STROKE} stroke-width="2.4" stroke-linejoin="round"/>
+</svg>`
+
+const MISFIT = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+  <path d="M7 7l10 10M17 7L7 17" ${STROKE} stroke-width="2.4"/>
+</svg>`
+
+// js is one literal for the page script. A bare identifier would be spliced in
+// as a variable name — `captchaId: ${captchaId}` read the page's own (missing)
+// `captchaId` and handed the vendor's widget an undefined one — so the value is
+// quoted as a string, and a closing script tag in it could not end the block
+// early.
+const js = (v) => JSON.stringify(String(v)).replace(/</g, "\\u003c")
+const num = (v, byDefault) => JSON.stringify(Number.isFinite(Number(v)) ? Number(v) : byDefault)
+
+// The page is drawn in the design language of the Codar client's own login
+// dialog and the official site, read off both with computed styles
+// (2026-11-13): the client's white dialog on rgb(34,34,34) text in PingFang
+// SC, its tabs with an indigo (rgb(99,102,241)) active tab, its 12px rounded
+// fields on rgb(245,246,247) with rgb(223,226,232) borders and its focused
+// field ringed in the indigo at 10% alpha; the site's near-black primary
+// button (rgb(17,19,24), white label, 8px radius) and soft indigo glow
+// (rgba(83,72,223,…)). The identity mark is this plugin's own — not the
+// vendor's logo, which is not this page's to use.
+const STYLE = `
+  :root {
+    --ink: #222222; --muted: #6b7280; --line: #dfe2e8; --field: #f5f6f7;
+    --accent: #6366f1; --accent-soft: rgba(99, 102, 241, .1);
+    --primary: #111318; --ok: #107c65; --err: #d92d20;
+    --ok-deep: #0b5a4a; --err-deep: #9b1c15;
+    --glow: rgba(83, 72, 223, .28) 0 16px 38px;
+  }
+  * { box-sizing: border-box }
+  [hidden] { display: none !important }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+    background: radial-gradient(1200px 600px at 50% -10%, #eef0ff 0%, #f7f8fa 45%, #f2f3f5 100%);
+    color: var(--ink);
+    font: 14px/1.6 "PingFang SC", "PingFang TC", "PingFang HK", -apple-system, "system-ui", "Segoe UI", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    width: 100%; max-width: 400px; padding: 32px 32px 28px; background: #fff;
+    border: 1px solid rgba(17, 24, 39, .06); border-radius: 16px; box-shadow: var(--glow);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px }
+  .mark {
+    width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: linear-gradient(140deg, #1b1e2e 0%, #3b3f8f 70%, #6366f1 100%); color: #fff;
+    box-shadow: 0 4px 12px rgba(59, 63, 143, .28);
+  }
+  .brand strong { font-size: 15px; font-weight: 600; letter-spacing: .2px }
+  .brand span { color: var(--muted); font-size: 12px; margin-left: 2px }
+  h1 { font-size: 20px; line-height: 1.4; margin: 0 0 6px; font-weight: 600 }
+  p.hint { color: var(--muted); margin: 0 0 18px; font-size: 13px }
+  .tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--line); margin: 0 0 20px }
+  .tabs button {
+    position: relative; padding: 8px 0 10px; font: inherit; font-size: 14px; color: var(--ink);
+    background: none; border: 0; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { color: var(--accent); font-weight: 500 }
+  .tabs button[aria-selected="true"]::after {
+    content: ""; position: absolute; left: 50%; bottom: -1px; width: 20px; height: 2px;
+    margin-left: -10px; border-radius: 2px; background: var(--accent);
+  }
+  .panel { animation: rise .22s ease-out both }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+  @media (prefers-reduced-motion: reduce) { .panel, .qr img { animation: none; transition: none } }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px }
+  input {
+    width: 100%; padding: 10px 12px; font: inherit; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line); border-radius: 8px; transition: border-color .15s, box-shadow .15s;
+  }
+  input::placeholder { color: #9ca3af }
+  input:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: #fff }
+  input[readonly] { color: var(--muted) }
+  button.action {
+    font: inherit; font-size: 14px; padding: 0 18px; height: 40px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: rgba(255, 255, 255, .72); color: var(--ink); white-space: nowrap;
+    transition: background .15s, border-color .15s, opacity .15s;
+  }
+  button.action:hover:not(:disabled) { border-color: #c9cdd6 }
+  button.action.primary { width: 100%; background: var(--primary); border-color: var(--primary); color: #fff }
+  button.action.primary:hover:not(:disabled) { background: #24272f }
+  button.action:disabled { opacity: .45; cursor: default }
+  .row { display: flex; gap: 8px; align-items: stretch; margin-top: 16px }
+  .row input { flex: 1 }
+  #status { margin-top: 16px; min-height: 20px; font-size: 13px; color: var(--muted) }
+  #status.err { color: var(--err) }
+  #status.ok { color: var(--ok) }
+  #cap { margin-top: 12px }
+  .qr { position: relative; width: 236px; margin: 4px auto 0; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: #fff; text-align: center }
+  .qr img { width: 220px; height: 220px; display: block; image-rendering: pixelated; transition: opacity .25s, filter .25s }
+  .qr.fresh { color: var(--muted); font-size: 13px; display: flex; align-items: center; justify-content: center; width: 236px; height: 236px }
+  .qr.veil img { opacity: .16; filter: blur(2px) }
+  .qr .veil-text {
+    display: none; position: absolute; inset: 8px; grid-template-rows: 1fr auto 1fr; text-align: center;
+    color: var(--ink); font-size: 13px;
+  }
+  .qr.veil .veil-text { display: grid }
+  .qr.veil.again .veil-text { cursor: pointer }
+  .qr .veil-text span { grid-row: 2; justify-self: center; padding: 6px 12px; border-radius: 8px; background: rgba(255, 255, 255, .9); box-shadow: 0 1px 4px rgba(17, 24, 39, .06) }
+  .wechat { margin: 14px 0 0; text-align: center; color: var(--muted); font-size: 13px }
+  form hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0 0 }
+  footer { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; gap: 12px }
+  /* The end screen is the card's last panel, not a separate screen: the brand
+  row and the footer stay, the sign-in's h1 and hint make way for the end
+  screen's own, and one scale carries both — the 34px mark above the 20px/600
+  heading, a 14px sentence in ink, a 13px muted hint, left aligned like the form. */
+  main.ended > h1, main.ended > p.hint { display: none }
+  .end .mark { margin-bottom: 16px }
+  .end .mark.ok { background: linear-gradient(140deg, var(--ok-deep) 0%, var(--ok) 100%); box-shadow: 0 4px 12px rgba(16, 124, 101, .28) }
+  .end .mark.bad { background: linear-gradient(140deg, var(--err-deep) 0%, var(--err) 100%); box-shadow: 0 4px 12px rgba(217, 45, 32, .24) }
+  .end h2 { font-size: 20px; line-height: 1.4; margin: 0 0 6px; font-weight: 600 }
+  .end p { margin: 0 0 6px; overflow-wrap: anywhere }
+  .end p.hint { color: var(--muted); font-size: 13px; margin: 0 }
+`
+
+// PAGE is the page's markup and script. `mode` is "tabs" (the sign-in, two
+// tabs) or "verify" (the vendor's IP check, one form); `phone` is a number the
+// vendor already showed, filled in and locked; `hint` names the account on the
+// IP-check page. The page asks this listener for everything and never sees the
+// token: the last thing it shows is that the sign-in finished.
+const PAGE = ({ path, captchaId, pollMs, mode, title, hint, button, phone }) => `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>${esc(title)}</title>
+<style>${STYLE}</style>
+</head>
+<body>
+<main>
+  <div class="brand"><div class="mark">${SIGN}</div><strong>科搭 Codar</strong><span>· magpie</span></div>
+  <h1>${esc(title)}</h1>
+  <p class="hint">${esc(hint)}</p>
+${
+  mode === "verify"
+    ? `  <form id="sms">
+    <label for="phone">手机号</label>
+    <input id="phone" inputmode="numeric" autocomplete="tel" placeholder="11 位手机号"${phone ? ` value="${esc(phone)}" readonly` : ""}>
+    <div id="cap"></div>
+    <div class="row"><button id="send" class="action" type="button">发送验证码</button></div>
+    <label for="code">短信验证码</label>
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="6 位验证码">
+    <div class="row"><button id="go" class="action primary" type="submit">${esc(button)}</button></div>
+  </form>`
+    : `  <div class="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-scan" data-tab="scan" aria-selected="true" aria-controls="panel-scan">扫码登录</button>
+    <button type="button" role="tab" id="tab-sms" data-tab="sms" aria-selected="false" aria-controls="panel-sms">手机号登录</button>
+  </div>
+  <section class="panel" id="panel-scan" role="tabpanel" aria-labelledby="tab-scan">
+    <div class="qr fresh" id="qr">正在获取二维码…<div class="veil-text"></div></div>
+    <p class="wechat">请使用微信扫描二维码，并在手机上确认</p>
+    <div class="row"><button id="refresh" class="action primary" type="button" disabled>刷新二维码</button></div>
+  </section>
+  <section class="panel" id="panel-sms" role="tabpanel" aria-labelledby="tab-sms" hidden>
+    <form id="sms">
+      <label for="phone">手机号</label>
+      <input id="phone" inputmode="numeric" autocomplete="tel" placeholder="11 位手机号"${phone ? ` value="${esc(phone)}" readonly` : ""}>
+      <div id="cap"></div>
+      <div class="row"><button id="send" class="action" type="button">发送验证码</button></div>
+      <label for="code">短信验证码</label>
+      <input id="code" inputmode="numeric" autocomplete="one-time-code" placeholder="6 位验证码">
+      <div class="row"><button id="go" class="action primary" type="submit">${esc(button)}</button></div>
+    </form>
+  </section>`
+}
+  <div id="status" role="status"></div>
+  <div class="end" id="done" hidden>
+    <div class="mark ok">${FINISH}</div>
+    <h2>登录成功</h2>
+    <p>可以关闭此页面，回到 magpie 继续。</p>
+    <p class="hint">科搭的登录状态已交给 magpie，无需再做其他操作。</p>
+  </div>
+  <div class="end" id="bad" hidden>
+    <div class="mark bad">${MISFIT}</div>
+    <h2>无法完成登录</h2>
+    <p id="bad-why">科搭没有接受这次登录。</p>
+    <p class="hint">可以关闭此页面，回到 magpie 重新发起登录。</p>
+  </div>
+  <footer><span>magpie 插件 · 本机临时页面</span><span>所有凭证只在本页所在的插件里</span></footer>
+</main>
+<script>
+const PATH = ${js(path)}
+const MODE = ${js(mode)}
+const POLL = ${num(pollMs, 2500)}
+const el = (id) => document.getElementById(id)
+// say writes the status line. A page that has finished keeps "登录成功" as its
+// last word: a poll that loses a race with the success must not replace it.
+let finished = false
+const say = (m, cls) => { if (finished) return; const s = el("status"); s.textContent = m; s.className = cls || "" }
+// end is the page's last screen: the sign-in finished, or the vendor stated a
+// state it will not finish. Either way the form goes away and nothing more is
+// asked, so the person is left with one sentence and a way out.
+const end = (id) => {
+  finished = true
+  document.querySelector("main").classList.add("ended")
+  if (el("status")) el("status").hidden = true
+  for (const t of document.querySelectorAll(".tabs, .panel, form")) t.hidden = true
+  for (const b of document.querySelectorAll("button")) b.disabled = true
+  if (el("done")) el("done").hidden = id !== "done"
+  if (el("bad")) el("bad").hidden = id !== "bad"
+  el(id).scrollIntoView?.({ block: "nearest" })
+}
+const done = () => end("done")
+const fail = (m) => {
+  say(m, "err")
+  if (el("bad-why") && m) el("bad-why").textContent = m
+  end("bad")
+}
+// A listener that is gone stays gone: asking a closed port again only repeats
+// the same failure, so the page says so once and ends.
+const lost = (e) => {
+  if (e && e.gone) fail(e.message)
+}
+
+const post = async (p, body) => {
+  let r
+  try {
+    r = await fetch(PATH + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })
+  } catch {
+    // No answer at all: the listener is closed, and every later call would
+    // fail the same way. These two endings are what the page shows.
+    throw Object.assign(new Error("登录页面已失效，请重新发起登录"), { gone: true })
+  }
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) {
+    // 410 is the listener's own word for "this page ended at the vendor": the
+    // page ends the same way as an unreachable listener.
+    const err = new Error(data.error || ("HTTP " + r.status))
+    if (r.status === 410) err.gone = true
+    throw err
+  }
+  return data
+}
+
+/* ---------- the SMS tab (or the whole page, for the IP check) ---------- */
+const loadCaptcha = () => new Promise((resolve, reject) => {
+  if (typeof window.initAlicom4 === "function") return resolve()
+  const s = document.createElement("script")
+  s.src = "https://codar-web.speedai.com/ct4.js"
+  s.onload = () => (typeof window.initAlicom4 === "function" ? resolve() : reject(new Error("验证码脚本不完整")))
+  s.onerror = () => reject(new Error("验证码脚本加载失败"))
+  document.head.appendChild(s)
+})
+
+let cap = null
+let capReady = false
+let sending = false
+
+// ensureCaptcha starts the vendor's widget the first time its tab is shown.
+// The widget is loaded only there: switching to the QR tab must not be held up
+// by a captcha script the person is not looking at.
+const ensureCaptcha = async () => {
+  if (capReady) return
+  capReady = true
+  try {
+    await loadCaptcha()
+    await new Promise((resolve, reject) => {
+      window.initAlicom4({ captchaId: ${js(captchaId)}, language: "zh", product: "bind", protocol: "https://", https: true, onError: reject }, (c) => {
+        cap = c
+        c.appendTo("#cap")
+        c.onError((e) => reject(e instanceof Error ? e : new Error(String(e))))
+        resolve(c)
+      })
+    })
+  } catch (e) {
+    cap = null
+    say("人机验证加载失败：" + (e && e.message ? e.message : e), "err")
+    el("send").disabled = true
+  }
+}
+
+const phoneOf = () => el("phone").value.trim()
+
+el("send").onclick = () => {
+  if (sending || !cap) return
+  const phone = phoneOf()
+  if (!/^1[3-9]\\d{9}$/.test(phone)) { say("请输入正确的手机号", "err"); return }
+  sending = true
+  el("send").disabled = true
+  say("请完成人机验证…")
+  cap.showBox()
+  cap.onSuccess(async () => {
+    try {
+      const v = cap.getValidate()
+      await post("/send", { phone, captcha: { lot_number: v.lot_number, captcha_output: v.captcha_output, pass_token: v.pass_token, gen_time: v.gen_time } })
+      say("验证码已发送，请查看短信", "ok")
+      let left = 60
+      const timer = setInterval(() => {
+        left -= 1
+        el("send").textContent = left > 0 ? left + " 秒后重发" : "发送验证码"
+        if (left <= 0) { clearInterval(timer); el("send").disabled = false; sending = false }
+      }, 1000)
+      cap.reset()
+    } catch (e) {
+      if (e && e.gone) { lost(e); return }
+      say("验证码发送失败：" + e.message, "err")
+      el("send").disabled = false
+      sending = false
+      cap.reset()
+    }
+  })
+}
+
+el("sms").onsubmit = async (ev) => {
+  ev.preventDefault()
+  const phone = phoneOf()
+  const code = el("code").value.trim()
+  if (!/^1[3-9]\\d{9}$/.test(phone)) { say("请输入正确的手机号", "err"); return }
+  if (!/^\\d{4,8}$/.test(code)) { say("请输入短信验证码", "err"); return }
+  el("go").disabled = true
+  say("正在登录…")
+  try {
+    await post("/verify", { phone, code })
+    done()
+  } catch (e) {
+    if (e && e.gone) { lost(e); return }
+    if (!(e && e.gone)) el("go").disabled = false
+    say((MODE === "verify" ? "验证失败：" : "登录失败：") + e.message, "err")
+  }
+}
+
+if (MODE === "verify") ensureCaptcha()
+
+/* ---------- the QR tab ---------- */
+let scene = null
+let qrTimer = null
+let started = false
+// gen numbers the polling chain. Redrawing (a refresh click, an expired code)
+// starts a new chain and orphans the old one, so an in-flight poll that returns
+// later cannot schedule a second chain beside it.
+let gen = 0
+
+const showQr = (url) => {
+  const box = el("qr")
+  box.className = "qr"
+  box.textContent = ""
+  const img = document.createElement("img")
+  img.alt = "微信登录二维码"
+  img.src = url
+  box.appendChild(img)
+  const veil = document.createElement("div")
+  veil.className = "veil-text"
+  box.appendChild(veil)
+}
+
+// veil dims a code the vendor says is past use and puts a sentence over it:
+// "click to get a new one" when the person has to ask for a redraw, blank while
+// one is on its way. A dimmed code stays clickable so the redraw is never a
+// hidden button.
+const veil = (text, again) => {
+  const box = el("qr")
+  if (!box) return
+  if (!text) { box.className = "qr"; return }
+  const v = box.querySelector(".veil-text")
+  if (v) { v.textContent = ""; const s = document.createElement("span"); s.textContent = text; v.appendChild(s) }
+  box.className = "qr veil" + (again ? " again" : "")
+  box.onclick = again ? () => drawQr() : null
+}
+
+const drawQr = async (why) => {
+  if (!el("qr")) return
+  const mine = ++gen
+  clearTimeout(qrTimer)
+  if (finished) return
+  el("refresh").disabled = true
+  say(why || "正在获取二维码…")
+  try {
+    const got = await post("/qr")
+    if (mine !== gen || finished) return
+    scene = got.scene
+    showQr(got.qr_url)
+    el("refresh").disabled = false
+    say("请使用微信扫码")
+    qrTimer = setTimeout(() => pollQr(mine), POLL)
+  } catch (e) {
+    if (mine !== gen || finished) return
+    // A failure with a code on screen is the vendor's answer about this sign-in
+    // (「当前二维码需要绑定手机号」): the code under the sentence is no longer
+    // one to scan, so it is dimmed and the redraw comes from the person.
+    if (e && e.gone) { lost(e); return }
+    if (el("qr") && el("qr").querySelector("img")) veil("二维码获取失败，点击重试", true)
+    say("二维码获取失败：" + e.message, "err")
+    el("refresh").disabled = false
+  }
+}
+
+const pollQr = async (mine) => {
+  if (finished || !scene || mine !== gen) return
+  try {
+    const got = await post("/status", { scene })
+    // A success is the answer whatever chain asked: the person should not be
+    // told to keep scanning because they pressed refresh a moment before it
+    // landed.
+    if (got.state === "done") { gen++; done(); return }
+    if (mine !== gen) return
+    if (got.state === "expired") {
+      // The fresh code is asked for on its own: drawQr dims this one at once,
+      // so the code that no longer works is never shown as if it did.
+      veil("二维码已过期，正在刷新…", false)
+      drawQr("二维码已过期，正在刷新…")
+      return
+    }
+    if (got.state === "error") { fail(got.message || "登录失败"); return }
+    if (got.state === "scanned") {
+      veil("已扫码，请在手机上确认", false)
+      say("已扫码，请在手机上确认")
+    } else {
+      veil("", false)
+      say(got.message || "请使用微信扫码")
+    }
+  } catch (e) {
+    if (mine !== gen) return
+    if (e && e.gone) { lost(e); return }
+    say("状态查询失败：" + e.message, "err")
+  }
+  if (mine !== gen || finished) return
+  qrTimer = setTimeout(() => pollQr(mine), POLL)
+}
+
+// startQr begins the QR sign-in the first time its tab is shown. A tab that
+// was left before the code arrived keeps drawing: the code is good whether or
+// not the person is looking at it, and a switched-back tab must not have to
+// wait for a second one.
+const startQr = () => {
+  if (started) return
+  started = true
+  drawQr()
+}
+
+if (el("refresh")) el("refresh").onclick = () => drawQr()
+
+/* ---------- the tabs ---------- */
+const show = (which) => {
+  for (const t of document.querySelectorAll("[role=tab]")) t.setAttribute("aria-selected", String(t.dataset.tab === which))
+  el("panel-scan").hidden = which !== "scan"
+  el("panel-sms").hidden = which !== "sms"
+  if (which === "sms") ensureCaptcha()
+  else startQr()
+}
+for (const t of document.querySelectorAll("[role=tab]")) t.onclick = () => show(t.dataset.tab)
+if (MODE === "tabs") startQr()
+</script>
+</body>
+</html>`
+
+// SIGNIN is the copy the page shows by default: the phone-and-SMS and QR
+// sign-ins the 「科搭OAuth登录」 method opens.
+const SIGNIN = { title: "登录科搭 Codar", hint: "登录后回到 magpie 即可使用科搭的模型。", button: "登录", phone: "" }
+
+// startSignIn serves the page and answers it.
+//
+// The SMS side: sendCode(phone, captcha) and verifyCode(phone, code) make the
+// vendor calls and answer the token (verifyCode) or nothing (sendCode). The QR
+// side: qrcode() asks the vendor for a scene and its image ({scene, qrUrl});
+// status(scene) asks what became of it ({state, token?, username?, phone?,
+// message?}), where state is one of "waiting" | "scanned" | "expired" | "done"
+// | "error", already read from the vendor's own words by the caller, so this
+// module never guesses at them. Both throw an Error whose message the page
+// shows.
+//
+// `verify` turns the page into the vendor's IP-check step: { sendCode,
+// verifyCode, hint, phone } with the same two calls (each already bound to the
+// temp token and the account it belongs to). `copy` renames the page's title
+// and button. The result: {url, wait(signal), close()}.
+export function startSignIn({
+  sendCode,
+  verifyCode,
+  qrcode,
+  status,
+  verify,
+  captchaId = DEFAULT_CAPTCHA_ID,
+  ttlMs = 10 * 60 * 1000,
+  pollMs = POLL_MS,
+  copy = {},
+  // The page's 60-second resend countdown is the first line against a leaked
+  // link; these are the listener's own, so a script on the path cannot spend
+  // the account's SMS quota or guess a code faster than a person could. The
+  // submit limit counts refusals too, so a wrong code costs an attempt.
+  sendCooldownMs = 60 * 1000,
+  maxSubmits = 5,
+  now = () => Date.now(),
+} = {}) {
+  const said = { ...SIGNIN, ...copy }
+  const mode = verify ? "verify" : "tabs"
+  const secret = randomBytes(16).toString("hex")
+  const base = `/s/${secret}`
+  const state = { stage: "waiting", error: "", token: "", username: "" }
+  let settle = () => {}
+  const done = new Promise((resolve) => {
+    settle = resolve
+  })
+  let closing = false
+  // bound is "127.0.0.1:<port>", filled in once the listener is up: the page is
+  // handed that same origin, so anything else is not this page talking.
+  let bound = ""
+
+  // Per-page send cooldown and submit budget, held here rather than in the
+  // page: a resend and a wrong code both reach the vendor, and the page's own
+  // timer is not what a script has to honour. Resetting on the cooldown's
+  // expiry is wall-clock, so a page left open overnight can send once more.
+  let lastSentAt = -Infinity
+  let submits = 0
+  const cooldownLeft = () => lastSentAt === -Infinity ? 0 : Math.max(0, lastSentAt + sendCooldownMs - now())
+
+  // finish is the one success path, whichever tab got there first: the token
+  // stays here, the caller is woken, and nothing more is answered as success.
+  const finish = (got) => {
+    state.token = String(got?.token ?? "")
+    state.username = String(got?.username ?? "")
+    state.stage = "done"
+    settle()
+  }
+
+  const pageHtml = () =>
+    PAGE({
+      path: base,
+      captchaId,
+      pollMs,
+      mode,
+      title: said.title,
+      hint: verify ? verify.hint : said.hint,
+      button: said.button,
+      phone: verify ? verify.phone : said.phone,
+    })
+
+  // route answers one request from the page: "/send", "/verify", "/qr" and
+  // "/status" are this module's; everything else is a 404. The origin check and
+  // the JSON content type are the listener's, and are not repeated here — the
+  // server below applies them before it comes this far.
+  const route = async (rest, req, body) => {
+    const reply = (status, text, type) => ({ status, text: String(text), type })
+    if (!(rest === "/send" || rest === "/verify" || (!verify && (rest === "/qr" || rest === "/status")))) return reply(404, "not found", "text/plain; charset=utf-8")
+    if (!isJson(req)) return reply(415, JSON.stringify({ error: "请求格式不被允许" }))
+    if (state.stage === "done") return reply(409, JSON.stringify({ error: "已经登录" }))
+    try {
+      return reply(200, JSON.stringify(await answer(rest, body)))
+    } catch (e) {
+      state.error = e instanceof Error ? e.message : String(e)
+      return reply(typeof e?.reply === "number" ? e.reply : 400, JSON.stringify({ error: state.error }))
+    }
+  }
+
+  // answer is the work behind a recognised route, answered as the object the
+  // page reads back.
+  const answer = async (rest, body) => {
+    if (rest === "/qr") {
+      const got = await qrcode()
+      // 502 is the caller's: this module only names the failure
+      if (!got?.scene || !got?.qrUrl) throw Object.assign(new Error("二维码数据不完整"), { reply: 502 })
+      return { scene: got.scene, qr_url: got.qrUrl }
+    }
+    if (rest === "/status") {
+      const scene = String(body?.scene ?? "").trim()
+      if (!scene) throw new Error("缺少 scene")
+      const got = await status(scene)
+      if (got?.state === "done" && state.stage !== "done") finish(got)
+      // A state the vendor will not finish (phone binding required, an IP
+      // check, a failed scan) is the end of this sign-in: the page stops
+      // asking, and wait() must answer too. Left unsettled, the host sat on
+      // the page for the listener's whole TTL. (A "done" with no token still
+      // ends it in the caller's read of the vendor's words: an answer cannot be
+      // both.)
+      else if (got?.state === "error" && state.stage !== "done") {
+        state.stage = "error"
+        state.error = typeof got.message === "string" ? got.message : ""
+        settle()
+      }
+      // nothing but the state and a sentence ever leaves this listener
+      return { state: got?.state ?? "waiting", message: got?.message ? String(got.message) : "" }
+    }
+    const phone = String(body?.phone ?? "").trim()
+    if (!/^1[3-9]\d{9}$/.test(phone)) throw new Error("请输入正确的手机号")
+    if (rest === "/send") {
+      const left = cooldownLeft()
+      if (left > 0) throw Object.assign(new Error(`请 ${Math.ceil(left / 1000)} 秒后再发送验证码`), { reply: 429 })
+      const c = body?.captcha ?? {}
+      const captcha = {
+        lot_number: String(c.lot_number ?? ""),
+        captcha_output: String(c.captcha_output ?? ""),
+        pass_token: String(c.pass_token ?? ""),
+        gen_time: String(c.gen_time ?? ""),
+      }
+      if (!captcha.lot_number || !captcha.captcha_output || !captcha.pass_token || !captcha.gen_time) throw new Error("人机验证没有完成")
+      await sendCode(phone, captcha)
+      lastSentAt = now()
+      if (state.stage !== "done") state.stage = "sent"
+      return { ok: true }
+    }
+    // The submit budget is spent before the vendor is asked, refusals
+    // included: a page with five wrong codes in it ends here rather than
+    // letting a script walk the vendor's code space.
+    if (submits >= maxSubmits) throw Object.assign(new Error("验证码尝试次数过多，请重新打开登录页"), { reply: 429 })
+    submits += 1
+    const code = String(body?.code ?? "").trim()
+    if (!/^\d{4,8}$/.test(code)) throw new Error("请输入短信验证码")
+    const got = await verifyCode(phone, code)
+    // The token on record is the sign-in that finished first, and the page
+    // stops asking once one has: a second call over a finished sign-in is a
+    // lost race, not a new sign-in to replace it with.
+    if (state.stage !== "done") finish(got)
+    return { ok: true }
+  }
+
+  const server = createServer(async (req, res) => {
+    if (!sameOrigin(req, bound)) return send(res, 403, JSON.stringify({ error: "来源不被允许" }))
+    const url = new URL(req.url ?? "/", "http://127.0.0.1")
+    if (!url.pathname.startsWith(base)) return send(res, 404, "not found", "text/plain; charset=utf-8")
+    const rest = url.pathname.slice(base.length) || "/"
+    if (req.method === "GET" && (rest === "/" || rest === "/index.html")) return send(res, 200, pageHtml(), "text/html; charset=utf-8")
+    if (req.method !== "POST") return send(res, 404, "not found", "text/plain; charset=utf-8")
+    let body = {}
+    if (isJson(req)) {
+      try {
+        body = await readJson(req)
+      } catch {
+        return send(res, 400, JSON.stringify({ error: "请求内容无法识别" }))
+      }
+    }
+    const got = await route(rest, req, body)
+    return send(res, got.status, got.text, got.type)
+  })
+
+  return new Promise((resolve, reject) => {
+    server.once("error", reject)
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address()
+      bound = `127.0.0.1:${port}`
+      const url = `http://${bound}${base}/`
+      const close = () => {
+        if (closing) return
+        closing = true
+        clearTimeout(timer)
+        server.close()
+        settle()
+      }
+      // timer is unref'd so a page nobody closed never holds the process open.
+  let timer = null
+  timer = setTimeout(close, ttlMs)
+      timer.unref?.()
+      // wait answers the token once the page finished a sign-in, null when the
+      // sign-in was closed/aborted before that, and {error} when the vendor
+      // stated a state it will not finish.
+      const wait = async (signal) => {
+        if (signal?.aborted) {
+          close()
+          return null
+        }
+        await new Promise((res2) => {
+          const onAbort = () => {
+            close()
+            res2()
+          }
+          signal?.addEventListener?.("abort", onAbort, { once: true })
+          done.then(() => {
+            signal?.removeEventListener?.("abort", onAbort)
+            res2()
+          })
+        })
+        if (state.stage === "error") return { error: state.error || "登录失败" }
+        return state.stage === "done" && state.token ? { token: state.token, username: state.username } : null
+      }
+      resolve({ url, wait, close, state })
+    })
+  })
+}
