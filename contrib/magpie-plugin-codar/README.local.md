@@ -58,12 +58,17 @@ Claude 模型没暴露这个问题，因为 `pluginRequestBase` 会为 Anthropic
 ## 验证
 
 ```powershell
-cd "I:\开发文件\AI生成测试\magpie\contrib\magpie-plugin-codar"
-node --test test/plugin.test.mjs      # 394 pass / 0 fail
-
-# 经 magpie 网关实测（四种模型、两条协议）
-# codar/deepseek-v4.1-flash 200 · codar/auto 200 · codar/glm-5.3 200 · codar/claude-sonnet-5-5 200
+# 跑测试要先复制到纯 ASCII 路径：Windows 上从含中文的路径
+# （本仓库在 I:\开发文件\...）跑 node --test，Node 会栈溢出退出
+# （STATUS_STACK_BUFFER_OVERRUN，跑到第 90 个用例左右就没了）。
+# 同一份文件在 ASCII 路径下 397 个用例全跑完：
+$tmp = "$env:TEMP\codar-pkg"; Copy-Item . $tmp -Recurse
+cd $tmp; node --test test/plugin.test.mjs      # 394 pass / 0 fail
 ```
+
+运行不受影响：magpie 以 Bun 宿主从这条中文路径装载插件，实测四种模型、两条协议
+（`codar/deepseek-v4.1-flash`、`codar/auto`、`codar/glm-5.3`、`codar/claude-sonnet-5-5`）
+全部 200。
 
 ## 跟进上游
 
