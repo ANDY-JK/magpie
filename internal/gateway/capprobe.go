@@ -381,6 +381,9 @@ func init() {
 // capProbeOne asks one model what it can do, as a Test capabilities run
 // does (TestModelsWith), and keeps what settles. A probe that fails is no
 // route's and no health score's: the provider's test path notes neither.
+// A model no longer there to ask — its provider gone, or turned off —
+// gives the slot it took back (capProbeDropped): a slot never given back
+// would stop the loop's turns for good once two had piled up.
 func capProbeOne(ctx context.Context, k capProbeKey) {
 	p, err := provider.Find(k.id)
 	switch {
@@ -388,13 +391,13 @@ func capProbeOne(ctx context.Context, k capProbeKey) {
 		// the provider is gone since it was offered: nothing asked,
 		// nothing kept
 		log.Printf("cap probe: %s/%s not asked: %v", k.id, k.model, err)
-		deleteQueued(k)
+		capProbeDropped(k)
 		return
 	case p.Off:
 		// turned off since: on again, the next plan that lacks the model
 		// offers it
 		log.Printf("cap probe: %s/%s not asked: %s is off", k.id, k.model, k.id)
-		deleteQueued(k)
+		capProbeDropped(k)
 		return
 	}
 	c, done := context.WithTimeout(ctx, capProbeWait)
@@ -462,6 +465,20 @@ func deleteQueued(k capProbeKey) {
 	capProbes.Lock()
 	delete(capProbes.queued, k)
 	capProbes.Unlock()
+}
+
+// capProbeDropped is the turn a model no longer there to ask ends with:
+// the slot it took is given back (capProbesDone's asking--, which its two
+// early ways out of capProbeOne skip), the offer let go of, the loop
+// woken for the next turn. Nothing was asked, so nothing is recorded —
+// no failure, no backoff — and the day's count stays as the dispatch made
+// it: the offer had its place in the day, whatever came of it.
+func capProbeDropped(k capProbeKey) {
+	capProbes.Lock()
+	capProbes.asking--
+	capProbes.Unlock()
+	deleteQueued(k)
+	wakeCapProbe()
 }
 
 // capSaid is what a probe settled, as the pickers' letters spell it: T

@@ -337,3 +337,56 @@ func TestCapProbeOneAsksAndKeeps(t *testing.T) {
 		t.Fatalf("what the provider keeps: %+v", caps)
 	}
 }
+
+// A model no longer there to ask — its provider deleted or turned off
+// while it waited — gives the slot it took back: the turns go on, and a
+// slot never given back would stop them for good once two had piled up.
+func TestCapProbeDroppedGivesTheSlotBack(t *testing.T) {
+	resetCapProbes()
+	t.Cleanup(resetCapProbes)
+	off := provider.Provider{ID: "capprobe-off", Name: "Off", Key: "k", Chat: "http://127.0.0.1:9", Models: []string{"m"}, Off: true}
+	if err := provider.Save(off); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { provider.Delete("capprobe-off") })
+	capProbes.looping.Store(true)
+	setAutoCapProbe(t, nil)
+	// one offered whose provider is gone, one whose provider is off: both
+	// are let go of without a record, each slot back
+	capProbeOffer("capprobe-gone", "m")
+	capProbeOffer("capprobe-off", "m")
+	var asks sync.WaitGroup
+	if next := capProbesDue(context.Background(), &asks, time.Now()); !next.IsZero() {
+		t.Fatalf("next %v, want their wake to say nothing", next)
+	}
+	asks.Wait()
+	capProbes.Lock()
+	asking := capProbes.asking
+	capProbes.Unlock()
+	if asking != 0 {
+		t.Fatalf("%d slot(s) held after both drops, want none back late", asking)
+	}
+	if _, ok := capProbeRecordOf("capprobe-gone", "m"); ok {
+		t.Fatal("a drop left a record")
+	}
+	if _, ok := capProbeRecordOf("capprobe-off", "m"); ok {
+		t.Fatal("the off one left a record")
+	}
+	// the slots are back: a turn asks the two it can, whatever the drops
+	// took with them
+	held := make(chan struct{}, 2)
+	old := capProbeAsk
+	capProbeAsk = func(ctx context.Context, k capProbeKey) {
+		held <- struct{}{}
+		capProbesDone(k, true, "T✓")
+	}
+	t.Cleanup(func() { capProbeAsk = old })
+	capProbeOffer("capprobe-gone", "m1")
+	capProbeOffer("capprobe-gone", "m2")
+	capProbeOffer("capprobe-gone", "m3")
+	capProbesDue(context.Background(), &asks, time.Now())
+	asks.Wait()
+	if n := len(held); n != 2 {
+		t.Fatalf("%d probe(s) asked of two free slots, want both taken", n)
+	}
+}
