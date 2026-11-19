@@ -80,7 +80,7 @@ func TestKeysWeighedByTheirWindows(t *testing.T) {
 
 	// smart: b's week renews in a day, a's in six; c used up
 	of["a"], of["b"], of["c"] = week(10, now.Add(6*24*time.Hour)), week(40, now.Add(24*time.Hour)), week(99, now.Add(2*24*time.Hour))
-	got, wg := weigh(p, cs, "gpt-6-astra", provider.Responses)
+	got, wg := weigh(p, cs, "gpt-6-astra", provider.Responses, need{})
 	if restsOf(got) != "kw#b kw#a kw#c " {
 		t.Fatalf("smart: %s", restsOf(got))
 	}
@@ -123,7 +123,7 @@ func TestGroupWeighsKeyWindows(t *testing.T) {
 		{p: relay, model: "gpt-6-astra", rest: "sub2api"},
 	}
 	g := provider.Provider{ID: provider.GroupPrefix + "g"}
-	got, wg := weigh(g, heads, "", provider.Responses)
+	got, wg := weigh(g, heads, "", provider.Responses, need{})
 	if restsOf(got) != "sub2api codex " {
 		t.Fatalf("the key renewing first: %s", restsOf(got))
 	}
@@ -131,7 +131,7 @@ func TestGroupWeighsKeyWindows(t *testing.T) {
 		t.Fatalf("the key's trace: %+v", w)
 	}
 	of["sk-relay"] = week(99, now.Add(24*time.Hour))
-	if got, _ := weigh(g, heads, "", provider.Responses); restsOf(got) != "codex sub2api " {
+	if got, _ := weigh(g, heads, "", provider.Responses, need{}); restsOf(got) != "codex sub2api " {
 		t.Fatalf("the key used up: %s", restsOf(got))
 	}
 }
@@ -320,7 +320,7 @@ func TestRestingKeyReadAgainInAnOrderedGroup(t *testing.T) {
 	provider.KeyBalances(context.Background()) // its card: its week used up
 	s := &Server{}
 	first := func() (string, *Rest) {
-		out, pl := s.planGroup(g, ms, provider.Responses)
+		out, pl := s.planGroup(g, ms, provider.Responses, need{})
 		for i, c := range out {
 			if c.p.ID == "ko" {
 				return out[0].p.ID, pl.order[i].Rest
@@ -329,7 +329,7 @@ func TestRestingKeyReadAgainInAnOrderedGroup(t *testing.T) {
 		t.Fatalf("ko not planned: %d planned", len(out))
 		return "", nil
 	}
-	cs, _ := s.planGroup(g, ms, provider.Responses)
+	cs, _ := s.planGroup(g, ms, provider.Responses, need{})
 	if len(cs) != 2 || cs[0].p.ID != "ko" {
 		t.Fatalf("planned %d, ko first: %v", len(cs), len(cs) > 0 && cs[0].p.ID == "ko")
 	}

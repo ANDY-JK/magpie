@@ -25,7 +25,7 @@ func TestWeighedRankIsDraggedOrder(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, pl := (&Server{}).plan(*got, "model", provider.Chat)
+		_, pl := (&Server{}).plan(*got, "model", provider.Chat, need{})
 		want := map[string]int{provider.KeyID("third"): 0, provider.KeyID("first"): 1, provider.KeyID("second"): 2}
 		if len(pl.order) != 3 {
 			t.Fatalf("mode=%q order=%+v", mode, pl.order)

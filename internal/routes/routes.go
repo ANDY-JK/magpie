@@ -114,6 +114,13 @@ type Seat struct {
 	// costs 0. Cheapest goes by them.
 	Priced          bool
 	Cost, CacheCost float64
+	// Ability is what the model can do of what the request needs
+	// (gateway need.go, from the provider's capabilities letters,
+	// Provider.Caps): 0–1, each tag wanted a settled yes a whole one, one
+	// not settled half, a settled no nothing. 1 when the request asks
+	// nothing of the model's abilities: every seat alike, no signal.
+	// Score goes by it.
+	Ability float64
 }
 
 // Strategy orders a pool.

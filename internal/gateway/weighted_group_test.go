@@ -39,7 +39,7 @@ func TestWeightedGroup(t *testing.T) {
 	unitOf := map[string]string{"wa": "a", "wb": "b", "wc": "sub", "wd": "sub"}
 	plan := func() []candidate {
 		t.Helper()
-		cs, pl := s.planGroup(g, ms, provider.Chat)
+		cs, pl := s.planGroup(g, ms, provider.Chat, need{})
 		if len(cs) != 5 || len(pl.order) != 5 {
 			t.Fatalf("%d planned, %d in the trace: %s", len(cs), len(pl.order), restsOf(cs))
 		}

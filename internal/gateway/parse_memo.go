@@ -10,11 +10,13 @@ import (
 // bodyFacts is what the readers of a request's conversation that only
 // read it take from it: the turn count (turnOf), the folder its agent
 // works in and whether that is a git repository, as the text says
-// (dirOf, tellWorkPlace). A body that doesn't parse says none of them.
+// (dirOf, tellWorkPlace), and what the request asks of a model's abilities
+// (need.go). A body that doesn't parse says none of them.
 type bodyFacts struct {
 	turn     int
 	within   bool
 	dir, git string
+	nd       need
 }
 
 // factsOf is bodyFacts of body, read in protocol proto. Each of its
@@ -58,7 +60,10 @@ func factsOf(proto provider.Protocol, body []byte) bodyFacts {
 	return f
 }
 
-// readFacts parses body for its bodyFacts.
+// readFacts parses body for its bodyFacts. The abilities it asks of the
+// model are the request's tools and stream, off the parse, and whether any
+// turn holds a picture, off the body whole — the parse a request read for
+// facts alone keeps neither an assistant's nor a tool's pictures.
 func readFacts(proto provider.Protocol, body []byte) bodyFacts {
 	if f := factsParsed.Load(); f != nil {
 		(*f)(body)
@@ -70,6 +75,10 @@ func readFacts(proto provider.Protocol, body []byte) bodyFacts {
 	var f bodyFacts
 	f.turn, f.within = turnIn(req)
 	f.dir, f.git = workPlace(req)
+	f.nd = needOf(req)
+	if hasImage(proto, body) {
+		f.nd.vision = true
+	}
 	return f
 }
 

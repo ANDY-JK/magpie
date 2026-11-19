@@ -931,7 +931,7 @@ func TestNativeCompactionDecisionLeavesTheTurnsAlone(t *testing.T) {
 	s := New()
 	first := func() string {
 		q, _, _ := provider.Resolve("fake/m1")
-		cs, _ := s.plan(q, "m1", provider.Responses)
+		cs, _ := s.plan(q, "m1", provider.Responses, need{})
 		return cs[0].p.Key
 	}
 	if !s.nativeCompactionFor("fake/m1") {

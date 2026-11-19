@@ -33,7 +33,7 @@ func TestPaceGoesByCreditsExpiring(t *testing.T) {
 		return provider.Allowance{{Used: used, Amount: 500 * used / 100, Of: 500, Unit: "credits", Resets: now.Add(renews), Name: "Credits"}}
 	}
 	order := func() (string, weighing, []candidate) {
-		got, wg := weigh(p, []candidate{acct("b@x.com"), acct("a@x.com")}, model, provider.Chat)
+		got, wg := weigh(p, []candidate{acct("b@x.com"), acct("a@x.com")}, model, provider.Chat, need{})
 		var s []string
 		for _, c := range got {
 			s = append(s, c.p.Account.User[:1])

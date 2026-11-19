@@ -193,11 +193,10 @@ func TestScoreNoDataIsNeutral(t *testing.T) {
 	}
 }
 
-// The four dimensions score weighs share it whole: ability is not weighed
-// until the gateway has a source for it, and a weight left in would lift
-// every seat alike.
+// The five dimensions score weighs share it whole: a weight left over, or
+// one missing, would lift or sink every seat alike.
 func TestScoreWeightsSumToOne(t *testing.T) {
-	if sum := scoreWeightHealth + scoreWeightTTFT + scoreWeightTPS + scoreWeightQuota; math.Abs(sum-1) > 1e-9 {
+	if sum := scoreWeightHealth + scoreWeightTTFT + scoreWeightTPS + scoreWeightQuota + scoreWeightAbility; math.Abs(sum-1) > 1e-9 {
 		t.Fatalf("the weights sum to %v, want 1", sum)
 	}
 }

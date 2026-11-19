@@ -41,7 +41,7 @@ func TestBalancedWeighsFailuresAndVendors(t *testing.T) {
 	routed.failures["v1#k2"] = 2
 	routed.used["v1#k1"] = tokenUse{n: 500, at: now}
 	routed.Unlock()
-	got, wg := weigh(p, cs, "m", provider.Chat)
+	got, wg := weigh(p, cs, "m", provider.Chat, need{})
 	if order := restsOf(got); order != "v1#k1 v1#k2 " {
 		t.Fatalf("a key that failed: %s, want v1#k1 v1#k2", order)
 	}
@@ -102,7 +102,7 @@ func TestBalancedSpendsWhatComesBackSoonest(t *testing.T) {
 	of["week"] = week(20, now.Add(3*24*time.Hour))                                        // Claude's week
 	of["month"] = provider.Allowance{{Used: 20, Span: 30 * 24 * time.Hour, Resets: now.Add(20 * 24 * time.Hour)}}
 	p := provider.Provider{ID: "bv", Routing: provider.Balanced}
-	got, wg := weigh(p, cs, "m", provider.Chat)
+	got, wg := weigh(p, cs, "m", provider.Chat, need{})
 	if order := restsOf(got); order != "bv#credits bv#week bv#month bv#pay " {
 		t.Fatalf("by class: %s, want bv#credits bv#week bv#month bv#pay", order)
 	}
@@ -118,7 +118,7 @@ func TestBalancedSpendsWhatComesBackSoonest(t *testing.T) {
 	// the week is in its last ten hours with a fifth of it unspent: first,
 	// though the credits are the cheaper quota
 	of["week"] = week(20, now.Add(10*time.Hour))
-	got, wg = weigh(p, cs, "m", provider.Chat)
+	got, wg = weigh(p, cs, "m", provider.Chat, need{})
 	if order := restsOf(got); order != "bv#week bv#credits bv#month bv#pay " {
 		t.Fatalf("about to be lost: %s, want bv#week bv#credits bv#month bv#pay", order)
 	}

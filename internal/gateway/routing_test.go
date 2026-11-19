@@ -79,7 +79,7 @@ func TestRoutingKeepsModelAllowancesSeparate(t *testing.T) {
 			if reverse {
 				cs[0], cs[1] = cs[1], cs[0]
 			}
-			got, wg := weigh(p, cs, "group/mixed", provider.Chat)
+			got, wg := weigh(p, cs, "group/mixed", provider.Chat, need{})
 			if got[0].model != "grok-4.7-xhigh-fast" {
 				t.Errorf("routing %q, reverse %v: exhausted model goes first: %s", routing, reverse, got[0].model)
 			}
@@ -276,7 +276,7 @@ func TestUnknownClaudeGoesFirst(t *testing.T) {
 	}
 	p := provider.Provider{ID: "g"}
 	cs := []candidate{acct("codex", "k"), acct("x", "u"), acct("claude", "c")}
-	got, wg := weigh(p, cs, "m", provider.Anthropic)
+	got, wg := weigh(p, cs, "m", provider.Anthropic, need{})
 	if s := restsOf(got); s != "g#c g#k g#u " {
 		t.Fatalf("order: %s", s)
 	}

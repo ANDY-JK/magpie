@@ -41,7 +41,7 @@ func TestLoginSwitchKeepsEachAccountItself(t *testing.T) {
 		t.Fatalf("the conversation went to %s (kept %v, %s)", cs[0].p.Account.User, aff.Kept, aff.Why)
 	}
 	// least used: b, which served nothing, before a
-	cs, _ = weigh(b2.p, []candidate{a2, b2}, "claude-opus-4-8", provider.Anthropic)
+	cs, _ = weigh(b2.p, []candidate{a2, b2}, "claude-opus-4-8", provider.Anthropic, need{})
 	if cs[0].p.Account.User != "b@example.com" {
 		t.Fatalf("least used put %s first", cs[0].p.Account.User)
 	}

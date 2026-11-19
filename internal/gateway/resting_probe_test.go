@@ -47,7 +47,7 @@ func restFor(t *testing.T, s *Server, group string, until map[string]time.Time) 
 	if !ok {
 		t.Fatalf("no group %s", group)
 	}
-	cs, _ := s.planGroup(g.Live(), ms, provider.Chat)
+	cs, _ := s.planGroup(g.Live(), ms, provider.Chat, need{})
 	restingUntil.Lock()
 	defer restingUntil.Unlock()
 	for _, c := range cs {

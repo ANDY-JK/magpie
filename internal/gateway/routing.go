@@ -2234,7 +2234,7 @@ const (
 
 // route orders one provider's candidates as its routing says.
 func route(p provider.Provider, cs []candidate, model string, from provider.Protocol) []candidate {
-	cs, _ = weigh(p, cs, model, from)
+	cs, _ = weigh(p, cs, model, from, need{})
 	return cs
 }
 
@@ -2342,9 +2342,11 @@ func learns(c candidate, lefts map[allowanceKey]left) bool {
 
 // weigh orders one provider's candidates as its routing says, and tells
 // what it went by: with Sink on, those rate limited with quota left behind
-// the others (sink.go).
-func weigh(p provider.Provider, cs []candidate, model string, from provider.Protocol) ([]candidate, weighing) {
-	cs, wg := weighRouted(p, cs, model, from)
+// the others (sink.go). nd is what the request asks of a model's abilities
+// (need.go), which the score's ability dimension weighs and none of the
+// other routings do.
+func weigh(p provider.Provider, cs []candidate, model string, from provider.Protocol, nd need) ([]candidate, weighing) {
+	cs, wg := weighRouted(p, cs, model, from, nd)
 	if sinks(p.Sink, p.Routing) {
 		cs = sinkLast(cs)
 	}
@@ -2372,7 +2374,7 @@ func goesRound(routing string) bool {
 }
 
 // weighRouted is weigh by the routing alone.
-func weighRouted(p provider.Provider, cs []candidate, model string, from provider.Protocol) ([]candidate, weighing) {
+func weighRouted(p provider.Provider, cs []candidate, model string, from provider.Protocol, nd need) ([]candidate, weighing) {
 	var wg weighing
 	if len(cs) == 0 {
 		return cs, wg
@@ -2456,6 +2458,12 @@ func weighRouted(p provider.Provider, cs []candidate, model string, from provide
 		}
 	}
 	routed.Unlock()
+	// what each model can do of what the request needs (need.go), for the
+	// score's ability dimension (routes.ScoreOf): read off the provider's
+	// own table, no lock of the gateway's in it
+	for i, c := range cs {
+		seats[i].Ability = abilityOf(c, nd)
+	}
 	if st.ByUse {
 		wg.tokens = map[string]float64{}
 		for i, c := range cs {

@@ -43,7 +43,7 @@ func TestResetSpentIsTheDeadline(t *testing.T) {
 	for _, routing := range []string{provider.Pace, ""} {
 		p := provider.Provider{ID: "codex", Routing: routing, Account: &provider.Account{Agent: "codex", User: "a@x.com"}}
 		order := func() (string, weighing, []candidate) {
-			got, wg := weigh(p, []candidate{acct("b@x.com"), acct("a@x.com")}, "gpt-5.6-sol", provider.Chat)
+			got, wg := weigh(p, []candidate{acct("b@x.com"), acct("a@x.com")}, "gpt-5.6-sol", provider.Chat, need{})
 			var s []string
 			for _, c := range got {
 				s = append(s, c.p.Account.User[:1])

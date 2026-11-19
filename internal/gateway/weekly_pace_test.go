@@ -38,7 +38,7 @@ func TestWeeklyPace(t *testing.T) {
 		}
 	}
 	order := func(cs ...candidate) string {
-		got, _ := weigh(p, cs, "gpt-5.6-sol", provider.Chat)
+		got, _ := weigh(p, cs, "gpt-5.6-sol", provider.Chat, need{})
 		var s []string
 		for _, c := range got {
 			s = append(s, c.p.Account.User[:1])
@@ -102,7 +102,7 @@ func TestWeeklyPace(t *testing.T) {
 		c.model = "claude-opus-5-5"
 		return c
 	}
-	if got, _ := weigh(p, []candidate{opus("a@x.com"), opus("b@x.com")}, "claude-opus-5-5", provider.Anthropic); got[0].p.Account.User != "b@x.com" {
+	if got, _ := weigh(p, []candidate{opus("a@x.com"), opus("b@x.com")}, "claude-opus-5-5", provider.Anthropic, need{}); got[0].p.Account.User != "b@x.com" {
 		t.Fatalf("Opus request goes by the Opus week: %s first", got[0].p.Account.User)
 	}
 	if got := order(acct("b@x.com"), acct("a@x.com")); got != "ab" {
@@ -123,12 +123,12 @@ func TestWeeklyPace(t *testing.T) {
 		c.p.Account.Agent, c.rest = "claude", "claude#"+user
 		return c
 	}
-	if got, _ := weigh(p, []candidate{claude("a@x.com"), claude("b@x.com"), claude("c@x.com")}, "gpt-5.6-sol", provider.Chat); got[0].p.Account.User != "c@x.com" {
+	if got, _ := weigh(p, []candidate{claude("a@x.com"), claude("b@x.com"), claude("c@x.com")}, "gpt-5.6-sol", provider.Chat, need{}); got[0].p.Account.User != "c@x.com" {
 		t.Fatalf("one that learns goes first: %s", got[0].p.Account.User)
 	}
 	// ...and by its pace once its answer has told
 	share["c@x.com"] = week(50, 5*24*time.Hour) // 0.42, behind a's 0.5
-	if got, _ := weigh(p, []candidate{claude("c@x.com"), claude("a@x.com"), claude("b@x.com")}, "gpt-5.6-sol", provider.Chat); got[0].p.Account.User != "b@x.com" || got[1].p.Account.User != "a@x.com" {
+	if got, _ := weigh(p, []candidate{claude("c@x.com"), claude("a@x.com"), claude("b@x.com")}, "gpt-5.6-sol", provider.Chat, need{}); got[0].p.Account.User != "b@x.com" || got[1].p.Account.User != "a@x.com" {
 		t.Fatalf("known, it goes by its pace: %s %s", got[0].p.Account.User, got[1].p.Account.User)
 	}
 	delete(share, "c@x.com")
@@ -211,17 +211,17 @@ func TestWeeklyPace(t *testing.T) {
 	sent(key("k1"), 500)
 	sent(key("k2"), 100)
 	kp := provider.Provider{ID: "keys", Routing: provider.Pace}
-	if got, _ := weigh(kp, []candidate{key("k1"), key("k2")}, "gpt-5.6-sol", provider.Chat); got[0].p.ID != "k2" {
+	if got, _ := weigh(kp, []candidate{key("k1"), key("k2")}, "gpt-5.6-sol", provider.Chat, need{}); got[0].p.ID != "k2" {
 		t.Fatalf("keys by tokens: %s first", got[0].p.ID)
 	}
 	// a key follows the subscriptions with a week
-	if got, _ := weigh(p, []candidate{key("k2"), acct("a@x.com")}, "gpt-5.6-sol", provider.Chat); got[0].p.Account == nil {
+	if got, _ := weigh(p, []candidate{key("k2"), acct("a@x.com")}, "gpt-5.6-sol", provider.Chat, need{}); got[0].p.Account == nil {
 		t.Fatal("a key before a subscription")
 	}
 	// the trace tells the pace and the window it went by, the week's
 	share["a@x.com"] = week(40, 5*24*time.Hour)
 	share["b@x.com"] = week(80, time.Hour)
-	got, wg := weigh(p, []candidate{acct("a@x.com"), acct("b@x.com")}, "gpt-5.6-sol", provider.Chat)
+	got, wg := weigh(p, []candidate{acct("a@x.com"), acct("b@x.com")}, "gpt-5.6-sol", provider.Chat, need{})
 	if w := weighed(got[0], p, wg, false, provider.Chat); w.Pace < 19 || w.Pace > 21 || w.Due == nil || !w.Due.Equal(share["b@x.com"][1].Resets) {
 		t.Fatalf("the trace: pace %v due %v", w.Pace, w.Due)
 	}

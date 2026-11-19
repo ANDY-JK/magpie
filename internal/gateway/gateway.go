@@ -2542,6 +2542,10 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			readCareful(r.Context(), ps, models)
 		}
 	}
+	// what the request asks of a model's abilities (need.go): read off the
+	// body as the agent wrote it, held above, so images a describer or a
+	// text-only fit will take out of the body below are asked for still
+	nd := factsOf(from, plain).nd
 	// the primary, then its fallbacks while it can't take the request and
 	// nothing has been sent yet
 	var cands []candidate
@@ -2555,7 +2559,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 	leadScope := scope // where the lead of a subagent is kept
 	if isGroup {
 		// a routing group: every member's keys or accounts weighed together
-		cands, pl = s.planGroup(g, ms, from)
+		cands, pl = s.planGroup(g, ms, from, nd)
 		group = groupRef(g, ms)
 		group.Paused = paused
 		scope, mode, rotate = provider.GroupPrefix+g.ID, g.Affinity, routingOf(g.Routing) == provider.Rotate
@@ -2576,7 +2580,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request, from provider.Pro
 			}
 			kept, _ := provider.PausedOut(fg, fms, agent, folder, ruleClock())
 			return kept
-		})
+		}, nd)
 		if handedOnOf(r) != nil {
 			// Codex's own sign-in, asked as often as it is asked: only
 			// the fallbacks are left (codexFallBack)

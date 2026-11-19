@@ -43,7 +43,7 @@ func TestTryNowPutsASunkAccountBack(t *testing.T) {
 	cs := []candidate{acct("a@x.com"), acct("b@x.com")}
 	p := provider.Provider{ID: "workbuddy", Routing: provider.Ordered, Sink: true}
 	order := func() []string {
-		out, _ := weigh(p, slices.Clone(cs), "m", "")
+		out, _ := weigh(p, slices.Clone(cs), "m", "", need{})
 		out, _ = restLast(out, planned{order: make([]Weighed, len(out))})
 		return whoOf(out)
 	}

@@ -64,7 +64,7 @@ func (s *Server) decideTries(g provider.Group, ms []provider.Member) ([]candidat
 	if len(ms) == 0 {
 		return nil, planned{}, nil
 	}
-	cs, pl := s.planGroup(g, ms, provider.Chat)
+	cs, pl := s.planGroup(g, ms, provider.Chat, need{})
 	return cs, pl, ms
 }
 
@@ -142,7 +142,7 @@ func (s *Server) serveDecisionGroup(w http.ResponseWriter, r *http.Request, body
 // out of quota was asked on every turn, the next never).
 func (s *Server) decideKeys(p provider.Provider, model string) ([]candidate, planned) {
 	p.Fallback = nil
-	return s.plan(p, model, provider.Chat)
+	return s.plan(p, model, provider.Chat, need{})
 }
 
 // serveDecideTries answers a System One request with cs, a decision

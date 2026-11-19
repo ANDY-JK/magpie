@@ -69,7 +69,7 @@ func TestRateLimitedSinksToTheBack(t *testing.T) {
 	cs := []candidate{acct("a@x.com"), acct("b@x.com"), acct("c@x.com")}
 	p := provider.Provider{ID: "workbuddy", Routing: provider.Ordered, Sink: true}
 	order := func(p provider.Provider) []string {
-		out, _ := weigh(p, slices.Clone(cs), "m", "")
+		out, _ := weigh(p, slices.Clone(cs), "m", "", need{})
 		out, _ = restLast(out, planned{order: make([]Weighed, len(out))})
 		return whoOf(out)
 	}
@@ -101,7 +101,7 @@ func TestRateLimitedSinksToTheBack(t *testing.T) {
 	want(p, "b@x.com", "c@x.com", "a@x.com")
 
 	// in the trace, the one at the back says when it sank
-	_, wg := weigh(p, slices.Clone(cs), "m", "")
+	_, wg := weigh(p, slices.Clone(cs), "m", "", need{})
 	if w := weighed(cs[0], p, wg, false, ""); w.Sunk == nil {
 		t.Fatal("trace: a sank, and doesn't say so")
 	}
@@ -152,12 +152,12 @@ func TestGroupRateLimitedSinks(t *testing.T) {
 		return out
 	}
 	rate := []byte(`{"error":{"message":"Too many requests"}}`)
-	cs, _ := s.planGroup(provider.Group{ID: "g", Routing: provider.Ordered}, ms, provider.Chat)
+	cs, _ := s.planGroup(provider.Group{ID: "g", Routing: provider.Ordered}, ms, provider.Chat, need{})
 	s.restAfter(cs[0], 429, http.Header{}, rate)
 	rested(cs[0].restKey())
 	for _, routing := range []string{provider.Ordered, ""} {
 		g := provider.Group{ID: "g", Routing: routing, Sink: true}
-		out, pl := s.planGroup(g, ms, provider.Chat)
+		out, pl := s.planGroup(g, ms, provider.Chat, need{})
 		if got := ids(out); !slices.Equal(got, []string{"b", "c", "a"}) {
 			t.Fatalf("%q: order %v", routing, got)
 		}
@@ -165,7 +165,7 @@ func TestGroupRateLimitedSinks(t *testing.T) {
 			t.Fatalf("%q: trace %+v", routing, pl.order)
 		}
 		g.Sink = false
-		if out, _ := s.planGroup(g, ms, provider.Chat); ids(out)[0] != "a" {
+		if out, _ := s.planGroup(g, ms, provider.Chat, need{}); ids(out)[0] != "a" {
 			t.Fatalf("%q off: order %v", routing, ids(out))
 		}
 	}
@@ -206,7 +206,7 @@ func TestNestedGroupSinksItsOwnOrder(t *testing.T) {
 		t.Helper()
 		forgetSinks(t)
 		inner := provider.Group{ID: "inner", Routing: provider.Ordered}
-		cs, _ := s.planGroup(provider.Group{ID: "outer", Routing: provider.Ordered}, []provider.Member{mem("a", inner), mem("b", inner)}, provider.Chat)
+		cs, _ := s.planGroup(provider.Group{ID: "outer", Routing: provider.Ordered}, []provider.Member{mem("a", inner), mem("b", inner)}, provider.Chat, need{})
 		if cs[0].p.ID != "a" {
 			t.Fatalf("first: %v", ids(cs))
 		}
@@ -221,7 +221,7 @@ func TestNestedGroupSinksItsOwnOrder(t *testing.T) {
 			// the inner group first, then a model outer names itself:
 			// a goes behind b, next to it (where outer's routing puts
 			// the inner group is outer's: by weight it goes round)
-			out, pl := s.planGroup(outer, []provider.Member{mem("a", inner), mem("b", inner), mem("x")}, provider.Chat)
+			out, pl := s.planGroup(outer, []provider.Member{mem("a", inner), mem("b", inner), mem("x")}, provider.Chat, need{})
 			got := ids(out)
 			if b := slices.Index(got, "b"); b < 0 || b+1 >= len(got) || got[b+1] != "a" || (routing == provider.Ordered && !slices.Equal(got, []string{"b", "a", "x"})) {
 				t.Fatalf("the inner group's own Sink: order %v, want b then a", got)
@@ -233,7 +233,7 @@ func TestNestedGroupSinksItsOwnOrder(t *testing.T) {
 			}
 			// its Sink off: the routing's order
 			inner.Sink = false
-			got = ids(first(s.planGroup(outer, []provider.Member{mem("a", inner), mem("b", inner), mem("x")}, provider.Chat)))
+			got = ids(first(s.planGroup(outer, []provider.Member{mem("a", inner), mem("b", inner), mem("x")}, provider.Chat, need{})))
 			if a := slices.Index(got, "a"); a < 0 || a+1 >= len(got) || got[a+1] != "b" {
 				t.Fatalf("Sink off: order %v, want a then b", got)
 			}
@@ -247,13 +247,13 @@ func TestNestedGroupSinksItsOwnOrder(t *testing.T) {
 		inner := provider.Group{ID: "inner", Routing: provider.Ordered}
 		outer := provider.Group{ID: "outer", Routing: provider.Ordered}
 		ms := []provider.Member{mem("a", mid, inner), mem("b", mid, inner), mem("c", mid), mem("y")}
-		if out, _ := s.planGroup(outer, ms, provider.Chat); !slices.Equal(ids(out), []string{"b", "c", "a", "y"}) {
+		if out, _ := s.planGroup(outer, ms, provider.Chat, need{}); !slices.Equal(ids(out), []string{"b", "c", "a", "y"}) {
 			t.Fatalf("mid's Sink: order %v, want [b c a y]", ids(out))
 		}
 		// inner's Sink on, mid's off: a goes behind b only
 		mid.Sink, inner.Sink = false, true
 		ms = []provider.Member{mem("a", mid, inner), mem("b", mid, inner), mem("c", mid), mem("y")}
-		if out, _ := s.planGroup(outer, ms, provider.Chat); !slices.Equal(ids(out), []string{"b", "a", "c", "y"}) {
+		if out, _ := s.planGroup(outer, ms, provider.Chat, need{}); !slices.Equal(ids(out), []string{"b", "a", "c", "y"}) {
 			t.Fatalf("inner's Sink: order %v, want [b a c y]", ids(out))
 		}
 	})
@@ -262,7 +262,7 @@ func TestNestedGroupSinksItsOwnOrder(t *testing.T) {
 		// the outer group's Sink still orders the whole, as before
 		inner := provider.Group{ID: "inner", Routing: provider.Ordered}
 		outer := provider.Group{ID: "outer", Routing: provider.Ordered, Sink: true}
-		if out, _ := s.planGroup(outer, []provider.Member{mem("a", inner), mem("b", inner), mem("x")}, provider.Chat); !slices.Equal(ids(out), []string{"b", "x", "a"}) {
+		if out, _ := s.planGroup(outer, []provider.Member{mem("a", inner), mem("b", inner), mem("x")}, provider.Chat, need{}); !slices.Equal(ids(out), []string{"b", "x", "a"}) {
 			t.Fatalf("the outer group's Sink: order %v, want [b x a]", ids(out))
 		}
 	})

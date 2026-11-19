@@ -481,29 +481,32 @@ func modelFamily(model string) provider.Protocol {
 
 // candidates is the primary and then its fallbacks, each provider's keys
 // or accounts as its routing orders them, those resting after a recent
-// failure moved behind the rest.
+// failure moved behind the rest. No abilities are asked of the models for
+// it: its callers weigh requests with a body (plan), the rest — a count,
+// a drawing — need nothing of them.
 func (s *Server) candidates(p provider.Provider, model string, from provider.Protocol) []candidate {
-	out, _ := s.plan(p, model, from)
+	out, _ := s.plan(p, model, from, need{})
 	return out
 }
 
 // plan is candidates, and for the routing trace what each stood where it
-// did by, and those left out.
-func (s *Server) plan(p provider.Provider, model string, from provider.Protocol) ([]candidate, planned) {
-	return s.planPaused(p, model, from, nil)
+// did by, and those left out. nd is what the request asks of a model's
+// abilities (need.go); none is taken for a request read without its body.
+func (s *Server) plan(p provider.Provider, model string, from provider.Protocol, nd need) ([]candidate, planned) {
+	return s.planPaused(p, model, from, nil, nd)
 }
 
 // planPaused is plan, a routing group among the fallbacks (01huadalang on
 // Discord) less the models paused leaves out of it: its pause rules, as
 // a request to the group would have them; nil pauses none.
-func (s *Server) planPaused(p provider.Provider, model string, from provider.Protocol, paused func(provider.Group, []provider.Member) []provider.Member) ([]candidate, planned) {
+func (s *Server) planPaused(p provider.Provider, model string, from provider.Protocol, paused func(provider.Group, []provider.Member) []provider.Member, nd need) ([]candidate, planned) {
 	var pl planned
 	add := func(q provider.Provider, m string, fallback bool) []candidate {
 		cs, aside, left, barred := perKeyBarred(q, m, from)
 		pl.left = append(pl.left, barredOf(barred, q, fallback, from, nil)...)
 		pl.held = append(pl.held, creditsHeld(barred)...)
 		pl.capped = append(pl.capped, capHeldOnly(barred)...)
-		cs, wg := weigh(q, cs, m, from)
+		cs, wg := weigh(q, cs, m, from, nd)
 		for i, c := range cs {
 			w := weighed(c, q, wg, fallback, from)
 			w.Turn = i == 0 && goesRound(q.Routing) && len(cs) > 1
@@ -545,7 +548,7 @@ func (s *Server) planPaused(p provider.Provider, model string, from provider.Pro
 				seen[k] = true
 				return false
 			})
-			out = append(out, planFallbackGroup(g, ms, from, &pl)...)
+			out = append(out, planFallbackGroup(g, ms, from, &pl, nd)...)
 			continue
 		}
 		fp, fm, ok := provider.ResolveRoute(id)
@@ -555,6 +558,7 @@ func (s *Server) planPaused(p provider.Provider, model string, from provider.Pro
 		seen[fp.ID+"/"+fm] = true
 		out = append(out, add(fp, fm, true)...)
 	}
+	out, pl = capOrdered(out, pl, nd)
 	return restLast(out, pl)
 }
 
@@ -562,14 +566,14 @@ func (s *Server) planPaused(p provider.Provider, model string, from provider.Pro
 // to, its rows added to pl as fallbacks reached through g: the group's
 // keys and accounts in its own order, sunk by its own Sink, those set
 // aside after them.
-func planFallbackGroup(g provider.Group, ms []provider.Member, from provider.Protocol, pl *planned) []candidate {
+func planFallbackGroup(g provider.Group, ms []provider.Member, from provider.Protocol, pl *planned, nd need) []candidate {
 	if len(ms) == 0 {
 		return nil
 	}
 	at, leftAt, unlistedAt := len(pl.order), len(pl.left), len(pl.unlistedW)
 	var asides []candidate
 	var wAsides []Weighed
-	out := planLevel(g, ms, 0, from, pl, &asides, &wAsides, []provider.Group{g})
+	out := planLevel(g, ms, 0, from, pl, &asides, &wAsides, []provider.Group{g}, nd)
 	if sinks(g.Sink, g.Routing) {
 		var order []Weighed
 		out, order = sinkPlanned(out, pl.order[at:])
@@ -600,11 +604,11 @@ func planFallbackGroup(g provider.Group, ms []provider.Member, from provider.Pro
 // groups, never within them. A group in the group sinks by its own Sink
 // too, within its own order (#2255), before g's Sink orders the whole.
 // A member's fallbacks are not the group's.
-func (s *Server) planGroup(g provider.Group, ms []provider.Member, from provider.Protocol) ([]candidate, planned) {
+func (s *Server) planGroup(g provider.Group, ms []provider.Member, from provider.Protocol, nd need) ([]candidate, planned) {
 	var pl planned
 	var asides []candidate
 	var wAsides []Weighed
-	out := planLevel(g, ms, 0, from, &pl, &asides, &wAsides, nil)
+	out := planLevel(g, ms, 0, from, &pl, &asides, &wAsides, nil, nd)
 	if sinks(g.Sink, g.Routing) {
 		out, pl.order = sinkPlanned(out, pl.order)
 	}
@@ -614,6 +618,7 @@ func (s *Server) planGroup(g provider.Group, ms []provider.Member, from provider
 	}
 	placed(ms, out)
 	placed(ms, pl.unlisted)
+	out, pl = capOrdered(out, pl, nd)
 	return restLast(out, pl)
 }
 
@@ -657,7 +662,7 @@ func innerPatience(m provider.Member) int {
 // planLevel orders the models ms of g, a group depth groups down from the
 // one asked for, adding to pl's order as it goes: those set aside and
 // those unlisted it gathers for planGroup to put last.
-func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.Protocol, pl *planned, asides *[]candidate, wAsides *[]Weighed, hold []provider.Group) []candidate {
+func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.Protocol, pl *planned, asides *[]candidate, wAsides *[]Weighed, hold []provider.Group, nd need) []candidate {
 	keys := func(m provider.Member) []candidate {
 		cs, aside, left, barred := perKeyBarred(m.Provider, m.Model, from)
 		// a group the member is reached through that is held to some
@@ -737,7 +742,7 @@ func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.
 					j++
 				}
 				var sub planned
-				cs := planLevel(m.Via[depth], ms[i:j], depth+1, from, &sub, asides, wAsides, hold)
+				cs := planLevel(m.Via[depth], ms[i:j], depth+1, from, &sub, asides, wAsides, hold, nd)
 				cs, sub.order = sinkOwn(m.Via[depth], cs, sub.order)
 				pl.left = append(pl.left, sub.left...)
 				pl.capped = append(pl.capped, sub.capped...)
@@ -754,7 +759,7 @@ func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.
 				// in the group does: weighed as one by the first it
 				// would try, and tried whole in its own order (kchen0x
 				// on X: Antigravity in order inside a Smart group)
-				cs, wg := weigh(m.Provider, keys(m), m.Model, from)
+				cs, wg := weigh(m.Provider, keys(m), m.Model, from, nd)
 				var order []Weighed
 				for k, c := range cs {
 					w := weighed(c, m.Provider, wg, false, from)
@@ -798,7 +803,7 @@ func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.
 		if routing == provider.Manual {
 			routing = "" // the member picked, its keys or accounts weighed smartly
 		}
-		weighedHeads, wg := weigh(provider.Provider{ID: provider.GroupPrefix + g.ID, Routing: routing}, heads, "", from)
+		weighedHeads, wg := weigh(provider.Provider{ID: provider.GroupPrefix + g.ID, Routing: routing}, heads, "", from, nd)
 		var out []candidate
 		for i, c := range weighedHeads {
 			k := at[c.seat()][0]
@@ -829,7 +834,7 @@ func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.
 				j++
 			}
 			at := len(pl.order)
-			cs := planLevel(m.Via[depth], ms[i:j], depth+1, from, pl, asides, wAsides, hold)
+			cs := planLevel(m.Via[depth], ms[i:j], depth+1, from, pl, asides, wAsides, hold, nd)
 			var order []Weighed
 			cs, order = sinkOwn(m.Via[depth], cs, pl.order[at:])
 			pl.order = append(pl.order[:at], order...)
@@ -837,7 +842,7 @@ func planLevel(g provider.Group, ms []provider.Member, depth int, from provider.
 			i = j
 			continue
 		}
-		cs, wg := weigh(m.Provider, keys(m), m.Model, from)
+		cs, wg := weigh(m.Provider, keys(m), m.Model, from, nd)
 		for k, c := range cs {
 			w := weighed(c, m.Provider, wg, false, from)
 			w.Turn = k == 0 && goesRound(m.Provider.Routing) && len(cs) > 1

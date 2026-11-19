@@ -26,7 +26,7 @@ import (
 //  2. the score, the highest first. Seats alike keep their listed order, so
 //     a pool alike throughout keeps the vendor's prompt cache warm.
 //
-// The score is 0–1, a weighted sum of four dimensions:
+// The score is 0–1, a weighted sum of five dimensions:
 //
 //	0.40 health       how it has answered lately (Seat.Health, 0–1); one
 //	                  with no record yet counts health.go's prior 1.0, so a
@@ -35,28 +35,31 @@ import (
 //	0.12 throughput   0 at nothing a second, up to 1 at 60 output tokens
 //	0.20 quota left   the share unused, and its pace against a whole week,
 //	                  each half (Seat.Used, Seat.Pace)
+//	0.10 ability      what the model can do of what the request needs
+//	                  (Seat.Ability, gateway need.go): a tool call, a
+//	                  picture and a stream asked of it, what the provider's
+//	                  capabilities test settled of each (Provider.Caps),
+//	                  half for a tag nothing settled
 //
-// A fifth dimension, ability (the tags a request needs: tools, vision,
-// stream), is absent: weighRouted and plan carry no request body, and
-// Provider.Caps holds only what a probe settled, yes or no, with no
-// per-request check; for a request that needs nothing it would be 1 for
-// every seat, a constant that lifts all alike. It returns when the
-// request's needs reach a strategy through weighRouted and plan — a
-// probed "no" excluding the seat — with its 0.10 weighed again and these
-// four renormalized. Until then the four keep their shares, normalized
-// here to sum 1.
+// A request that asks nothing of the model's abilities weighs a whole
+// Seat.Ability for every seat alike: a constant, no signal. One that asks
+// and a seat probed unable of it is not weighed at all —
+// the plan holds it out (gateway capOrdered), unless every candidate of
+// the plan is one of those, when they are weighed with the nothing they
+// settled and answer last.
 //
 // A dimension nothing was measured for lately counts 0.5: neither rewarded
 // nor punished, so a seat is never put first or last for being new. Health
 // alone outweighs both speed dimensions together, since a link that drops
 // fails a turn where a slow one only takes longer.
 const (
-	scoreShares = 0.40 + 0.18 + 0.12 + 0.20
+	scoreShares = 0.40 + 0.18 + 0.12 + 0.20 + 0.10
 
-	scoreWeightHealth = 0.40 / scoreShares
-	scoreWeightTTFT   = 0.18 / scoreShares
-	scoreWeightTPS    = 0.12 / scoreShares
-	scoreWeightQuota  = 0.20 / scoreShares
+	scoreWeightHealth  = 0.40 / scoreShares
+	scoreWeightTTFT    = 0.18 / scoreShares
+	scoreWeightTPS     = 0.12 / scoreShares
+	scoreWeightQuota   = 0.20 / scoreShares
+	scoreWeightAbility = 0.10 / scoreShares
 )
 
 const (
@@ -130,8 +133,13 @@ func ScoreOf(s Seat) float64 {
 	if s.TPS > 0 {
 		tps = clampShare(s.TPS / scoreTPSFull)
 	}
+	// what the model can do of what the request needs (Seat.Ability): a
+	// request that asks nothing carries a whole one for every seat alike
+	// — no signal — and one a capabilities test settled unable of a tag
+	// it needs carries nothing, behind half an untested one
+	ability := clampShare(s.Ability)
 	return scoreWeightHealth*health + scoreWeightTTFT*ttft + scoreWeightTPS*tps +
-		scoreWeightQuota*scoreQuota(s)
+		scoreWeightQuota*scoreQuota(s) + scoreWeightAbility*ability
 }
 
 // scoreQuota is the allowance a seat has left, 0–1: the share unused, and

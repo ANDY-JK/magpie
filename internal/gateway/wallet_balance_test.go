@@ -26,7 +26,7 @@ func TestWalletWithMoreLeftGoesFirst(t *testing.T) {
 	for _, routing := range []string{"", provider.Pace, provider.LeastUsed} {
 		p := provider.Provider{ID: "magicrew", Routing: routing}
 		order := func(cs ...candidate) (string, weighing, []candidate) {
-			got, wg := weigh(p, cs, "m", provider.Chat)
+			got, wg := weigh(p, cs, "m", provider.Chat, need{})
 			var s []string
 			for _, c := range got {
 				s = append(s, c.p.Account.User)
@@ -72,7 +72,7 @@ func TestGroupWalletsGoByWhatTheyHaveLeft(t *testing.T) {
 	}
 	for _, routing := range []string{"", provider.Pace, provider.LeastUsed} {
 		g := provider.Provider{ID: provider.GroupPrefix + "deepseek-v4.1-flash1017", Routing: routing}
-		got, _ := weigh(g, []candidate{acct("workbuddy", "wb"), acct("magicrew", "181****632"), acct("magicrew", "181****710"), acct("magicrew", "189****051")}, "", provider.Chat)
+		got, _ := weigh(g, []candidate{acct("workbuddy", "wb"), acct("magicrew", "181****632"), acct("magicrew", "181****710"), acct("magicrew", "189****051")}, "", provider.Chat, need{})
 		var s []string
 		for _, c := range got {
 			s = append(s, c.p.Account.User)

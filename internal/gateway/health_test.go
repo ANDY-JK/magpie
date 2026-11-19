@@ -210,7 +210,7 @@ func TestScoreWeighsTheHealthItReads(t *testing.T) {
 		t.Fatalf("the failing model isn't unstable: %v", healthOf(flaky.restID(), time.Now()))
 	}
 	p := provider.Provider{ID: "pool", Routing: provider.Score}
-	out, wg := weighRouted(p, []candidate{flaky, steady}, model, provider.Chat)
+	out, wg := weighRouted(p, []candidate{flaky, steady}, model, provider.Chat, need{})
 	if len(out) != 2 || out[0].rest != "b" || out[1].rest != "a" {
 		t.Fatalf("order %q then %q, want the steady b first", out[0].rest, out[1].rest)
 	}
@@ -233,7 +233,7 @@ func TestWeighedCarriesTheScoreItWasOrderedBy(t *testing.T) {
 	noteUnstable(flaky)
 
 	scored := provider.Provider{ID: "pool", Routing: provider.Score}
-	out, wg := weighRouted(scored, []candidate{flaky, steady}, model, provider.Chat)
+	out, wg := weighRouted(scored, []candidate{flaky, steady}, model, provider.Chat, need{})
 	if len(out) != 2 || out[0].rest != "b" {
 		t.Fatalf("order %d candidates, want the steady b first", len(out))
 	}
@@ -254,7 +254,7 @@ func TestWeighedCarriesTheScoreItWasOrderedBy(t *testing.T) {
 
 	// a pool routed any other way weighs no score
 	plain := provider.Provider{ID: "pool"}
-	_, pw := weighRouted(plain, []candidate{flaky, steady}, model, provider.Chat)
+	_, pw := weighRouted(plain, []candidate{flaky, steady}, model, provider.Chat, need{})
 	if pw.scores != nil {
 		t.Fatalf("a pool routed smart weighed scores: %v", pw.scores)
 	}

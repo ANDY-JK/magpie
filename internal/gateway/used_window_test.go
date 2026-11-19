@@ -43,7 +43,7 @@ func TestUsedRenewsWithItsOwnWindow(t *testing.T) {
 		{p: dp, model: "claude-opus-5-5", rest: "devin"},
 	}
 	group := provider.Provider{ID: "g"}
-	got, wg := weigh(group, cs, "claude-opus-5-5", provider.Anthropic)
+	got, wg := weigh(group, cs, "claude-opus-5-5", provider.Anthropic, need{})
 	if restsOf(got) != restsOf([]candidate{cs[1], cs[0]}) {
 		t.Fatalf("Smart: %s, want Devin first (Factory's month renews later)", restsOf(got))
 	}

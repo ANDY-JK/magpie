@@ -73,7 +73,7 @@ func TestAllDownSaidOncePerEpisode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cs, _ := s.planPaused(*p, "m", provider.Chat, nil)
+	cs, _ := s.planPaused(*p, "m", provider.Chat, nil, need{})
 	restEvery(t, cs)
 	u.fail = true
 	if code := allDownAsk(t, s, u); code != 429 {

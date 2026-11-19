@@ -763,7 +763,7 @@ func (s *Server) drawingTries(g provider.Group, ms []provider.Member, keeps map[
 		seen[ref] = true
 		out = append(out, m)
 	}
-	cs, _ := s.planGroup(g.Live(), ms, provider.Chat)
+	cs, _ := s.planGroup(g.Live(), ms, provider.Chat, need{})
 	for _, c := range cs {
 		add(c.p.ID + "/" + c.model)
 	}

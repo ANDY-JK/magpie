@@ -340,6 +340,12 @@ type Weighed struct {
 	// Barred: left out as the user set it not to serve the model, its
 	// own list of models leaving it out (#474)
 	Barred bool `json:"barred,omitempty"`
+	// Lacks: left out as a capabilities test answered "no" for something
+	// the request needs of the model (Provider.Caps), the tags named —
+	// unless every candidate of the plan lacked one, when none is left
+	// out and the score's ability dimension holds them last (gateway
+	// capOrdered)
+	Lacks []string `json:"lacks,omitempty"`
 	// Held: left out as the gateway key asking may not use its account or
 	// key (#905), or a routing group it was reached through is held to
 	// other accounts (Group.Accounts): HeldBy names that group

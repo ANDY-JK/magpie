@@ -37,7 +37,7 @@ func TestAtOnceKeepsFirstInUserOrder(t *testing.T) {
 		}
 		split := func() (kept []string, reserve string) {
 			t.Helper()
-			cs, pl := (&Server{}).plan(*got, "model", provider.Chat)
+			cs, pl := (&Server{}).plan(*got, "model", provider.Chat, need{})
 			if len(cs) != 3 || len(pl.order) != 3 {
 				t.Fatalf("mode=%q: %d candidates, order %+v", mode, len(cs), pl.order)
 			}
@@ -80,7 +80,7 @@ func TestAtOnceKeepsFirstInUserOrder(t *testing.T) {
 	}
 	// with no limit, every one is routed over
 	p := provider.Provider{ID: "every", Name: "Every", Chat: "https://example.invalid/v1", Key: "first", Keys: []provider.KeyAccount{{Key: "second"}, {Key: "third"}}}
-	if _, pl := (&Server{}).plan(p, "model", provider.Chat); len(pl.order) != 3 || slices.ContainsFunc(pl.order, func(w Weighed) bool { return w.Reserve > 0 || w.Aside }) {
+	if _, pl := (&Server{}).plan(p, "model", provider.Chat, need{}); len(pl.order) != 3 || slices.ContainsFunc(pl.order, func(w Weighed) bool { return w.Reserve > 0 || w.Aside }) {
 		t.Fatalf("no limit: %+v", pl.order)
 	}
 }

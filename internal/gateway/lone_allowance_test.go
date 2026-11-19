@@ -29,7 +29,7 @@ func TestLoneOneTellsWhatItHasLeft(t *testing.T) {
 
 	p := provider.Provider{ID: "kimi-code-cn", Name: "Kimi Code (China)", Key: "sk-kimi-a", Chat: "https://api.kimi.com/coding/v1"}
 	cs := []candidate{{p: p, model: "kimi-for-coding", rest: "kimi-code-cn"}}
-	got, wg := weigh(p, cs, "kimi-for-coding", provider.Chat)
+	got, wg := weigh(p, cs, "kimi-for-coding", provider.Chat, need{})
 	if len(got) != 1 || got[0].rest != "kimi-code-cn" {
 		t.Fatalf("the one key: %s", restsOf(got))
 	}
@@ -40,14 +40,14 @@ func TestLoneOneTellsWhatItHasLeft(t *testing.T) {
 
 	codex := provider.Provider{ID: "codex", Account: &provider.Account{Agent: "codex", User: "me@example.com"}}
 	ac := []candidate{{p: codex, model: "gpt-6-astra", rest: "codex"}}
-	got, wg = weigh(codex, ac, "gpt-6-astra", provider.Responses)
+	got, wg = weigh(codex, ac, "gpt-6-astra", provider.Responses, need{})
 	if w := weighed(got[0], codex, wg, false, provider.Responses); w.Kind != "account" || !w.Known || w.Used != 49 {
 		t.Fatalf("the one account's trace: %+v", w)
 	}
 
 	plain := provider.Provider{ID: "deepseek", Key: "sk-ds", Chat: "https://api.deepseek.com/v1"}
 	pc := []candidate{{p: plain, model: "deepseek-chat", rest: "deepseek"}}
-	got, wg = weigh(plain, pc, "deepseek-chat", provider.Chat)
+	got, wg = weigh(plain, pc, "deepseek-chat", provider.Chat, need{})
 	if w := weighed(got[0], plain, wg, false, provider.Chat); w.Known || w.Learns {
 		t.Fatalf("a key whose windows aren't read: %+v", w)
 	}
@@ -61,7 +61,7 @@ func TestLoneSpentKeyKeepsItsConversation(t *testing.T) {
 	keyWindows(t, map[string]provider.Allowance{"sk-kimi-a": {{Used: 99, Resets: now.Add(2 * time.Hour), Span: 5 * time.Hour}}})
 	p := provider.Provider{ID: "kimi-code-cn", Key: "sk-kimi-a", Chat: "https://api.kimi.com/coding/v1"}
 	c := candidate{p: p, model: "kimi-for-coding", rest: "kimi-code-cn"}
-	cs, wg := weigh(p, []candidate{c}, "kimi-for-coding", provider.Chat)
+	cs, wg := weigh(p, []candidate{c}, "kimi-for-coding", provider.Chat, need{})
 	pl := planned{order: []Weighed{weighed(cs[0], p, wg, false, provider.Chat)}}
 	if !pl.order[0].Known || pl.order[0].Used != 99 {
 		t.Fatalf("the trace: %+v", pl.order[0])

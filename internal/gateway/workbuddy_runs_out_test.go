@@ -31,7 +31,7 @@ func TestSmartSpendsWorkBuddyCreditsRunningOutFirst(t *testing.T) {
 		return provider.Allowance{l}
 	}
 	order := func(cs ...candidate) string {
-		got, _ := weigh(p, cs, "hy3", provider.Chat)
+		got, _ := weigh(p, cs, "hy3", provider.Chat, need{})
 		var s []string
 		for _, c := range got {
 			s = append(s, c.p.Account.User[:1])
@@ -93,7 +93,7 @@ func TestSmartSpendsCreditsLapsingFirstWhenRenewingTogether(t *testing.T) {
 		return provider.Allowance{l}
 	}
 	order := func(cs ...candidate) string {
-		got, _ := weigh(p, cs, "hy3", provider.Chat)
+		got, _ := weigh(p, cs, "hy3", provider.Chat, need{})
 		var s []string
 		for _, c := range got {
 			s = append(s, c.p.Account.User)
